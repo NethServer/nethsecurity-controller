@@ -58,6 +58,8 @@ The following environment variables can be used to configure the containers:
 - `OVPN_TUN`: OpenVPN tun device name, default is `tunsec`
 - `API_PORT`: API server listening port, default is `5000`
 - `UI_PORT`: UI listening port, default is `3000`
+- `API_USER`: controller admin user, default is `admin`
+- `API_PASSWORD`: controller admin password, it must be passed as SHA56SUM, default is `admin`
 - `UI_BIND_IP`: UI binding IP, default is `0.0.0.0`
 - `PROXY_PORT`: proxy listening port, default is `8080`
 - `PROXY_BIND_IP`: proxy binding IP, default is `0.0.0.0`
