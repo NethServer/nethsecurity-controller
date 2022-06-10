@@ -68,6 +68,12 @@ http:
       service: service-ui
       rule: PathPrefix(\`/ui\`) || Path(\`/\`)
 
+    routerui-root:
+      entryPoints:
+      - web
+      service: service-ui
+      rule: Path(\`/\`)
+
   # Add the service
   services:
     service-ui:
