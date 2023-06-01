@@ -4,7 +4,7 @@ set -e
 
 ovpn_network=${OVPN_NETWORK:-172.21.0.0}
 ovpn_netmask=${OVPN_NETMASK:-255.255.0.0}
-cn=${OVPN_CN:-nextsec}
+cn=${OVPN_CN:-nethsec}
 ovpn_port=${OVPN_UDP_PORT:-1194}
 tun=${OVPN_TUN:-tunsec}
 

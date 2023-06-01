@@ -1,4 +1,4 @@
-name: "Publish UI dist for nextsecurity (OpenWrt) build"
+name: "Publish UI dist for nethsecurity (OpenWrt) build"
 
 on:
   workflow_dispatch:
@@ -14,9 +14,9 @@ jobs:
     name: 'Publish UI dist'
     runs-on: ubuntu-latest
     env:
-      DO_SPACE_NAME: 'distfeed-nextsecurity'
+      DO_SPACE_NAME: 'distfeed'
       DO_SPACE_REGION: 'fra1'
-      CDN_NAME: 'distfeed.nextsecurity.nethserver.org'
+      CDN_NAME: 'distfeed.nethsecurity.nethserver.org'
     steps:
       - uses: actions/checkout@v2
       - id: build
