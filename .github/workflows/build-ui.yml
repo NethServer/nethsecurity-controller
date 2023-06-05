@@ -14,11 +14,11 @@ jobs:
     name: 'Publish UI dist'
     runs-on: ubuntu-latest
     env:
-      DO_SPACE_NAME: 'distfeed'
-      DO_SPACE_REGION: 'fra1'
-      CDN_NAME: 'distfeed.nethsecurity.nethserver.org'
+      DO_SPACE_NAME: 'nethsecurity'
+      DO_SPACE_REGION: 'ams3'
+      CDN_NAME: 'updates.nethsecurity.nethserver.org'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - id: build
         run: |
           # Build only the UI
