@@ -16,8 +16,8 @@ buildah add "${container}" vpn/controller-auth /usr/local/bin/controller-auth
 buildah add "${container}" vpn/handle-connection /usr/local/bin/handle-connection
 buildah add "${container}" vpn/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/sbin/openvpn", "/etc/openvpn/server.conf"]' ${container}
-buildah commit "${container}" "${repobase}/nethsec-vpn"
-images+=("${repobase}/nethsec-vpn")
+buildah commit "${container}" "${repobase}/nethsecurity-vpn"
+images+=("${repobase}/nethsecurity-vpn")
 
 container_p=$(buildah from docker.io/alpine:3.17)
 buildah run ${container_p} apk add --no-cache python3 py3-pip easy-rsa
@@ -29,8 +29,8 @@ buildah run ${container_p} /bin/sh -c "source /nethsec-api/bin/activate; pip --n
 buildah run ${container_p} /bin/sh -c "apk --purge del py3-pip"
 buildah add "${container_p}" api/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' ${container_p}
-buildah commit "${container_p}" "${repobase}/nethsec-api"
-images+=("${repobase}/nethsec-api")
+buildah commit "${container_p}" "${repobase}/nethsecurity-api"
+images+=("${repobase}/nethsecurity-api")
 
 container_ui_build=$(buildah from -v "${PWD}/ui:/build:z" docker.io/library/node:18.13.0-alpine)
 buildah run ${container_ui_build} sh -c "export NODE_OPTIONS='--openssl-legacy-provider --max-old-space-size=1024'; cd /build && npm ci && npm run build"
@@ -41,14 +41,14 @@ buildah run ${container_ui} apk add --no-cache lighttpd
 buildah add "${container_ui}" ui/dist/ /var/www/localhost/htdocs/
 buildah add "${container_ui}" ui/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' ${container_ui}
-buildah commit "${container_ui}" "${repobase}/nethsec-ui"
-images+=("${repobase}/nethsec-ui")
+buildah commit "${container_ui}" "${repobase}/nethsecurity-ui"
+images+=("${repobase}/nethsecurity-ui")
 
 container_proxy=$(buildah from docker.io/library/traefik:v2.6)
 buildah add "${container_proxy}" proxy/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/local/bin/traefik", "--configFile=/config.yaml"]' ${container_proxy}
-buildah commit "${container_proxy}" "${repobase}/nethsec-proxy"
-images+=("${repobase}/nethsec-proxy")
+buildah commit "${container_proxy}" "${repobase}/nethsecurity-proxy"
+images+=("${repobase}/nethsecurity-proxy")
 
 if [[ -n "${CI}" ]]; then
     # Set output value for Github Actions
