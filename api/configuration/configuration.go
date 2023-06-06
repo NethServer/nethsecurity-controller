@@ -16,12 +16,6 @@ import (
 	"github.com/Showmax/go-fqdn"
 )
 
-/*
-
-cfile = f"{odir}/credentials.json"
-
-*/
-
 type Configuration struct {
 	OpenVPNDir     string `json:"openvpn_dir"`
 	OpenVPNNetwork string `json:"openvpn_network"`
