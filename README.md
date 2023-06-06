@@ -9,10 +9,7 @@ Firewalls can register to the server using [ns-plug](https://github.com/NethServ
 
 ## Quickstart
 
-You can install it on [NS8](https://github.com/NethServer/ns8-nethsec-controller):
-```
-add-module ghcr.io/nethserver/nethsec-controller:latest
-```
+You can install it on [NS8](https://github.com/NethServer/ns8-nethsecurity-controller#install).
 
 Otherwise, first make sure to have [podman](https://podman.io/) installed on your server.
 Then clone this repository and execute as root:
