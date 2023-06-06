@@ -26,3 +26,48 @@ func GetUnits(c *gin.Context) {
 		Data:    "",
 	}))
 }
+
+func GetUnit(c *gin.Context) {
+	// return 200 OK with data
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "ubus call action success",
+		Data:    "",
+	}))
+}
+
+func GetToken(c *gin.Context) {
+	// return 200 OK with data
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "ubus call action success",
+		Data:    "",
+	}))
+}
+
+func AddUnit(c *gin.Context) {
+	// return 200 OK with data
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "ubus call action success",
+		Data:    "",
+	}))
+}
+
+func RegisterUnit(c *gin.Context) {
+	// return 200 OK with data
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "ubus call action success",
+		Data:    "",
+	}))
+}
+
+func DeleteUnit(c *gin.Context) {
+	// return 200 OK with data
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "ubus call action success",
+		Data:    "",
+	}))
+}

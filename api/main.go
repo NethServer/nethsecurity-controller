@@ -74,7 +74,7 @@ func main() {
 	api.POST("/logout", middleware.InstanceJWT().LogoutHandler)
 
 	// define server registration, in waiting list
-	//api.POST("/units/register", methods.RegisterUnit)
+	api.POST("/units/register", methods.RegisterUnit)
 
 	// define JWT middleware
 	api.Use(middleware.InstanceJWT().MiddlewareFunc())
@@ -86,10 +86,10 @@ func main() {
 		units := api.Group("/units")
 		{
 			units.GET("", methods.GetUnits)
-			// units.GET("/:unit_id", methods.GetUnit)
-			// units.GET("/:unit_id/token", methods.GetToken)
-			// units.POST("", methods.AddUnit)
-			// units.DELETE("/:unit_id", methods.DeleteUnit)
+			units.GET("/:unit_id", methods.GetUnit)
+			units.GET("/:unit_id/token", methods.GetToken)
+			units.POST("", methods.AddUnit)
+			units.DELETE("/:unit_id", methods.DeleteUnit)
 		}
 	}
 
