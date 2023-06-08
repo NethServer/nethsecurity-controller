@@ -10,17 +10,32 @@
 package methods
 
 import (
+	"bytes"
+	"encoding/json"
+	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
 
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/global"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 )
+
+type LoginRequest struct {
+	Username string `json:"username"`
+	Password string `json: "password"`
+}
+
+type LoginResponse struct {
+	Code   int    `json:"code"`
+	Expire string `json:"expire"`
+	Token  string `json:"token"`
+}
 
 func GetUnits(c *gin.Context) {
 	// execute status command on openvpn socket
@@ -103,7 +118,7 @@ func GetUnits(c *gin.Context) {
 	}
 
 	// list units in waiting state
-	for name, _ := range configuration.WaitingList {
+	for name, _ := range global.WaitingList {
 		result := gin.H{
 			"name":       name,
 			"ipaddress":  "",
@@ -204,11 +219,76 @@ func GetUnit(c *gin.Context) {
 }
 
 func GetToken(c *gin.Context) {
+	// get unit name
+	unitId := c.Param("unit_id")
+
+	// read credentials
+	var credentials LoginRequest
+	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "cannot open credentials file for: " + unitId,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// convert json string to struct
+	json.Unmarshal(body, &credentials)
+
+	// compose request URL
+	postURL := "http://localhost:" + configuration.Config.ProxyPort + "/" + unitId + "/api/api/login"
+
+	// create request action
+	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(body))
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "cannot make request for: " + unitId,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// set request header
+	r.Header.Add("Content-Type", "application/json")
+
+	// make request
+	client := &http.Client{}
+	res, err := client.Do(r)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "request failed for: " + unitId,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// close response
+	defer res.Body.Close()
+
+	// convert response to struct
+	loginResponse := &LoginResponse{}
+	err = json.NewDecoder(res.Body).Decode(loginResponse)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "cannot convert response to struct for: " + unitId,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "ubus call action success",
-		Data:    "",
+		Data: gin.H{
+			"token":  loginResponse.Token,
+			"expire": loginResponse.Expire,
+		},
 	}))
 }
 

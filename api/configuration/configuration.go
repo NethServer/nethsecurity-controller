@@ -14,7 +14,6 @@ import (
 
 	"github.com/NethServer/nethsecurity-api/logs"
 	"github.com/Showmax/go-fqdn"
-	"github.com/gin-gonic/gin"
 )
 
 type Configuration struct {
@@ -28,15 +27,14 @@ type Configuration struct {
 	OpenVPNPKIDir   string `json:"openvpn_pki_dir"`
 	OpenVPNMGMTSock string `json:"openvpn_mgmt_sock"`
 
-	CredentialsDir string `json:"credentials_dir"`
-
 	ListenAddress string `json:"listen_address"`
 
 	AdminUsername string `json:"admin_username"`
 	AdminPassword string `json:"admin_password"`
 	SecretJWT     string `json:"secret_jwt"`
 
-	TokensDir string `json:"tokens_dir"`
+	TokensDir      string `json:"tokens_dir"`
+	CredentialsDir string `json:"credentials_dir"`
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
@@ -47,12 +45,8 @@ type Configuration struct {
 }
 
 var Config = Configuration{}
-var WaitingList map[string]gin.H
 
 func Init() {
-	// init global var
-	WaitingList = make(map[string]gin.H)
-
 	// read configuration from ENV
 	if os.Getenv("LISTEN_ADDRESS") != "" {
 		Config.ListenAddress = os.Getenv("LISTEN_ADDRESS")
@@ -83,6 +77,12 @@ func Init() {
 		Config.TokensDir = os.Getenv("TOKENS_DIR")
 	} else {
 		logs.Logs.Crit("[CRITICAL][ENV] TOKENS_DIR variable is empty")
+		os.Exit(1)
+	}
+	if os.Getenv("CREDENTIALS_DIR") != "" {
+		Config.CredentialsDir = os.Getenv("CREDENTIALS_DIR")
+	} else {
+		logs.Logs.Crit("[CRITICAL][ENV] CREDENTIALS_DIR variable is empty")
 		os.Exit(1)
 	}
 
