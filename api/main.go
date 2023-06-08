@@ -23,6 +23,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/methods"
 	"github.com/NethServer/nethsecurity-controller/api/middleware"
+	"github.com/NethServer/nethsecurity-controller/api/socket"
 )
 
 // @title NethSecurity Controller API Server
@@ -45,6 +46,9 @@ func main() {
 
 	// init configuration
 	configuration.Init()
+
+	// init socket connection
+	socket.Init()
 
 	// disable log to stdout when running in release mode
 	if gin.Mode() == gin.ReleaseMode {
