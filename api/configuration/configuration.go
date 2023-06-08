@@ -14,6 +14,7 @@ import (
 
 	"github.com/NethServer/nethsecurity-api/logs"
 	"github.com/Showmax/go-fqdn"
+	"github.com/gin-gonic/gin"
 )
 
 type Configuration struct {
@@ -46,8 +47,12 @@ type Configuration struct {
 }
 
 var Config = Configuration{}
+var WaitingList map[string]gin.H
 
 func Init() {
+	// init global var
+	WaitingList = make(map[string]gin.H)
+
 	// read configuration from ENV
 	if os.Getenv("LISTEN_ADDRESS") != "" {
 		Config.ListenAddress = os.Getenv("LISTEN_ADDRESS")

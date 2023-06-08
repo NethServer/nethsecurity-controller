@@ -12,11 +12,11 @@ package methods
 import (
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/socket"
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
@@ -24,36 +24,34 @@ import (
 
 func GetUnits(c *gin.Context) {
 	// execute status command on openvpn socket
-	out, err := exec.Command("bash", "-c", "echo status 3  | nc -U "+configuration.Config.OpenVPNMGMTSock+" | grep ^CLIENT_LIST | awk '{print $2,$3,$4,$5,$6,$9}'").Output()
+	var lines []string
+	outSocket := socket.Write("status 3")
 
-	// check errors
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "unit list failed. openvpn status socket failed",
-			Data:    err.Error(),
-		}))
-		return
+	// get only necessary lines
+	rawLines := strings.Split(outSocket, "\n")
+	for _, line := range rawLines {
+		if strings.HasPrefix(line, "CLIENT_LIST") {
+			lines = append(lines, line)
+		}
 	}
 
-	// parse output
+	// define vpns object
 	var vpns map[string]gin.H
 	vpns = make(map[string]gin.H)
-	lines := strings.Split(string(out[:]), "\n")
-	lines = lines[:len(lines)-1]
 
 	// loop through lines
 	for _, line := range lines {
+
 		// get values from line
-		parts := strings.Split(line, " ")
+		parts := strings.Split(line, "\t")
 
 		// compose result
-		vpns[parts[0]] = gin.H{
-			"real_address":    parts[1],
-			"virtual_address": parts[2],
-			"bytes_rcvd":      parts[3],
-			"bytes_sent":      parts[4],
-			"connected_since": parts[5],
+		vpns[parts[1]] = gin.H{
+			"real_address":    parts[2],
+			"virtual_address": parts[3],
+			"bytes_rcvd":      parts[5],
+			"bytes_sent":      parts[6],
+			"connected_since": parts[8],
 		}
 	}
 
@@ -62,7 +60,7 @@ func GetUnits(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "unit list failed. access CCD directory failed",
+			Message: "units list failed. access CCD directory failed",
 			Data:    err.Error(),
 		}))
 		return
@@ -76,7 +74,7 @@ func GetUnits(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
-				Message: "unit list failed. openvpn client read failed",
+				Message: "units list failed. openvpn client read failed",
 				Data:    err.Error(),
 			}))
 		}
@@ -91,7 +89,33 @@ func GetUnits(c *gin.Context) {
 			"ipaddress":  parts[1],
 			"netmask":    parts[2],
 			"registered": true,
-			"vpn":        vpns[e.Name()],
+		}
+
+		// check if vpn data exists
+		if vpns[e.Name()] != nil {
+			result["vpn"] = vpns[e.Name()]
+		} else {
+			result["vpn"] = gin.H{}
+		}
+
+		// append to array
+		results = append(results, result)
+	}
+
+	// list units in waiting state
+	for name, _ := range configuration.WaitingList {
+		result := gin.H{
+			"name":       name,
+			"ipaddress":  "",
+			"netmask":    "",
+			"registered": false,
+		}
+
+		// check if vpn data exists
+		if vpns[name] != nil {
+			result["vpn"] = vpns[name]
+		} else {
+			result["vpn"] = gin.H{}
 		}
 
 		// append to array
@@ -108,11 +132,74 @@ func GetUnits(c *gin.Context) {
 }
 
 func GetUnit(c *gin.Context) {
+	// get unit name
+	unitId := c.Param("unit_id")
+
+	// execute status command on openvpn socket
+	var lines []string
+	outSocket := socket.Write("status 3")
+
+	// get only necessary lines
+	rawLines := strings.Split(outSocket, "\n")
+	for _, line := range rawLines {
+		if strings.HasPrefix(line, "CLIENT_LIST\t"+unitId) {
+			lines = append(lines, line)
+		}
+	}
+
+	// define vpns object
+	var vpn gin.H
+
+	// loop through lines
+	for _, line := range lines {
+
+		// get values from line
+		parts := strings.Split(line, "\t")
+
+		// compose result
+		vpn = gin.H{
+			"real_address":    parts[2],
+			"virtual_address": parts[3],
+			"bytes_rcvd":      parts[5],
+			"bytes_sent":      parts[6],
+			"connected_since": parts[8],
+		}
+	}
+
+	// read unit file
+	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "unit list failed. openvpn client read failed",
+			Data:    err.Error(),
+		}))
+	}
+
+	// parse unit file
+	parts := strings.Split(string(unitFile), "\n")
+	parts = strings.Split(parts[0], " ")
+
+	// compose result
+	result := gin.H{
+		"name":       unitId,
+		"ipaddress":  parts[1],
+		"netmask":    parts[2],
+		"registered": true,
+	}
+
+	// check if vpn data exists
+	if vpn != nil {
+		result["vpn"] = vpn
+	} else {
+		result["vpn"] = gin.H{}
+	}
+
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "ubus call action success",
-		Data:    "",
+		Message: "unit list success",
+		Data:    result,
 	}))
 }
 
