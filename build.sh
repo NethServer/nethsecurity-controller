@@ -22,8 +22,6 @@ images+=("${repobase}/nethsecurity-vpn")
 container_api=$(buildah from docker.io/alpine:3.17)
 buildah run ${container_api} apk add --no-cache go easy-rsa
 buildah run ${container_api} mkdir /nethsecurity-api
-buildah add "${container_api}" go.mod /nethsecurity-api/
-buildah add "${container_api}" go.sum /nethsecurity-api/
 buildah add "${container_api}" api/ /nethsecurity-api/
 buildah run ${container_api} /bin/sh -c "cd /nethsecurity-api && CGO_ENABLED=0 go build"
 buildah add "${container_api}" api/entrypoint.sh /entrypoint.sh
