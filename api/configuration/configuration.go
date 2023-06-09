@@ -44,6 +44,7 @@ type Configuration struct {
 	ProxyProtocol string `json:"proxy_protocol"`
 	ProxyHost     string `json:"proxy_host"`
 	ProxyPort     string `json:"proxy_port"`
+	LoginEndpoint string `json:"login_endpoint"`
 
 	FQDN string `json:"fqdn"`
 }
@@ -165,6 +166,11 @@ func Init() {
 		Config.ProxyPort = os.Getenv("PROXY_PORT")
 	} else {
 		Config.ProxyPort = "8080"
+	}
+	if os.Getenv("LOGIN_ENDPOINT") != "" {
+		Config.LoginEndpoint = os.Getenv("LOGIN_ENDPOINT")
+	} else {
+		Config.LoginEndpoint = "/api/login"
 	}
 
 	if os.Getenv("FQDN") != "" {
