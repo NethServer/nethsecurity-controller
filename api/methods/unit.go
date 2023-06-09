@@ -365,7 +365,7 @@ func RegisterUnit(c *gin.Context) {
 			return
 		}
 
-		// return config
+		// compose config
 		config := gin.H{
 			"host":             configuration.Config.FQDN,
 			"port":             configuration.Config.OpenVPNUDPPort,
@@ -376,10 +376,41 @@ func RegisterUnit(c *gin.Context) {
 			"promtail_port":    configuration.Config.PromtailPort,
 		}
 
+		// read credentials
+		var credentials LoginRequest
+		jsonString, errRead := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.SystemID)
+		if errRead != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot open credentials file for: " + jsonRequest.SystemID,
+				Data:    errRead.Error(),
+			}))
+			return
+		}
+
+		// convert json string to struct
+		json.Unmarshal(jsonString, &credentials)
+
+		// update credentials
+		credentials.Username = jsonRequest.Username
+		credentials.Password = jsonRequest.Password
+
+		// write new credentials
+		newJsonString, _ := json.Marshal(credentials)
+		errWrite := os.WriteFile(configuration.Config.CredentialsDir+"/"+jsonRequest.SystemID, newJsonString, 0644)
+		if errWrite != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot write credentials file for: " + jsonRequest.SystemID,
+				Data:    errWrite.Error(),
+			}))
+			return
+		}
+
 		// return 200 OK with data
 		c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 			Code:    200,
-			Message: "unit openvpn config retrieved successfully",
+			Message: "unit registered successfully",
 			Data:    config,
 		}))
 	} else {
