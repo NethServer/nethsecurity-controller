@@ -15,6 +15,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/NethServer/nethsecurity-api/response"
@@ -75,7 +76,7 @@ func GetUnits(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "units list failed. access CCD directory failed",
+			Message: "access CCD directory failed",
 			Data:    err.Error(),
 		}))
 		return
@@ -89,7 +90,7 @@ func GetUnits(c *gin.Context) {
 		if err != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
-				Message: "units list failed. openvpn client read failed",
+				Message: "access CCD directory unit file failed",
 				Data:    err.Error(),
 			}))
 		}
@@ -140,7 +141,7 @@ func GetUnits(c *gin.Context) {
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "units list success",
+		Message: "units listed successfully",
 		Data:    results,
 	}))
 
@@ -186,7 +187,7 @@ func GetUnit(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "unit list failed. openvpn client read failed",
+			Message: "access CCD directory unit file failed",
 			Data:    err.Error(),
 		}))
 	}
@@ -213,7 +214,7 @@ func GetUnit(c *gin.Context) {
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "unit list success",
+		Message: "unit listed successfully",
 		Data:    result,
 	}))
 }
@@ -226,8 +227,8 @@ func GetToken(c *gin.Context) {
 	var credentials LoginRequest
 	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
 			Message: "cannot open credentials file for: " + unitId,
 			Data:    err.Error(),
 		}))
@@ -238,13 +239,13 @@ func GetToken(c *gin.Context) {
 	json.Unmarshal(body, &credentials)
 
 	// compose request URL
-	postURL := "http://localhost:" + configuration.Config.ProxyPort + "/" + unitId + "/api/api/login"
+	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitId + "/api/api/login"
 
 	// create request action
 	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(body))
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
 			Message: "cannot make request for: " + unitId,
 			Data:    err.Error(),
 		}))
@@ -258,8 +259,8 @@ func GetToken(c *gin.Context) {
 	client := &http.Client{}
 	res, err := client.Do(r)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
 			Message: "request failed for: " + unitId,
 			Data:    err.Error(),
 		}))
@@ -273,8 +274,8 @@ func GetToken(c *gin.Context) {
 	loginResponse := &LoginResponse{}
 	err = json.NewDecoder(res.Body).Decode(loginResponse)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
 			Message: "cannot convert response to struct for: " + unitId,
 			Data:    err.Error(),
 		}))
@@ -284,7 +285,7 @@ func GetToken(c *gin.Context) {
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "ubus call action success",
+		Message: "unit token retrieved successfully",
 		Data: gin.H{
 			"token":  loginResponse.Token,
 			"expire": loginResponse.Expire,
@@ -311,10 +312,72 @@ func RegisterUnit(c *gin.Context) {
 }
 
 func DeleteUnit(c *gin.Context) {
-	// return 200 OK with data
+	// get unit name
+	unitId := c.Param("unit_id")
+
+	// kill vpn connection
+	_ = socket.Write("kill " + unitId)
+
+	// revoke certificate
+	cmdRevoke := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "revoke", unitId)
+	cmdRevoke.Env = append(os.Environ(),
+		"EASYRSA_BATCH=1",
+		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
+	)
+	if err := cmdRevoke.Run(); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot revoke certificate for: " + unitId,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// renew certificate revocation list
+	cmdGen := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "gen-crl")
+	cmdGen.Env = append(os.Environ(),
+		"EASYRSA_BATCH=1",
+		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
+	)
+	if err := cmdGen.Run(); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot renew certificate revocation list (CLR)",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// delete reservation/auth file
+	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + unitId); err == nil {
+		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + unitId)
+		if errDeleteAuth != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    403,
+				Message: "error in deletion auth file for: " + unitId,
+				Data:    errDeleteAuth.Error(),
+			}))
+			return
+		}
+	}
+
+	// delete traefik conf
+	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml"); err == nil {
+		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml")
+		if errDeleteProxy != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    403,
+				Message: "error in deletion proxy file for: " + unitId,
+				Data:    errDeleteProxy.Error(),
+			}))
+			return
+		}
+	}
+
+	// return 200 OK
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "ubus call action success",
+		Message: "unit deleted successfully",
 		Data:    "",
 	}))
 }
