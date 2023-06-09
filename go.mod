@@ -1,9 +1,10 @@
-module github.com/NethServer/nethsecurity-controller
+module github.com/NethServer/nethsecurity-controller/api
 
 go 1.19
 
 require (
 	github.com/NethServer/nethsecurity-api v0.0.0-20230609091000-bf319035cafc
+	github.com/NethServer/nethsecurity-controller v0.0.0-20230609145252-f7b764616712
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/appleboy/gin-jwt/v2 v2.9.1
 	github.com/fatih/structs v1.1.0

@@ -6,9 +6,9 @@ repobase="ghcr.io/nethserver"
 images=()
 container=$(buildah from docker.io/alpine:3.16)
 
-trap "buildah rm ${container} ${container_p} ${container_ui} ${container_ui_build} ${container_proxy}" EXIT
+trap "buildah rm ${container} ${container_api} ${container_proxy}" EXIT
 
-echo "Installing build depencies..."
+echo "Installing build dependencies..."
 buildah run ${container} apk add --no-cache openvpn easy-rsa
 
 echo "Setup image"
@@ -19,30 +19,17 @@ buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/sbin/openvpn", "/
 buildah commit "${container}" "${repobase}/nethsecurity-vpn"
 images+=("${repobase}/nethsecurity-vpn")
 
-container_p=$(buildah from docker.io/alpine:3.17)
-buildah run ${container_p} apk add --no-cache python3 py3-pip easy-rsa
-buildah run ${container_p} mkdir /nethsec-api
-buildah add "${container_p}" api/requirements.txt /nethsec-api
-buildah add "${container_p}" api/api.py /nethsec-api
-buildah run ${container_p} python3 -m venv /nethsec-api
-buildah run ${container_p} /bin/sh -c "source /nethsec-api/bin/activate; pip --no-cache-dir install wheel; pip install -r /nethsec-api/requirements.txt"
-buildah run ${container_p} /bin/sh -c "apk --purge del py3-pip"
-buildah add "${container_p}" api/entrypoint.sh /entrypoint.sh
-buildah config --entrypoint='["/entrypoint.sh"]' ${container_p}
-buildah commit "${container_p}" "${repobase}/nethsecurity-api"
+container_api=$(buildah from docker.io/alpine:3.17)
+buildah run ${container_api} apk add --no-cache go easy-rsa
+buildah run ${container_api} mkdir /nethsecurity-api
+buildah add "${container_api}" go.mod /nethsecurity-api/
+buildah add "${container_api}" go.sum /nethsecurity-api/
+buildah add "${container_api}" api/ /nethsecurity-api/
+buildah run ${container_api} /bin/sh -c "cd /nethsecurity-api && CGO_ENABLED=0 go build"
+buildah add "${container_api}" api/entrypoint.sh /entrypoint.sh
+buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["./nethsecurity-api"]' ${container_api}
+buildah commit "${container_api}" "${repobase}/nethsecurity-api"
 images+=("${repobase}/nethsecurity-api")
-
-container_ui_build=$(buildah from -v "${PWD}/ui:/build:z" docker.io/library/node:18.13.0-alpine)
-buildah run ${container_ui_build} sh -c "export NODE_OPTIONS='--openssl-legacy-provider --max-old-space-size=1024'; cd /build && npm ci && npm run build"
-buildah rm ${container_ui_build}
-
-container_ui=$(buildah from docker.io/alpine:3.17)
-buildah run ${container_ui} apk add --no-cache lighttpd
-buildah add "${container_ui}" ui/dist/ /var/www/localhost/htdocs/
-buildah add "${container_ui}" ui/entrypoint.sh /entrypoint.sh
-buildah config --entrypoint='["/entrypoint.sh"]' ${container_ui}
-buildah commit "${container_ui}" "${repobase}/nethsecurity-ui"
-images+=("${repobase}/nethsecurity-ui")
 
 container_proxy=$(buildah from docker.io/library/traefik:v2.6)
 buildah add "${container_proxy}" proxy/entrypoint.sh /entrypoint.sh
