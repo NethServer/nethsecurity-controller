@@ -12,6 +12,7 @@ package methods
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -26,28 +27,27 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
-	"github.com/gin-gonic/gin/binding"
 )
 
 type LoginRequest struct {
-	Username string `json:"username"`
-	Password string `json: "password"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 type LoginResponse struct {
-	Code   int    `json:"code"`
-	Expire string `json:"expire"`
-	Token  string `json:"token"`
+	Code   int    `json:"code" binding:"required"`
+	Expire string `json:"expire" binding:"required"`
+	Token  string `json:"token" binding:"required"`
 }
 
 type AddRequest struct {
-	SystemID string `json:"system_id"`
+	UnitName string `json:"unit_name" binding:"required"`
 }
 
 type RegisterRequest struct {
-	SystemID string `json:"system_id"`
-	Username string `json:"username"`
-	Password string `json: "password"`
+	UnitName string `json:"unit_name" binding:"required"`
+	Username string `json:"username" binding:"required"`
+	Password string `json:"password" binding:"required"`
 }
 
 func GetUnits(c *gin.Context) {
@@ -161,7 +161,7 @@ func GetUnits(c *gin.Context) {
 
 func GetUnit(c *gin.Context) {
 	// get unit name
-	unitId := c.Param("unit_id")
+	unitName := c.Param("unit_name")
 
 	// execute status command on openvpn socket
 	var lines []string
@@ -170,7 +170,7 @@ func GetUnit(c *gin.Context) {
 	// get only necessary lines
 	rawLines := strings.Split(outSocket, "\n")
 	for _, line := range rawLines {
-		if strings.HasPrefix(line, "CLIENT_LIST\t"+unitId) {
+		if strings.HasPrefix(line, "CLIENT_LIST\t"+unitName) {
 			lines = append(lines, line)
 		}
 	}
@@ -195,7 +195,7 @@ func GetUnit(c *gin.Context) {
 	}
 
 	// read unit file
-	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
+	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -210,7 +210,7 @@ func GetUnit(c *gin.Context) {
 
 	// compose result
 	result := gin.H{
-		"name":       unitId,
+		"name":       unitName,
 		"ipaddress":  parts[1],
 		"netmask":    parts[2],
 		"registered": true,
@@ -233,15 +233,15 @@ func GetUnit(c *gin.Context) {
 
 func GetToken(c *gin.Context) {
 	// get unit name
-	unitId := c.Param("unit_id")
+	unitName := c.Param("unit_name")
 
 	// read credentials
 	var credentials LoginRequest
-	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
+	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + unitName)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot open credentials file for: " + unitId,
+			Message: "cannot open credentials file for: " + unitName,
 			Data:    err.Error(),
 		}))
 		return
@@ -251,14 +251,14 @@ func GetToken(c *gin.Context) {
 	json.Unmarshal(body, &credentials)
 
 	// compose request URL
-	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitId + "/api/api/login"
+	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitName + configuration.Config.LoginEndpoint
 
 	// create request action
 	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(body))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot make request for: " + unitId,
+			Message: "cannot make request for: " + unitName,
 			Data:    err.Error(),
 		}))
 		return
@@ -273,7 +273,7 @@ func GetToken(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "request failed for: " + unitId,
+			Message: "request failed for: " + unitName,
 			Data:    err.Error(),
 		}))
 		return
@@ -288,11 +288,13 @@ func GetToken(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot convert response to struct for: " + unitId,
+			Message: "cannot convert response to struct for: " + unitName,
 			Data:    err.Error(),
 		}))
 		return
 	}
+
+	fmt.Println(loginResponse)
 
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
@@ -308,7 +310,7 @@ func GetToken(c *gin.Context) {
 func AddUnit(c *gin.Context) {
 	// parse request fields
 	var jsonRequest AddRequest
-	if err := c.ShouldBindBodyWith(&jsonRequest, binding.JSON); err != nil {
+	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
 			Message: "request fields malformed",
@@ -318,7 +320,7 @@ func AddUnit(c *gin.Context) {
 	}
 
 	// check duplicates
-	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + jsonRequest.SystemID); err == nil {
+	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + jsonRequest.UnitName); err == nil {
 		c.JSON(http.StatusConflict, structs.Map(response.StatusConflict{
 			Code:    409,
 			Message: "unit name duplicated",
@@ -373,32 +375,32 @@ func AddUnit(c *gin.Context) {
 	}
 
 	// generate certificate request
-	cmdGenerateGenReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "gen-req", jsonRequest.SystemID, "nopass")
+	cmdGenerateGenReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "gen-req", jsonRequest.UnitName, "nopass")
 	cmdGenerateGenReq.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
-		"EASYRSA_REQ_CN="+jsonRequest.SystemID,
+		"EASYRSA_REQ_CN="+jsonRequest.UnitName,
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
 	)
 	if err := cmdGenerateGenReq.Run(); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot generate request certificate for: " + jsonRequest.SystemID,
+			Message: "cannot generate request certificate for: " + jsonRequest.UnitName,
 			Data:    err.Error(),
 		}))
 		return
 	}
 
 	// generate certificate sign
-	cmdGenerateSignReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "sign-req", "client", jsonRequest.SystemID)
+	cmdGenerateSignReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "sign-req", "client", jsonRequest.UnitName)
 	cmdGenerateSignReq.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
-		"EASYRSA_REQ_CN="+jsonRequest.SystemID,
+		"EASYRSA_REQ_CN="+jsonRequest.UnitName,
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
 	)
 	if err := cmdGenerateSignReq.Run(); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot sign request certificate for: " + jsonRequest.SystemID,
+			Message: "cannot sign request certificate for: " + jsonRequest.UnitName,
 			Data:    err.Error(),
 		}))
 		return
@@ -406,11 +408,11 @@ func AddUnit(c *gin.Context) {
 
 	// write conf
 	conf := "ifconfig-push " + freeIP + " " + configuration.Config.OpenVPNNetmask + "\n"
-	errWrite := os.WriteFile(configuration.Config.OpenVPNCCDDir+"/"+jsonRequest.SystemID, []byte(conf), 0644)
+	errWrite := os.WriteFile(configuration.Config.OpenVPNCCDDir+"/"+jsonRequest.UnitName, []byte(conf), 0644)
 	if errWrite != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot write conf file for: " + jsonRequest.SystemID,
+			Message: "cannot write conf file for: " + jsonRequest.UnitName,
 			Data:    errWrite.Error(),
 		}))
 		return
@@ -420,14 +422,16 @@ func AddUnit(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "unit added successfully",
-		Data:    freeIP,
+		Data: gin.H{
+			"ipaddress": freeIP,
+		},
 	}))
 }
 
 func RegisterUnit(c *gin.Context) {
 	// parse request fields
 	var jsonRequest RegisterRequest
-	if err := c.ShouldBindBodyWith(&jsonRequest, binding.JSON); err != nil {
+	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
 			Message: "request fields malformed",
@@ -437,7 +441,7 @@ func RegisterUnit(c *gin.Context) {
 	}
 
 	// check openvpn conf exists
-	if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + jsonRequest.SystemID + ".crt"); err == nil {
+	if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + jsonRequest.UnitName + ".crt"); err == nil {
 		// read ca
 		ca, errCa := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/" + "ca.crt")
 		caS := strings.TrimSpace(string(ca[:]))
@@ -453,7 +457,7 @@ func RegisterUnit(c *gin.Context) {
 		}
 
 		// read cert
-		crt, errCrt := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/issued/" + jsonRequest.SystemID + ".crt")
+		crt, errCrt := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/issued/" + jsonRequest.UnitName + ".crt")
 		crtS := strings.TrimSpace(string(crt[:]))
 
 		// check error
@@ -467,7 +471,7 @@ func RegisterUnit(c *gin.Context) {
 		}
 
 		// read key
-		key, errKey := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/private/" + jsonRequest.SystemID + ".key")
+		key, errKey := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/private/" + jsonRequest.UnitName + ".key")
 		keyS := strings.TrimSpace(string(key[:]))
 
 		// check error
@@ -493,11 +497,11 @@ func RegisterUnit(c *gin.Context) {
 
 		// read credentials
 		var credentials LoginRequest
-		jsonString, errRead := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.SystemID)
+		jsonString, errRead := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.UnitName)
 		if errRead != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
-				Message: "cannot open credentials file for: " + jsonRequest.SystemID,
+				Message: "cannot open credentials file for: " + jsonRequest.UnitName,
 				Data:    errRead.Error(),
 			}))
 			return
@@ -512,11 +516,11 @@ func RegisterUnit(c *gin.Context) {
 
 		// write new credentials
 		newJsonString, _ := json.Marshal(credentials)
-		errWrite := os.WriteFile(configuration.Config.CredentialsDir+"/"+jsonRequest.SystemID, newJsonString, 0644)
+		errWrite := os.WriteFile(configuration.Config.CredentialsDir+"/"+jsonRequest.UnitName, newJsonString, 0644)
 		if errWrite != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
-				Message: "cannot write credentials file for: " + jsonRequest.SystemID,
+				Message: "cannot write credentials file for: " + jsonRequest.UnitName,
 				Data:    errWrite.Error(),
 			}))
 			return
@@ -530,7 +534,7 @@ func RegisterUnit(c *gin.Context) {
 		}))
 	} else {
 		// add to waiting list
-		global.WaitingList[jsonRequest.SystemID] = gin.H{
+		global.WaitingList[jsonRequest.UnitName] = gin.H{
 			"username": jsonRequest.Username,
 			"password": jsonRequest.Password,
 		}
@@ -546,13 +550,13 @@ func RegisterUnit(c *gin.Context) {
 
 func DeleteUnit(c *gin.Context) {
 	// get unit name
-	unitId := c.Param("unit_id")
+	unitName := c.Param("unit_name")
 
 	// kill vpn connection
-	_ = socket.Write("kill " + unitId)
+	_ = socket.Write("kill " + unitName)
 
 	// revoke certificate
-	cmdRevoke := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "revoke", unitId)
+	cmdRevoke := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "revoke", unitName)
 	cmdRevoke.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
@@ -560,7 +564,7 @@ func DeleteUnit(c *gin.Context) {
 	if err := cmdRevoke.Run(); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot revoke certificate for: " + unitId,
+			Message: "cannot revoke certificate for: " + unitName,
 			Data:    err.Error(),
 		}))
 		return
@@ -582,12 +586,12 @@ func DeleteUnit(c *gin.Context) {
 	}
 
 	// delete reservation/auth file
-	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + unitId); err == nil {
-		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + unitId)
+	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + unitName); err == nil {
+		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + unitName)
 		if errDeleteAuth != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    403,
-				Message: "error in deletion auth file for: " + unitId,
+				Message: "error in deletion auth file for: " + unitName,
 				Data:    errDeleteAuth.Error(),
 			}))
 			return
@@ -595,12 +599,12 @@ func DeleteUnit(c *gin.Context) {
 	}
 
 	// delete traefik conf
-	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml"); err == nil {
-		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml")
+	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + unitName + ".yaml"); err == nil {
+		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + unitName + ".yaml")
 		if errDeleteProxy != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    403,
-				Message: "error in deletion proxy file for: " + unitId,
+				Message: "error in deletion proxy file for: " + unitName,
 				Data:    errDeleteProxy.Error(),
 			}))
 			return
