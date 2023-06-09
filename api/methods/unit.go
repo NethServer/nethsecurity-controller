@@ -25,6 +25,7 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
+	"github.com/gin-gonic/gin/binding"
 )
 
 type LoginRequest struct {
@@ -36,6 +37,12 @@ type LoginResponse struct {
 	Code   int    `json:"code"`
 	Expire string `json:"expire"`
 	Token  string `json:"token"`
+}
+
+type RegisterRequest struct {
+	SystemID string `json:"system_id"`
+	Username string `json:"username"`
+	Password string `json: "password"`
 }
 
 func GetUnits(c *gin.Context) {
@@ -303,12 +310,92 @@ func AddUnit(c *gin.Context) {
 }
 
 func RegisterUnit(c *gin.Context) {
-	// return 200 OK with data
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "ubus call action success",
-		Data:    "",
-	}))
+	// parse request fields
+	var jsonRequest RegisterRequest
+	if err := c.ShouldBindBodyWith(&jsonRequest, binding.JSON); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "request fields malformed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// check openvpn conf exists
+	if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + jsonRequest.SystemID + ".crt"); err == nil {
+		// read ca
+		ca, errCa := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/" + "ca.crt")
+		caS := strings.TrimSpace(string(ca[:]))
+
+		// check error
+		if errCa != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot retrieve openvpn config: ca.crt read failed",
+				Data:    errCa.Error(),
+			}))
+			return
+		}
+
+		// read cert
+		crt, errCrt := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/issued/" + jsonRequest.SystemID + ".crt")
+		crtS := strings.TrimSpace(string(crt[:]))
+
+		// check error
+		if errCrt != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot retrieve openvpn config: crt read failed",
+				Data:    errCrt.Error(),
+			}))
+			return
+		}
+
+		// read key
+		key, errKey := os.ReadFile(configuration.Config.OpenVPNPKIDir + "/private/" + jsonRequest.SystemID + ".key")
+		keyS := strings.TrimSpace(string(key[:]))
+
+		// check error
+		if errKey != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot retrieve openvpn config: key read failed",
+				Data:    errKey.Error(),
+			}))
+			return
+		}
+
+		// return config
+		config := gin.H{
+			"host":             configuration.Config.FQDN,
+			"port":             configuration.Config.OpenVPNUDPPort,
+			"ca":               caS,
+			"cert":             crtS,
+			"key":              keyS,
+			"promtail_address": configuration.Config.PromtailAddress,
+			"promtail_port":    configuration.Config.PromtailPort,
+		}
+
+		// return 200 OK with data
+		c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+			Code:    200,
+			Message: "unit openvpn config retrieved successfully",
+			Data:    config,
+		}))
+	} else {
+		// add to waiting list
+		global.WaitingList[jsonRequest.SystemID] = gin.H{
+			"username": jsonRequest.Username,
+			"password": jsonRequest.Password,
+		}
+
+		// return forbidden state
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "unit added to waiting list",
+			Data:    "",
+		}))
+	}
 }
 
 func DeleteUnit(c *gin.Context) {
