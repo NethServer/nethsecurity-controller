@@ -22,6 +22,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/global"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
@@ -37,6 +38,10 @@ type LoginResponse struct {
 	Code   int    `json:"code"`
 	Expire string `json:"expire"`
 	Token  string `json:"token"`
+}
+
+type AddRequest struct {
+	SystemID string `json:"system_id"`
 }
 
 type RegisterRequest struct {
@@ -301,11 +306,121 @@ func GetToken(c *gin.Context) {
 }
 
 func AddUnit(c *gin.Context) {
+	// parse request fields
+	var jsonRequest AddRequest
+	if err := c.ShouldBindBodyWith(&jsonRequest, binding.JSON); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "request fields malformed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// check duplicates
+	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + jsonRequest.SystemID); err == nil {
+		c.JSON(http.StatusConflict, structs.Map(response.StatusConflict{
+			Code:    409,
+			Message: "unit name duplicated",
+			Data:    "",
+		}))
+		return
+	}
+
+	// get used ips
+	var usedIPs []string
+
+	units, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "access CCD directory failed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	for _, e := range units {
+		// read unit file
+		unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + e.Name())
+		if err != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "access CCD directory unit file failed",
+				Data:    err.Error(),
+			}))
+			return
+		}
+
+		// parse unit file
+		parts := strings.Split(string(unitFile), "\n")
+		parts = strings.Split(parts[0], " ")
+
+		// append to array
+		usedIPs = append(usedIPs, parts[1])
+	}
+
+	// get free ip of a network
+	freeIP := utils.GetFreeIP(configuration.Config.OpenVPNNetwork, configuration.Config.OpenVPNNetmask, usedIPs)
+
+	if freeIP == "" {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "no IP available for new unit",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// generate certificate request
+	cmdGenerateGenReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "gen-req", jsonRequest.SystemID, "nopass")
+	cmdGenerateGenReq.Env = append(os.Environ(),
+		"EASYRSA_BATCH=1",
+		"EASYRSA_REQ_CN="+jsonRequest.SystemID,
+		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
+	)
+	if err := cmdGenerateGenReq.Run(); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot generate request certificate for: " + jsonRequest.SystemID,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// generate certificate sign
+	cmdGenerateSignReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "sign-req", "client", jsonRequest.SystemID)
+	cmdGenerateSignReq.Env = append(os.Environ(),
+		"EASYRSA_BATCH=1",
+		"EASYRSA_REQ_CN="+jsonRequest.SystemID,
+		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
+	)
+	if err := cmdGenerateSignReq.Run(); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot sign request certificate for: " + jsonRequest.SystemID,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// write conf
+	conf := "ifconfig-push " + freeIP + " " + configuration.Config.OpenVPNNetmask + "\n"
+	errWrite := os.WriteFile(configuration.Config.OpenVPNCCDDir+"/"+jsonRequest.SystemID, []byte(conf), 0644)
+	if errWrite != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot write conf file for: " + jsonRequest.SystemID,
+			Data:    errWrite.Error(),
+		}))
+		return
+	}
+
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "ubus call action success",
-		Data:    "",
+		Message: "unit added successfully",
+		Data:    freeIP,
 	}))
 }
 
