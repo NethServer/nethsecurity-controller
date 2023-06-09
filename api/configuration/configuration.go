@@ -39,7 +39,11 @@ type Configuration struct {
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
 
-	ProxyPort string `json:"proxy_port"`
+	EasyRSAPath string `json:"easy_rsa_path"`
+
+	ProxyProtocol string `json:"proxy_protocol"`
+	ProxyHost     string `json:"proxy_host"`
+	ProxyPort     string `json:"proxy_port"`
 
 	FQDN string `json:"fqdn"`
 }
@@ -141,11 +145,26 @@ func Init() {
 		os.Exit(1)
 	}
 
+	if os.Getenv("EASYRSA_PATH") != "" {
+		Config.EasyRSAPath = os.Getenv("EASYRSA_PATH")
+	} else {
+		Config.EasyRSAPath = "/usr/share/easy-rsa/easyrsa"
+	}
+
+	if os.Getenv("PROXY_PROTOCOL") != "" {
+		Config.ProxyProtocol = os.Getenv("PROXY_PROTOCOL")
+	} else {
+		Config.ProxyProtocol = "http://"
+	}
+	if os.Getenv("PROXY_HOST") != "" {
+		Config.ProxyHost = os.Getenv("PROXY_HOST")
+	} else {
+		Config.ProxyHost = "localhost"
+	}
 	if os.Getenv("PROXY_PORT") != "" {
 		Config.ProxyPort = os.Getenv("PROXY_PORT")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] PROXY_PORT variable is empty")
-		os.Exit(1)
+		Config.ProxyPort = "8080"
 	}
 
 	if os.Getenv("FQDN") != "" {
