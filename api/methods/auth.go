@@ -14,7 +14,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/NethServer/nethsecurity-api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/configuration"
 )
 
 func CheckTokenValidation(username string, token string) bool {
