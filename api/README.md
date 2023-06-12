@@ -35,13 +35,13 @@ CGO_ENABLED=0 go build
 - `PROXY_PROTOCOL`: traefik protocol - *default*: `http://`
 - `PROXY_HOST`: traefik host - *default*: `localhost`
 - `PROXY_PORT`: traefik port - *default*: `8080`
-- `LOGIN_ENDPOINT`: unit login endpoint - *default*: `/api/login`
+- `LOGIN_ENDPOINT`: unit login endpoint, on stand-alone api server - *default*: `/api/login`
 
 - `FQDN`: fully qualified domain name of the machine - *default*: `hostname -f`
 
 ## APIs
 ### Auth
-- `POST /api/login`
+- `POST /login`
 
     REQ
     ```json
@@ -64,7 +64,7 @@ CGO_ENABLED=0 go build
         "token": "eyJh...E-f0"
      }
     ```
-- `POST /api/logout`
+- `POST /logout`
 
     REQ
     ```json
@@ -81,7 +81,7 @@ CGO_ENABLED=0 go build
         "code": 200
      }
     ```
-- `GET /api/refresh`
+- `GET /refresh`
 
     REQ
     ```json
@@ -101,7 +101,7 @@ CGO_ENABLED=0 go build
      }
     ```
 ### Units
-- `GET /api/units`
+- `GET /units`
 
     REQ
     ```json
@@ -143,7 +143,7 @@ CGO_ENABLED=0 go build
         "message": "units listed successfully"
      }
     ```
-- `GET /api/units/<unit_name>`
+- `GET /units/<unit_name>`
 
     REQ
     ```json
@@ -174,7 +174,7 @@ CGO_ENABLED=0 go build
         "message": "unit listed successfully"
      }
     ```
-- `GET /api/units/<unit_name>/token`
+- `GET /units/<unit_name>/token`
 
     REQ
     ```json
@@ -196,7 +196,7 @@ CGO_ENABLED=0 go build
         "message": "unit token retrieved successfully"
      }
     ```
-- `POST /api/units`
+- `POST /units`
 
     REQ
     ```json
@@ -221,7 +221,7 @@ CGO_ENABLED=0 go build
         "message": "unit added successfully"
      }
     ```
-- `POST /api/units/register`
+- `POST /units/register`
 
     REQ
     ```json
@@ -266,7 +266,7 @@ CGO_ENABLED=0 go build
         "message": "unit added to waiting list"
      }
     ```
-- `DELETE /api/units/<unit_name>`
+- `DELETE /units/<unit_name>`
 
     REQ
     ```json

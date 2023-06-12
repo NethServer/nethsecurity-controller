@@ -75,7 +75,7 @@ func main() {
 	}
 
 	// define api group
-	api := router.Group("/api")
+	api := router.Group("/")
 
 	// define login and logout endpoint
 	api.POST("/login", middleware.InstanceJWT().LoginHandler)
