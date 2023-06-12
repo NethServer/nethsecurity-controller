@@ -19,13 +19,15 @@ buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/sbin/openvpn", "/
 buildah commit "${container}" "${repobase}/nethsecurity-vpn"
 images+=("${repobase}/nethsecurity-vpn")
 
-container_api=$(buildah from docker.io/alpine:3.17)
+container_api=$(buildah from docker.io/alpine:3.16)
 buildah run ${container_api} apk add --no-cache go easy-rsa
 buildah run ${container_api} mkdir /nethsecurity-api
 buildah add "${container_api}" api/ /nethsecurity-api/
-buildah run ${container_api} /bin/sh -c "cd /nethsecurity-api && CGO_ENABLED=0 go build"
+buildah config --workingdir /nethsecurity-api ${container_api}
+buildah config --env GOOS=linux --env GOARCH=amd64 --env CGO_ENABLED=0 ${container_api}
+buildah run ${container_api} go build
 buildah add "${container_api}" api/entrypoint.sh /entrypoint.sh
-buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["./nethsecurity-api"]' ${container_api}
+buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["./api"]' ${container_api}
 buildah commit "${container_api}" "${repobase}/nethsecurity-api"
 images+=("${repobase}/nethsecurity-api")
 

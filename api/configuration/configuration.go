@@ -12,7 +12,7 @@ package configuration
 import (
 	"os"
 
-	"github.com/NethServer/nethsecurity-api/logs"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/Showmax/go-fqdn"
 )
 
@@ -62,32 +62,32 @@ func Init() {
 	if os.Getenv("ADMIN_USERNAME") != "" {
 		Config.AdminUsername = os.Getenv("ADMIN_USERNAME")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] ADMIN_USERNAME variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] ADMIN_USERNAME variable is empty")
 		os.Exit(1)
 	}
 	if os.Getenv("ADMIN_PASSWORD") != "" {
 		Config.AdminPassword = os.Getenv("ADMIN_PASSWORD")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] ADMIN_PASSWORD variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] ADMIN_PASSWORD variable is empty")
 		os.Exit(1)
 	}
 	if os.Getenv("SECRET_JWT") != "" {
 		Config.SecretJWT = os.Getenv("SECRET_JWT")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] SECRET_JWT variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] SECRET_JWT variable is empty")
 		os.Exit(1)
 	}
 
 	if os.Getenv("TOKENS_DIR") != "" {
 		Config.TokensDir = os.Getenv("TOKENS_DIR")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] TOKENS_DIR variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] TOKENS_DIR variable is empty")
 		os.Exit(1)
 	}
 	if os.Getenv("CREDENTIALS_DIR") != "" {
 		Config.CredentialsDir = os.Getenv("CREDENTIALS_DIR")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] CREDENTIALS_DIR variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] CREDENTIALS_DIR variable is empty")
 		os.Exit(1)
 	}
 
@@ -136,13 +136,13 @@ func Init() {
 	if os.Getenv("PROMTAIL_ADDRESS") != "" {
 		Config.PromtailAddress = os.Getenv("PROMTAIL_ADDRESS")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] PROMTAIL_ADDRESS variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] PROMTAIL_ADDRESS variable is empty")
 		os.Exit(1)
 	}
 	if os.Getenv("PROMTAIL_PORT") != "" {
 		Config.PromtailPort = os.Getenv("PROMTAIL_PORT")
 	} else {
-		logs.Logs.Crit("[CRITICAL][ENV] PROMTAIL_PORT variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] PROMTAIL_PORT variable is empty")
 		os.Exit(1)
 	}
 

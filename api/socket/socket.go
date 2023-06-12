@@ -12,8 +12,8 @@ package socket
 import (
 	"net"
 
-	"github.com/NethServer/nethsecurity-api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
 )
 
 var Socket net.Conn
@@ -24,7 +24,7 @@ func Init() {
 
 	// check error
 	if err != nil {
-		logs.Logs.Err("[ERR][OPENVPN SOCKET] can't connect to openvpn socket: " + configuration.Config.OpenVPNMGMTSock)
+		logs.Logs.Println("[ERR][OPENVPN SOCKET] can't connect to openvpn socket: " + configuration.Config.OpenVPNMGMTSock)
 	}
 
 	// assign object
@@ -37,7 +37,7 @@ func Write(message string) string {
 
 	// check write error
 	if err != nil {
-		logs.Logs.Err("[ERR][OPENVPN SOCKET] can't write to openvpn socket: " + configuration.Config.OpenVPNMGMTSock + ". error: " + err.Error())
+		logs.Logs.Println("[ERR][OPENVPN SOCKET] can't write to openvpn socket: " + configuration.Config.OpenVPNMGMTSock + ". error: " + err.Error())
 	}
 
 	// compose buffer
@@ -46,7 +46,7 @@ func Write(message string) string {
 
 	// check read error
 	if err != nil {
-		logs.Logs.Err("[ERR][OPENVPN SOCKET] can't read from openvpn socket: " + configuration.Config.OpenVPNMGMTSock + ". error: " + err.Error())
+		logs.Logs.Println("[ERR][OPENVPN SOCKET] can't read from openvpn socket: " + configuration.Config.OpenVPNMGMTSock + ". error: " + err.Error())
 	}
 
 	// return string

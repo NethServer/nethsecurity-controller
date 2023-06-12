@@ -18,10 +18,10 @@ import (
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 
-	"github.com/NethServer/nethsecurity-api/logs"
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/global"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"
 	"github.com/NethServer/nethsecurity-controller/api/middleware"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
