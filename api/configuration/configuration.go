@@ -174,7 +174,7 @@ func Init() {
 	}
 
 	if os.Getenv("FQDN") != "" {
-		Config.ProxyPort = os.Getenv("FQDN")
+		Config.FQDN = os.Getenv("FQDN")
 	} else {
 		Config.FQDN, _ = fqdn.FqdnHostname()
 	}
