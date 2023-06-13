@@ -5,7 +5,6 @@ on:
   push:
     paths:
       - 'api/**'
-      - 'ui/**'
       - 'vpn/**'
       - 'build.sh'
 
