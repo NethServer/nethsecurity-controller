@@ -37,6 +37,18 @@ buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/local/bin/traefik
 buildah commit "${container_proxy}" "${repobase}/nethsecurity-proxy"
 images+=("${repobase}/nethsecurity-proxy")
 
+container_ui=$(buildah from docker.io/alpine:3.17)
+buildah run ${container_ui} apk add --no-cache lighttpd git nodejs npm
+buildah run ${container_ui} git clone https://github.com/NethServer/nethsecurity-ui.git
+buildah config --workingdir /nethsecurity-ui ${container_ui}
+buildah run ${container_ui} sh -c "sed -i 's/standalone/controller/g' .env.production"
+buildah run ${container_ui} sh -c "npm ci && npm run build"
+buildah run ${container_ui} sh -c "cp -r dist/* /var/www/localhost/htdocs/"
+buildah add ${container_ui} ui/entrypoint.sh /entrypoint.sh
+buildah config --entrypoint='["/entrypoint.sh"]' ${container_ui}
+buildah commit ${container_ui} "${repobase}/nethsecurity-ui"
+images+=("${repobase}/nethsecurity-ui")
+
 if [[ -n "${CI}" ]]; then
     # Set output value for Github Actions
     printf "::set-output name=images::%s\n" "${images[*]}"
