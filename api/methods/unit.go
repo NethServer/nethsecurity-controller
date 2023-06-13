@@ -375,7 +375,7 @@ func AddUnit(c *gin.Context) {
 	}
 
 	// generate certificate request
-	cmdGenerateGenReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "gen-req", jsonRequest.UnitName, "nopass")
+	cmdGenerateGenReq := exec.Command(configuration.Config.EasyRSAPath, "gen-req", jsonRequest.UnitName, "nopass")
 	cmdGenerateGenReq.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
 		"EASYRSA_REQ_CN="+jsonRequest.UnitName,
@@ -391,7 +391,7 @@ func AddUnit(c *gin.Context) {
 	}
 
 	// generate certificate sign
-	cmdGenerateSignReq := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "sign-req", "client", jsonRequest.UnitName)
+	cmdGenerateSignReq := exec.Command(configuration.Config.EasyRSAPath, "sign-req", "client", jsonRequest.UnitName)
 	cmdGenerateSignReq.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
 		"EASYRSA_REQ_CN="+jsonRequest.UnitName,
@@ -556,7 +556,7 @@ func DeleteUnit(c *gin.Context) {
 	_ = socket.Write("kill " + unitName)
 
 	// revoke certificate
-	cmdRevoke := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "revoke", unitName)
+	cmdRevoke := exec.Command(configuration.Config.EasyRSAPath, "revoke", unitName)
 	cmdRevoke.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
@@ -571,7 +571,7 @@ func DeleteUnit(c *gin.Context) {
 	}
 
 	// renew certificate revocation list
-	cmdGen := exec.Command("bash", "-c", configuration.Config.EasyRSAPath, "gen-crl")
+	cmdGen := exec.Command(configuration.Config.EasyRSAPath, "gen-crl")
 	cmdGen.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
