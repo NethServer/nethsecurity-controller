@@ -495,24 +495,28 @@ func RegisterUnit(c *gin.Context) {
 			"promtail_port":    configuration.Config.PromtailPort,
 		}
 
-		// read credentials
+		// read credentials from request
+		username := jsonRequest.Username
+		password := jsonRequest.Password
+
+		// read credentials from file
 		var credentials LoginRequest
 		jsonString, errRead := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.UnitName)
-		if errRead != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    400,
-				Message: "cannot open credentials file for: " + jsonRequest.UnitName,
-				Data:    errRead.Error(),
-			}))
-			return
+
+		// credentials exists, update only if username matches
+		if errRead == nil {
+			// convert json string to struct
+			json.Unmarshal(jsonString, &credentials)
+
+			// check username
+			if credentials.Username == username {
+				credentials.Password = password
+			}
+		} else {
+			// update credentials
+			credentials.Username = username
+			credentials.Password = password
 		}
-
-		// convert json string to struct
-		json.Unmarshal(jsonString, &credentials)
-
-		// update credentials
-		credentials.Username = jsonRequest.Username
-		credentials.Password = jsonRequest.Password
 
 		// write new credentials
 		newJsonString, _ := json.Marshal(credentials)
