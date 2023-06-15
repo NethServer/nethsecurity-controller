@@ -293,6 +293,16 @@ func GetToken(c *gin.Context) {
 		return
 	}
 
+	// check if token is not empty
+	if len(loginResponse.Token) == 0 {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "invalid JWT token response for: " + unitName,
+			Data:    "token is invalid",
+		}))
+		return
+	}
+
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
