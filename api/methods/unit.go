@@ -12,7 +12,6 @@ package methods
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"io/ioutil"
 	"net/http"
 	"os"
@@ -294,8 +293,6 @@ func GetToken(c *gin.Context) {
 		return
 	}
 
-	fmt.Println(loginResponse)
-
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
@@ -421,20 +418,23 @@ func AddUnit(c *gin.Context) {
 	// get unit from waiting list and save credentials
 	waiter := global.WaitingList[jsonRequest.UnitName]
 
-	// write new credentials
-	newCredentials, _ := json.Marshal(waiter)
-	errSave := os.WriteFile(configuration.Config.CredentialsDir+"/"+jsonRequest.UnitName, newCredentials, 0644)
-	if errSave != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "cannot write waiter credentials file for: " + jsonRequest.UnitName,
-			Data:    errSave.Error(),
-		}))
-		return
-	}
+	// check if unit was in waiting list
+	if waiter != nil {
+		// write new credentials
+		newCredentials, _ := json.Marshal(waiter)
+		errSave := os.WriteFile(configuration.Config.CredentialsDir+"/"+jsonRequest.UnitName, newCredentials, 0644)
+		if errSave != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot write waiter credentials file for: " + jsonRequest.UnitName,
+				Data:    errSave.Error(),
+			}))
+			return
+		}
 
-	// remove element from waiting list
-	delete(global.WaitingList, jsonRequest.UnitName)
+		// remove element from waiting list
+		delete(global.WaitingList, jsonRequest.UnitName)
+	}
 
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
