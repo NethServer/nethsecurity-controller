@@ -12,6 +12,7 @@ echo "Installing build dependencies..."
 buildah run ${container} apk add --no-cache openvpn easy-rsa
 
 echo "Setup image"
+buildah add "${container}" vpn/ip /sbin/ip
 buildah add "${container}" vpn/controller-auth /usr/local/bin/controller-auth
 buildah add "${container}" vpn/handle-connection /usr/local/bin/handle-connection
 buildah add "${container}" vpn/entrypoint.sh /entrypoint.sh
