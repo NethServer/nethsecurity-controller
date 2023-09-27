@@ -12,8 +12,22 @@ Firewalls can register to the server using [ns-plug](https://github.com/NethServ
 You can install it on [NS8](https://github.com/NethServer/ns8-nethsecurity-controller#install).
 
 Otherwise, first make sure to have [podman](https://podman.io/) installed on your server.
-Then clone this repository and execute as root:
+Containers should run under non-root users, but first you need to configure the tun device and the user.
+
+As root, execute:
 ```
+useradd -m controller
+loginctl enable-linger controller
+
+ip tuntap add dev tunsec mod tun
+ip addr add 172.21.0.1/16 dev tunsec
+ip link set dev tunsec up
+```
+
+Then change to non-root user, clone this repository and execute:
+```
+su - controller
+
 ./start.sh
 ```
 
