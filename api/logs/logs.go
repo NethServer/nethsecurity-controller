@@ -18,7 +18,7 @@ var Logs *log.Logger
 
 func Init(name string) {
 	// init syslog writer
-	logger := log.New(os.Stderr, name, log.Ldate|log.Ltime|log.Lshortfile)
+	logger := log.New(os.Stderr, name+" ", log.Ldate|log.Ltime|log.Lshortfile)
 
 	// assign writer to Logs var
 	Logs = logger
