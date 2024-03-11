@@ -135,7 +135,7 @@ CGO_ENABLED=0 go build
             ...
             {
                 "ipaddress": "",
-                "id": "<unit_name>",
+                "id": "<unit_id>",
                 "netmask": "",
                 "registered": false,
                 "vpn": {}
