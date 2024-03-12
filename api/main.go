@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Nethesis S.r.l.
+ * Copyright (C) 2024 Nethesis S.r.l.
  * http://www.nethesis.it - info@nethesis.it
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -25,6 +25,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/methods"
 	"github.com/NethServer/nethsecurity-controller/api/middleware"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
 )
 
 // @title NethSecurity Controller API Server
@@ -47,6 +48,9 @@ func main() {
 
 	// init configuration
 	configuration.Init()
+
+	// init storage
+	storage.Init()
 
 	// init globa vars
 	global.Init()
@@ -89,6 +93,16 @@ func main() {
 	{
 		// refresh handler
 		api.GET("/refresh", middleware.InstanceJWT().RefreshHandler)
+
+		// accounts APIs
+		accounts := api.Group("/accounts")
+		{
+			accounts.GET("", methods.GetAccounts)
+			accounts.GET("/:account_id", methods.GetAccount)
+			accounts.POST("", methods.AddAccount)
+			accounts.PUT("/:account_id", methods.UpdateAccount)
+			accounts.DELETE("/:account_id", methods.DeleteAccount)
+		}
 
 		// units APIs
 		units := api.Group("/units")

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Nethesis S.r.l.
+ * Copyright (C) 2024 Nethesis S.r.l.
  * http://www.nethesis.it - info@nethesis.it
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -35,9 +35,13 @@ type Configuration struct {
 
 	TokensDir      string `json:"tokens_dir"`
 	CredentialsDir string `json:"credentials_dir"`
+	StorageFile    string `json:"credentials_file"`
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
+	PathPrometheus  string `json:"path_prometheus"`
+	PathWebSSH      string `json:"path_webssh"`
+	PathGrafana     string `json:"path_grafana"`
 
 	EasyRSAPath string `json:"easy_rsa_path"`
 
@@ -88,6 +92,12 @@ func Init() {
 		Config.CredentialsDir = os.Getenv("CREDENTIALS_DIR")
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] CREDENTIALS_DIR variable is empty")
+		os.Exit(1)
+	}
+	if os.Getenv("STORAGE_FILE") != "" {
+		Config.StorageFile = os.Getenv("STORAGE_FILE")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] STORAGE_FILE variable is empty")
 		os.Exit(1)
 	}
 
@@ -143,6 +153,24 @@ func Init() {
 		Config.PromtailPort = os.Getenv("PROMTAIL_PORT")
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] PROMTAIL_PORT variable is empty")
+		os.Exit(1)
+	}
+	if os.Getenv("PATH_PROMETHEUS") != "" {
+		Config.PathPrometheus = os.Getenv("PATH_PROMETHEUS")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] PATH_PROMETHEUS variable is empty")
+		os.Exit(1)
+	}
+	if os.Getenv("PATH_WEBSSH") != "" {
+		Config.PathWebSSH = os.Getenv("PATH_WEBSSH")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] PATH_WEBSSH variable is empty")
+		os.Exit(1)
+	}
+	if os.Getenv("PATH_GRAFANA") != "" {
+		Config.PathGrafana = os.Getenv("PATH_GRAFANA")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] PATH_GRAFANA variable is empty")
 		os.Exit(1)
 	}
 

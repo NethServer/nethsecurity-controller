@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Nethesis S.r.l.
+ * Copyright (C) 2024 Nethesis S.r.l.
  * http://www.nethesis.it - info@nethesis.it
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -14,7 +14,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -180,8 +179,6 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			//get claims
 			tokenObj, _ := InstanceJWT().ParseTokenString(token)
 			claims := jwt.ExtractClaimsFromToken(tokenObj)
-
-			fmt.Println("save token", claims["id"].(string), token)
 
 			// set token to valid
 			methods.SetTokenValidation(claims["id"].(string), token)
