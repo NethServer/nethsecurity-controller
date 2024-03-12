@@ -35,7 +35,7 @@ type Configuration struct {
 
 	TokensDir      string `json:"tokens_dir"`
 	CredentialsDir string `json:"credentials_dir"`
-	StorageFile    string `json:"credentials_file"`
+	StorageFile    string `json:"storage_file"`
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
