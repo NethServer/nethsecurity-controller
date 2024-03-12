@@ -103,7 +103,7 @@ func AddAccount(account models.Account) error {
 	return err
 }
 
-func UpdateAccount(account models.Account) error {
+func UpdateAccount(accountID string, account models.Account) error {
 	// get db
 	db := Instance()
 
@@ -112,7 +112,7 @@ func UpdateAccount(account models.Account) error {
 		"UPDATE accounts set password = ?, display_name = ? WHERE id = ?",
 		utils.HashPassword(account.Password),
 		account.DisplayName,
-		account.ID,
+		accountID,
 	)
 
 	// check error
@@ -121,6 +121,22 @@ func UpdateAccount(account models.Account) error {
 	}
 
 	return err
+}
+
+func IsAdmin(accountUsername string) (bool, string) {
+	// get db
+	db := Instance()
+
+	// define query
+	var id string
+	query := "SELECT id FROM accounts where username = ? LIMIT 1"
+	err := db.QueryRow(query, accountUsername).Scan(&id)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET PASSWORD] error in query execution:" + err.Error())
+	}
+
+	// return password
+	return id == "1", id
 }
 
 func GetAccounts() ([]models.Account, error) {

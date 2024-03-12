@@ -18,10 +18,27 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/fatih/structs"
 
+	jwt "github.com/appleboy/gin-jwt/v2"
 	"github.com/gin-gonic/gin"
 )
 
 func GetAccounts(c *gin.Context) {
+	// get claims
+	claims := jwt.ExtractClaims(c)
+
+	// check is admin
+	isAdmin, _ := storage.IsAdmin(claims["id"].(string))
+
+	// check authorization
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// execute query
 	accounts, err := storage.GetAccounts()
 
@@ -53,6 +70,22 @@ func GetAccounts(c *gin.Context) {
 }
 
 func GetAccount(c *gin.Context) {
+	// get claims
+	claims := jwt.ExtractClaims(c)
+
+	// check is admin
+	isAdmin, _ := storage.IsAdmin(claims["id"].(string))
+
+	// check authorization
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// get account id
 	accountID := c.Param("account_id")
 
@@ -87,6 +120,22 @@ func GetAccount(c *gin.Context) {
 }
 
 func AddAccount(c *gin.Context) {
+	// get claims
+	claims := jwt.ExtractClaims(c)
+
+	// check is admin
+	isAdmin, _ := storage.IsAdmin(claims["id"].(string))
+
+	// check authorization
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// get account fields
 	var json models.Account
 	if err := c.BindJSON(&json); err != nil {
@@ -118,6 +167,25 @@ func AddAccount(c *gin.Context) {
 }
 
 func UpdateAccount(c *gin.Context) {
+	// get account id
+	accountID := c.Param("account_id")
+
+	// get claims
+	claims := jwt.ExtractClaims(c)
+
+	// check is admin
+	isAdmin, id := storage.IsAdmin(claims["id"].(string))
+
+	// check authorization
+	if !isAdmin && accountID != id {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// get account fields
 	var json models.Account
 	if err := c.BindJSON(&json); err != nil {
@@ -126,7 +194,7 @@ func UpdateAccount(c *gin.Context) {
 	}
 
 	// update account
-	err := storage.UpdateAccount(json)
+	err := storage.UpdateAccount(accountID, json)
 
 	// check results
 	if err != nil {
@@ -147,6 +215,22 @@ func UpdateAccount(c *gin.Context) {
 }
 
 func DeleteAccount(c *gin.Context) {
+	// get claims
+	claims := jwt.ExtractClaims(c)
+
+	// check is admin
+	isAdmin, _ := storage.IsAdmin(claims["id"].(string))
+
+	// check authorization
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// get account id
 	accountID := c.Param("account_id")
 
