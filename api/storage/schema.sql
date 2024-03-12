@@ -15,10 +15,3 @@ CREATE TABLE accounts (
     `locked` BOOLEAN NOT NULL,
     `created` TIMESTAMP NOT NULL
 );
-
-CREATE TABLE units (
-    `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-    `name` TEXT NOT NULL,
-    `label` TEXT NOT NULL,
-    `created` TIMESTAMP NOT NULL
-);
