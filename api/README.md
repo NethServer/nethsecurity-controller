@@ -119,7 +119,8 @@ CGO_ENABLED=0 go build
         "data": [
             {
                 "ipaddress": "172.23.21.3",
-                "name": "<unit_name>",
+                "id": "<unit_id>",
+                "name": "fw.nethsecurity.local",
                 "netmask": "255.255.255.0",
                 "registered": true,
                 "vpn": {
@@ -134,7 +135,7 @@ CGO_ENABLED=0 go build
             ...
             {
                 "ipaddress": "",
-                "name": "<unit_name>",
+                "id": "<unit_id>",
                 "netmask": "",
                 "registered": false,
                 "vpn": {}
@@ -143,7 +144,7 @@ CGO_ENABLED=0 go build
         "message": "units listed successfully"
      }
     ```
-- `GET /units/<unit_name>`
+- `GET /units/<unit_id>`
 
     REQ
     ```json
@@ -160,7 +161,8 @@ CGO_ENABLED=0 go build
         "code": 200,
         "data": {
             "ipaddress": "172.23.21.3",
-            "name": "<unit_name>",
+            "id": "<unit_id>",
+            "name": "fw.nethsecurity.local",
             "netmask": "255.255.255.0",
             "registered": true,
             "vpn": {
@@ -174,7 +176,7 @@ CGO_ENABLED=0 go build
         "message": "unit listed successfully"
      }
     ```
-- `GET /units/<unit_name>/token`
+- `GET /units/<unit_id>/token`
 
     REQ
     ```json
@@ -204,7 +206,7 @@ CGO_ENABLED=0 go build
      Authorization: Bearer <JWT_TOKEN>
 
      {
-        "unit_name": "<unit_name>"
+        "unit_id": "<unit_id>"
      }
     ```
 
@@ -229,7 +231,8 @@ CGO_ENABLED=0 go build
      Authorization: Bearer <JWT_TOKEN>
 
      {
-        "unit_name": "<unit_name>",
+        "unit_name": "fw.nethsecurity.local",
+        "unit_id": "d330b2db-cdfe-4c56-b9b6-f97e5b838748",
         "username": "test",
         "password": "Nethesis,1234"
      }
@@ -266,7 +269,7 @@ CGO_ENABLED=0 go build
         "message": "unit added to waiting list"
      }
     ```
-- `DELETE /units/<unit_name>`
+- `DELETE /units/<unit_id>`
 
     REQ
     ```json
