@@ -179,6 +179,22 @@ func GetAccount(accountID string) ([]models.Account, error) {
 	return results, err
 }
 
+func GetPassword(accountUsername string) string {
+	// get db
+	db := Instance()
+
+	// define query
+	var password string
+	query := "SELECT password FROM accounts where username = ? LIMIT 1"
+	err := db.QueryRow(query, accountUsername).Scan(&password)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET PASSWORD] error in query execution:" + err.Error())
+	}
+
+	// return password
+	return password
+}
+
 func DeleteAccount(accountID string) error {
 	// get db
 	db := Instance()

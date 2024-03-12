@@ -31,6 +31,8 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 )
 
 type login struct {
@@ -73,7 +75,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			h.Write([]byte(password))
 			sha256Hash := hex.EncodeToString(h.Sum(nil))
 
-			// check login
+			// check login for admin
 			if username == configuration.Config.AdminUsername && sha256Hash == configuration.Config.AdminPassword {
 				// login ok action
 				logs.Logs.Println("[INFO][AUTH] authentication success for user " + username)
@@ -83,11 +85,27 @@ func InitJWT() *jwt.GinJWTMiddleware {
 					Username: username,
 				}, nil
 			} else {
-				// login fail action
-				logs.Logs.Println("[INFO][AUTH] authentication failed for user " + username)
+				// read user password hash
+				passwordHash := storage.GetPassword(username)
 
-				// return JWT error
-				return nil, jwt.ErrFailedAuthentication
+				// check password
+				valid := utils.CheckPasswordHash(password, passwordHash)
+
+				if !valid {
+					// login fail action
+					logs.Logs.Println("[INFO][AUTH] authentication failed for user " + username)
+
+					// return JWT error
+					return nil, jwt.ErrFailedAuthentication
+				}
+
+				// login ok action
+				logs.Logs.Println("[INFO][AUTH] authentication success for user " + username)
+
+				// return user auth model
+				return &models.UserAuthorizations{
+					Username: username,
+				}, nil
 			}
 
 		},
