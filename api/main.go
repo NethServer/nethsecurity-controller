@@ -104,6 +104,12 @@ func main() {
 			accounts.DELETE("/:account_id", methods.DeleteAccount)
 		}
 
+		// default APIs
+		defaults := api.Group("/defaults")
+		{
+			defaults.GET("", methods.GetDefaults)
+		}
+
 		// units APIs
 		units := api.Group("/units")
 		{
