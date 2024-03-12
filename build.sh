@@ -27,6 +27,8 @@ buildah add "${container_api}" api/ /nethsecurity-api/
 buildah config --workingdir /nethsecurity-api ${container_api}
 buildah config --env GOOS=linux --env GOARCH=amd64 --env CGO_ENABLED=0 ${container_api}
 buildah run ${container_api} go build
+buildah run ${container_api} rm -rf root/go
+buildah run ${container_api} apk del --no-cache go
 buildah add "${container_api}" api/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["./api"]' ${container_api}
 buildah commit "${container_api}" "${repobase}/nethsecurity-api"
@@ -46,6 +48,9 @@ buildah run ${container_ui} sh -c "sed -i 's/standalone/controller/g' .env.produ
 buildah run ${container_ui} sh -c "npm ci && npm run build"
 buildah run ${container_ui} sh -c "cp -r dist/* /var/www/localhost/htdocs/"
 buildah add ${container_ui} ui/entrypoint.sh /entrypoint.sh
+buildah run ${container_ui} sh -c "rm -rf /nethsecurity-ui"
+buildah run ${container_ui} apk del --no-cache git nodejs npm
+buildah config --workingdir / ${container_ui}
 buildah config --entrypoint='["/entrypoint.sh"]' ${container_ui}
 buildah commit ${container_ui} "${repobase}/nethsecurity-ui"
 images+=("${repobase}/nethsecurity-ui")
