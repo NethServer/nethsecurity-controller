@@ -30,6 +30,4 @@ func GetDefaults(c *gin.Context) {
 			"grafana_path":    configuration.Config.GrafanaPath,
 		},
 	}))
-	return
-
 }
