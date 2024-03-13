@@ -144,7 +144,6 @@ func AddAccount(c *gin.Context) {
 	}
 
 	// create account
-	json.Locked = false
 	json.Created = time.Now()
 	err := storage.AddAccount(json)
 

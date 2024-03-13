@@ -39,9 +39,9 @@ type Configuration struct {
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
-	PathPrometheus  string `json:"path_prometheus"`
-	PathWebSSH      string `json:"path_webssh"`
-	PathGrafana     string `json:"path_grafana"`
+	PrometheusPath  string `json:"prometheus_path"`
+	WebSSHPath      string `json:"webssh_path"`
+	GrafanaPath     string `json:"grafana_path"`
 
 	EasyRSAPath string `json:"easy_rsa_path"`
 
@@ -155,22 +155,22 @@ func Init() {
 		logs.Logs.Println("[CRITICAL][ENV] PROMTAIL_PORT variable is empty")
 		os.Exit(1)
 	}
-	if os.Getenv("PATH_PROMETHEUS") != "" {
-		Config.PathPrometheus = os.Getenv("PATH_PROMETHEUS")
+	if os.Getenv("PROMETHEUS_PATH") != "" {
+		Config.PrometheusPath = os.Getenv("PROMETHEUS_PATH")
 	} else {
-		logs.Logs.Println("[CRITICAL][ENV] PATH_PROMETHEUS variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] PROMETHEUS_PATH variable is empty")
 		os.Exit(1)
 	}
-	if os.Getenv("PATH_WEBSSH") != "" {
-		Config.PathWebSSH = os.Getenv("PATH_WEBSSH")
+	if os.Getenv("WEBSSH_PATH") != "" {
+		Config.WebSSHPath = os.Getenv("WEBSSH_PATH")
 	} else {
-		logs.Logs.Println("[CRITICAL][ENV] PATH_WEBSSH variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] WEBSSH_PATH variable is empty")
 		os.Exit(1)
 	}
-	if os.Getenv("PATH_GRAFANA") != "" {
-		Config.PathGrafana = os.Getenv("PATH_GRAFANA")
+	if os.Getenv("GRAFANA_PATH") != "" {
+		Config.GrafanaPath = os.Getenv("GRAFANA_PATH")
 	} else {
-		logs.Logs.Println("[CRITICAL][ENV] PATH_GRAFANA variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] GRAFANA_PATH variable is empty")
 		os.Exit(1)
 	}
 

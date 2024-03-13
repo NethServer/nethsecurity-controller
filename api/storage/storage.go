@@ -64,18 +64,6 @@ func Init() *sql.DB {
 		if errExecute != nil {
 			logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
 		}
-
-		// define default user
-		defaultUser := models.Account{
-			Username:    configuration.Config.AdminUsername,
-			Password:    configuration.Config.AdminPassword,
-			DisplayName: "Default User",
-			Locked:      true,
-			Created:     time.Now(),
-		}
-
-		// insert default user
-		_ = AddAccount(defaultUser)
 	}
 
 	return db
@@ -87,17 +75,16 @@ func AddAccount(account models.Account) error {
 
 	// define query
 	_, err := db.Exec(
-		"INSERT INTO accounts (id, username, password, display_name, locked, created) VALUES (null, ?, ?, ?, ?, ?)",
+		"INSERT INTO accounts (id, username, password, display_name, created) VALUES (null, ?, ?, ?, ?)",
 		account.Username,
 		utils.HashPassword(account.Password),
 		account.DisplayName,
-		account.Locked,
 		account.Created.Format(time.RFC3339),
 	)
 
 	// check error
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][ADD ACCOUNT] error in insert accounts query: " + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][ADD_ACCOUNT] error in insert accounts query: " + err.Error())
 	}
 
 	return err
@@ -117,7 +104,7 @@ func UpdateAccount(accountID string, account models.Account) error {
 
 	// check error
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][UPDATE ACCOUNT] error in insert accounts query: " + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][UPDATE_ACCOUNT] error in insert accounts query: " + err.Error())
 	}
 
 	return err
@@ -132,7 +119,7 @@ func IsAdmin(accountUsername string) (bool, string) {
 	query := "SELECT id FROM accounts where username = ? LIMIT 1"
 	err := db.QueryRow(query, accountUsername).Scan(&id)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][GET PASSWORD] error in query execution:" + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
 	}
 
 	// return password
@@ -144,10 +131,10 @@ func GetAccounts() ([]models.Account, error) {
 	db := Instance()
 
 	// define query
-	query := "SELECT id, username, display_name, locked, created FROM accounts"
+	query := "SELECT id, username, display_name, created FROM accounts"
 	rows, err := db.Query(query)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][GET ACCOUNTS] error in query execution:" + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query execution:" + err.Error())
 	}
 	defer rows.Close()
 
@@ -155,8 +142,8 @@ func GetAccounts() ([]models.Account, error) {
 	var results []models.Account
 	for rows.Next() {
 		var accountRow models.Account
-		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Locked, &accountRow.Created); err != nil {
-			logs.Logs.Panicln("[ERR][STORAGE][GET ACCOUNTS] error in query row extraction" + err.Error())
+		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
+			logs.Logs.Panicln("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
 		}
 
 		// append results
@@ -172,10 +159,10 @@ func GetAccount(accountID string) ([]models.Account, error) {
 	db := Instance()
 
 	// define query
-	query := "SELECT id, username, display_name, locked, created FROM accounts where id = ?"
+	query := "SELECT id, username, display_name, created FROM accounts where id = ?"
 	rows, err := db.Query(query, accountID)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][GET ACCOUNT] error in query execution:" + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNT] error in query execution:" + err.Error())
 	}
 	defer rows.Close()
 
@@ -183,8 +170,8 @@ func GetAccount(accountID string) ([]models.Account, error) {
 	var results []models.Account
 	for rows.Next() {
 		var accountRow models.Account
-		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Locked, &accountRow.Created); err != nil {
-			logs.Logs.Panicln("[ERR][STORAGE][GET ACCOUNT] error in query row extraction" + err.Error())
+		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
+			logs.Logs.Panicln("[ERR][STORAGE][GET_ACCOUNT] error in query row extraction" + err.Error())
 		}
 
 		// append results
@@ -204,7 +191,7 @@ func GetPassword(accountUsername string) string {
 	query := "SELECT password FROM accounts where username = ? LIMIT 1"
 	err := db.QueryRow(query, accountUsername).Scan(&password)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][GET PASSWORD] error in query execution:" + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
 	}
 
 	// return password
@@ -216,10 +203,10 @@ func DeleteAccount(accountID string) error {
 	db := Instance()
 
 	// define query
-	query := "DELETE FROM accounts where id = ? AND locked == 0"
+	query := "DELETE FROM accounts where id = ?"
 	_, err = db.Exec(query, accountID)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][DELETE ACCOUNT] error in query execution:" + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][DELETE_ACCOUNT] error in query execution:" + err.Error())
 	}
 
 	return err

@@ -12,6 +12,5 @@ CREATE TABLE accounts (
     `username` TEXT NOT NULL UNIQUE,
     `password` TEXT NOT NULL,
     `display_name` TEXT,
-    `locked` BOOLEAN NOT NULL,
     `created` TIMESTAMP NOT NULL
 );

@@ -18,6 +18,5 @@ type Account struct {
 	Username    string    `json:"username" structs:"username" binding:"required"`
 	Password    string    `json:"password" structs:"password" db:"-" binding:"required"`
 	DisplayName string    `json:"display_name" structs:"display_name"`
-	Locked      bool      `json:"locked" structs:"locked"`
 	Created     time.Time `json:"created" structs:"created"`
 }
