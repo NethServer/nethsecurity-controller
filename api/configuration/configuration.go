@@ -35,7 +35,7 @@ type Configuration struct {
 
 	TokensDir      string `json:"tokens_dir"`
 	CredentialsDir string `json:"credentials_dir"`
-	StorageFile    string `json:"storage_file"`
+	DataDir        string `json:"data_dir"`
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
@@ -94,10 +94,10 @@ func Init() {
 		logs.Logs.Println("[CRITICAL][ENV] CREDENTIALS_DIR variable is empty")
 		os.Exit(1)
 	}
-	if os.Getenv("STORAGE_FILE") != "" {
-		Config.StorageFile = os.Getenv("STORAGE_FILE")
+	if os.Getenv("DATA_DIR") != "" {
+		Config.DataDir = os.Getenv("DATA_DIR")
 	} else {
-		logs.Logs.Println("[CRITICAL][ENV] STORAGE_FILE variable is empty")
+		logs.Logs.Println("[CRITICAL][ENV] DATA_DIR variable is empty")
 		os.Exit(1)
 	}
 

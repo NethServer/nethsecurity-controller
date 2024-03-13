@@ -39,12 +39,12 @@ func Instance() *sql.DB {
 func Init() *sql.DB {
 	// check if file exists
 	initSchema := false
-	if _, err := os.Stat(configuration.Config.StorageFile); os.IsNotExist(err) {
+	if _, err := os.Stat(configuration.Config.DataDir + "/db.sqlite"); os.IsNotExist(err) {
 		initSchema = true
 	}
 
 	// try connection
-	db, err = sql.Open("sqlite3", configuration.Config.StorageFile)
+	db, err = sql.Open("sqlite3", configuration.Config.DataDir+"/db.sqlite")
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE] error in storage db file creation:" + err.Error())
 		os.Exit(1)

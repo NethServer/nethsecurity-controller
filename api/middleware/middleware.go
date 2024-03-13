@@ -11,8 +11,6 @@ package middleware
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"io"
 	"io/ioutil"
@@ -70,43 +68,32 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			username := loginVals.Username
 			password := loginVals.Password
 
-			// calculate sha256 of password
-			h := sha256.New()
-			h.Write([]byte(password))
-			sha256Hash := hex.EncodeToString(h.Sum(nil))
+			// read user password hash
+			passwordHash := storage.GetPassword(username)
 
 			// check login for admin
-			if username == configuration.Config.AdminUsername && sha256Hash == configuration.Config.AdminPassword {
-				// login ok action
-				logs.Logs.Println("[INFO][AUTH] authentication success for user " + username)
-
-				// return user auth model
-				return &models.UserAuthorizations{
-					Username: username,
-				}, nil
-			} else {
-				// read user password hash
-				passwordHash := storage.GetPassword(username)
-
-				// check password
-				valid := utils.CheckPasswordHash(password, passwordHash)
-
-				if !valid {
-					// login fail action
-					logs.Logs.Println("[INFO][AUTH] authentication failed for user " + username)
-
-					// return JWT error
-					return nil, jwt.ErrFailedAuthentication
-				}
-
-				// login ok action
-				logs.Logs.Println("[INFO][AUTH] authentication success for user " + username)
-
-				// return user auth model
-				return &models.UserAuthorizations{
-					Username: username,
-				}, nil
+			if username == configuration.Config.AdminUsername {
+				passwordHash = configuration.Config.AdminPassword
 			}
+
+			// check password
+			valid := utils.CheckPasswordHash(password, passwordHash)
+
+			if !valid {
+				// login fail action
+				logs.Logs.Println("[INFO][AUTH] authentication failed for user " + username)
+
+				// return JWT error
+				return nil, jwt.ErrFailedAuthentication
+			}
+
+			// login ok action
+			logs.Logs.Println("[INFO][AUTH] authentication success for user " + username)
+
+			// return user auth model
+			return &models.UserAuthorizations{
+				Username: username,
+			}, nil
 
 		},
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
@@ -231,7 +218,6 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				Message: message,
 				Data:    nil,
 			}))
-			return
 		},
 		TokenLookup:   "header: Authorization, token: jwt",
 		TokenHeadName: "Bearer",
