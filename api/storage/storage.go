@@ -111,6 +111,11 @@ func UpdateAccount(accountID string, account models.Account) error {
 }
 
 func IsAdmin(accountUsername string) (bool, string) {
+	// check if is admin
+	if accountUsername == configuration.Config.AdminUsername {
+		return true, ""
+	}
+
 	// get db
 	db := Instance()
 
@@ -118,12 +123,14 @@ func IsAdmin(accountUsername string) (bool, string) {
 	var id string
 	query := "SELECT id FROM accounts where username = ? LIMIT 1"
 	err := db.QueryRow(query, accountUsername).Scan(&id)
+
+	// check error
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
 	}
 
-	// return password
-	return id == "1", id
+	// check if user it's me
+	return false, id
 }
 
 func GetAccounts() ([]models.Account, error) {
