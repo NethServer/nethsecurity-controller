@@ -24,7 +24,15 @@ import (
 
 func GetAccounts(c *gin.Context) {
 	// check auth for not admin users
-	checkAuth(c)
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
 
 	// execute query
 	accounts, err := storage.GetAccounts()
@@ -58,7 +66,15 @@ func GetAccounts(c *gin.Context) {
 
 func GetAccount(c *gin.Context) {
 	// check auth for not admin users
-	checkAuth(c)
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
 
 	// get account id
 	accountID := c.Param("account_id")
@@ -95,7 +111,15 @@ func GetAccount(c *gin.Context) {
 
 func AddAccount(c *gin.Context) {
 	// check auth for not admin users
-	checkAuth(c)
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
 
 	// get account fields
 	var json models.Account
@@ -130,11 +154,8 @@ func UpdateAccount(c *gin.Context) {
 	// get account id
 	accountID := c.Param("account_id")
 
-	// get claims
-	claims := jwt.ExtractClaims(c)
-
 	// check is admin
-	isAdmin, id := storage.IsAdmin(claims["id"].(string))
+	isAdmin, id := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 
 	// check authorization
 	if !isAdmin && accountID != id {
@@ -176,7 +197,15 @@ func UpdateAccount(c *gin.Context) {
 
 func DeleteAccount(c *gin.Context) {
 	// check auth
-	checkAuth(c)
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
 
 	// get account id
 	accountID := c.Param("account_id")
@@ -200,22 +229,4 @@ func DeleteAccount(c *gin.Context) {
 		Message: "success",
 		Data:    nil,
 	}))
-}
-
-func checkAuth(c *gin.Context) {
-	// get claims
-	claims := jwt.ExtractClaims(c)
-
-	// check is admin
-	isAdmin, _ := storage.IsAdmin(claims["id"].(string))
-
-	// check authorization
-	if !isAdmin {
-		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
-			Code:    403,
-			Message: "can't access this resource",
-			Data:    nil,
-		}))
-		return
-	}
 }
