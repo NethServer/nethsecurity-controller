@@ -90,17 +90,42 @@ func AddAccount(account models.Account) error {
 	return err
 }
 
-func UpdateAccount(accountID string, account models.Account) error {
+func UpdateAccount(accountID string, account models.AccountUpdate) error {
 	// get db
 	db := Instance()
 
-	// define query
-	_, err := db.Exec(
-		"UPDATE accounts set password = ?, display_name = ? WHERE id = ?",
-		utils.HashPassword(account.Password),
-		account.DisplayName,
-		accountID,
-	)
+	// define error
+	var err error
+
+	// check props
+	if len(account.Password) > 0 {
+		// define and execute query
+		query := "UPDATE accounts set password = ? WHERE id = ?"
+		_, err = db.Exec(
+			query,
+			utils.HashPassword(account.Password),
+			accountID,
+		)
+	}
+	if len(account.DisplayName) > 0 {
+		// define and execute query
+		query := "UPDATE accounts set display_name = ? WHERE id = ?"
+		_, err = db.Exec(
+			query,
+			account.DisplayName,
+			accountID,
+		)
+	}
+	if len(account.Password) > 0 && len(account.DisplayName) > 0 {
+		// define and execute query
+		query := "UPDATE accounts set password = ?, display_name = ? WHERE id = ?"
+		_, err = db.Exec(
+			query,
+			utils.HashPassword(account.Password),
+			account.DisplayName,
+			accountID,
+		)
+	}
 
 	// check error
 	if err != nil {
@@ -150,7 +175,7 @@ func GetAccounts() ([]models.Account, error) {
 	for rows.Next() {
 		var accountRow models.Account
 		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
-			logs.Logs.Panicln("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
+			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
 		}
 
 		// append results
@@ -178,7 +203,7 @@ func GetAccount(accountID string) ([]models.Account, error) {
 	for rows.Next() {
 		var accountRow models.Account
 		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
-			logs.Logs.Panicln("[ERR][STORAGE][GET_ACCOUNT] error in query row extraction" + err.Error())
+			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNT] error in query row extraction" + err.Error())
 		}
 
 		// append results

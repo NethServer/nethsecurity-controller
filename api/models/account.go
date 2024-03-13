@@ -20,3 +20,8 @@ type Account struct {
 	DisplayName string    `json:"display_name" structs:"display_name"`
 	Created     time.Time `json:"created" structs:"created"`
 }
+
+type AccountUpdate struct {
+	Password    string `json:"password" structs:"password"`
+	DisplayName string `json:"display_name" structs:"display_name"`
+}
