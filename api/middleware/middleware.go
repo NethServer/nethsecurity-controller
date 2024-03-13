@@ -23,7 +23,6 @@ import (
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 
-	apiConf "github.com/NethServer/nethsecurity-api/configuration"
 	"github.com/NethServer/nethsecurity-api/models"
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
@@ -158,7 +157,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 
 				// search for sensitve data, in sensitive list
 				for k, _ := range in {
-					for _, s := range apiConf.Config.SensitiveList {
+					for _, s := range configuration.Config.SensitiveList {
 						if strings.Contains(strings.ToLower(k), strings.ToLower(s)) {
 							in[k] = "XXX"
 						}

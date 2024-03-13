@@ -11,6 +11,7 @@ package configuration
 
 import (
 	"os"
+	"strings"
 
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/Showmax/go-fqdn"
@@ -29,9 +30,10 @@ type Configuration struct {
 
 	ListenAddress string `json:"listen_address"`
 
-	AdminUsername string `json:"admin_username"`
-	AdminPassword string `json:"admin_password"`
-	SecretJWT     string `json:"secret_jwt"`
+	AdminUsername string   `json:"admin_username"`
+	AdminPassword string   `json:"admin_password"`
+	SecretJWT     string   `json:"secret_jwt"`
+	SensitiveList []string `json:"sensitive_list"`
 
 	TokensDir      string `json:"tokens_dir"`
 	CredentialsDir string `json:"credentials_dir"`
@@ -80,6 +82,11 @@ func Init() {
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] SECRET_JWT variable is empty")
 		os.Exit(1)
+	}
+	if os.Getenv("SENSITIVE_LIST") != "" {
+		Config.SensitiveList = strings.Split(os.Getenv("SENSITIVE_LIST"), ",")
+	} else {
+		Config.SensitiveList = []string{"password", "secret", "token"}
 	}
 
 	if os.Getenv("TOKENS_DIR") != "" {

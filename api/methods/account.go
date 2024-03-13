@@ -154,11 +154,9 @@ func UpdateAccount(c *gin.Context) {
 	// get account id
 	accountID := c.Param("account_id")
 
-	// check is admin
-	isAdmin, id := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
-
-	// check authorization
-	if !isAdmin && accountID != id {
+	// check auth for not admin users
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
 			Message: "can't access this resource",

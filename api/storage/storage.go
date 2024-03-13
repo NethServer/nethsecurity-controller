@@ -116,16 +116,6 @@ func UpdateAccount(accountID string, account models.AccountUpdate) error {
 			accountID,
 		)
 	}
-	if len(account.Password) > 0 && len(account.DisplayName) > 0 {
-		// define and execute query
-		query := "UPDATE accounts set password = ?, display_name = ? WHERE id = ?"
-		_, err = db.Exec(
-			query,
-			utils.HashPassword(account.Password),
-			account.DisplayName,
-			accountID,
-		)
-	}
 
 	// check error
 	if err != nil {
