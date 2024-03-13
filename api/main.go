@@ -101,6 +101,7 @@ func main() {
 			accounts.GET("/:account_id", methods.GetAccount)
 			accounts.POST("", methods.AddAccount)
 			accounts.PUT("/:account_id", methods.UpdateAccount)
+			accounts.POST("/change-password", methods.UpdatePassword)
 			accounts.DELETE("/:account_id", methods.DeleteAccount)
 		}
 

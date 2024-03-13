@@ -19,3 +19,8 @@ type LoginResponse struct {
 	Expire string `json:"expire" binding:"required"`
 	Token  string `json:"token" binding:"required"`
 }
+
+type PasswordChange struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
+}

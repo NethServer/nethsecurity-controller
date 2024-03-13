@@ -233,3 +233,18 @@ func DeleteAccount(accountID string) error {
 
 	return err
 }
+
+func UpdatePassword(accountUsername string, newPassword string) error {
+	// get db
+	db := Instance()
+
+	// define query
+	query := "UPDATE accounts set password = ? WHERE username = ?"
+	_, err = db.Exec(
+		query,
+		utils.HashPassword(newPassword),
+		accountUsername,
+	)
+
+	return err
+}

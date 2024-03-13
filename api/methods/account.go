@@ -16,6 +16,7 @@ import (
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"github.com/fatih/structs"
 
 	jwt "github.com/appleboy/gin-jwt/v2"
@@ -227,4 +228,50 @@ func DeleteAccount(c *gin.Context) {
 		Message: "success",
 		Data:    nil,
 	}))
+}
+
+func UpdatePassword(c *gin.Context) {
+	// get passwords fields
+	var json models.PasswordChange
+	if err := c.BindJSON(&json); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "request fields malformed", "error": err.Error()})
+		return
+	}
+
+	// get current password
+	currentPassword := storage.GetPassword(jwt.ExtractClaims(c)["id"].(string))
+
+	// check if current password is equal with passed one
+	equal := utils.CheckPasswordHash(json.OldPassword, currentPassword)
+
+	// return err if not equal
+	if !equal {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "current password mismatch with passed one",
+			Data:    nil,
+		}))
+		return
+	}
+
+	// update password
+	err := storage.UpdatePassword(jwt.ExtractClaims(c)["id"].(string), json.NewPassword)
+
+	// check results
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "change password account error",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// return ok
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "success",
+		Data:    nil,
+	}))
+
 }
