@@ -38,11 +38,7 @@ func SetTokenValidation(username string, token string) bool {
 	_, err := f.WriteString(token + "\n")
 
 	// check error
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func DelTokenValidation(username string, token string) bool {
@@ -64,10 +60,5 @@ func DelTokenValidation(username string, token string) bool {
 	_, err := f.WriteString(strings.TrimSpace(res) + "\n")
 
 	// check error
-	if err != nil {
-		return false
-	}
-
-	return true
-
+	return err == nil
 }

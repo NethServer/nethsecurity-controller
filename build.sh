@@ -25,10 +25,8 @@ buildah run ${container_api} apk add --no-cache go easy-rsa
 buildah run ${container_api} mkdir /nethsecurity-api
 buildah add "${container_api}" api/ /nethsecurity-api/
 buildah config --workingdir /nethsecurity-api ${container_api}
-buildah config --env GOOS=linux --env GOARCH=amd64 --env CGO_ENABLED=0 ${container_api}
-buildah run ${container_api} go build
-buildah run ${container_api} rm -rf root/go
-buildah run ${container_api} apk del --no-cache go
+buildah config --env GOOS=linux --env GOARCH=amd64 --env CGO_ENABLED=1 ${container_api}
+buildah run ${container_api} go build -ldflags='-extldflags=-static' -tags sqlite_omit_load_extension
 buildah add "${container_api}" api/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["./api"]' ${container_api}
 buildah commit "${container_api}" "${repobase}/nethsecurity-api"

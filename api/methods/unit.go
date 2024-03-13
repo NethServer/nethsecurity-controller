@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Nethesis S.r.l.
+ * Copyright (C) 2024 Nethesis S.r.l.
  * http://www.nethesis.it - info@nethesis.it
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -21,33 +21,13 @@ import (
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/global"
+	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 )
-
-type LoginRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
-
-type LoginResponse struct {
-	Code   int    `json:"code" binding:"required"`
-	Expire string `json:"expire" binding:"required"`
-	Token  string `json:"token" binding:"required"`
-}
-
-type AddRequest struct {
-	UnitId string `json:"unit_id" binding:"required"`
-}
-
-type RegisterRequest struct {
-	UnitId   string `json:"unit_id" binding:"required"`
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
-}
 
 func GetUnits(c *gin.Context) {
 	// execute status command on openvpn socket
@@ -63,8 +43,7 @@ func GetUnits(c *gin.Context) {
 	}
 
 	// define vpns object
-	var vpns map[string]gin.H
-	vpns = make(map[string]gin.H)
+	vpns := make(map[string]gin.H)
 
 	// loop through lines
 	for _, line := range lines {
@@ -160,7 +139,7 @@ func GetUnits(c *gin.Context) {
 
 func GetUnit(c *gin.Context) {
 	// get unit id
-	UnitId := c.Param("unit_id")
+	unitId := c.Param("unit_id")
 
 	// execute status command on openvpn socket
 	var lines []string
@@ -169,7 +148,7 @@ func GetUnit(c *gin.Context) {
 	// get only necessary lines
 	rawLines := strings.Split(outSocket, "\n")
 	for _, line := range rawLines {
-		if strings.HasPrefix(line, "CLIENT_LIST\t"+UnitId) {
+		if strings.HasPrefix(line, "CLIENT_LIST\t"+unitId) {
 			lines = append(lines, line)
 		}
 	}
@@ -194,7 +173,7 @@ func GetUnit(c *gin.Context) {
 	}
 
 	// read unit file
-	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + UnitId)
+	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -209,7 +188,7 @@ func GetUnit(c *gin.Context) {
 
 	// compose result
 	result := gin.H{
-		"id":         UnitId,
+		"id":         unitId,
 		"ipaddress":  parts[1],
 		"netmask":    parts[2],
 		"registered": true,
@@ -232,15 +211,15 @@ func GetUnit(c *gin.Context) {
 
 func GetToken(c *gin.Context) {
 	// get unit id
-	UnitId := c.Param("unit_id")
+	unitId := c.Param("unit_id")
 
 	// read credentials
-	var credentials LoginRequest
-	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + UnitId)
+	var credentials models.LoginRequest
+	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot open credentials file for: " + UnitId,
+			Message: "cannot open credentials file for: " + unitId,
 			Data:    err.Error(),
 		}))
 		return
@@ -250,14 +229,14 @@ func GetToken(c *gin.Context) {
 	json.Unmarshal(body, &credentials)
 
 	// compose request URL
-	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + UnitId + configuration.Config.LoginEndpoint
+	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitId + configuration.Config.LoginEndpoint
 
 	// create request action
 	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(body))
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot make request for: " + UnitId,
+			Message: "cannot make request for: " + unitId,
 			Data:    err.Error(),
 		}))
 		return
@@ -272,7 +251,7 @@ func GetToken(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "request failed for: " + UnitId,
+			Message: "request failed for: " + unitId,
 			Data:    err.Error(),
 		}))
 		return
@@ -282,12 +261,12 @@ func GetToken(c *gin.Context) {
 	defer res.Body.Close()
 
 	// convert response to struct
-	loginResponse := &LoginResponse{}
+	loginResponse := &models.LoginResponse{}
 	err = json.NewDecoder(res.Body).Decode(loginResponse)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot convert response to struct for: " + UnitId,
+			Message: "cannot convert response to struct for: " + unitId,
 			Data:    err.Error(),
 		}))
 		return
@@ -297,7 +276,7 @@ func GetToken(c *gin.Context) {
 	if len(loginResponse.Token) == 0 {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "invalid JWT token response for: " + UnitId,
+			Message: "invalid JWT token response for: " + unitId,
 			Data:    "token is invalid",
 		}))
 		return
@@ -316,7 +295,7 @@ func GetToken(c *gin.Context) {
 
 func AddUnit(c *gin.Context) {
 	// parse request fields
-	var jsonRequest AddRequest
+	var jsonRequest models.AddRequest
 	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -458,7 +437,7 @@ func AddUnit(c *gin.Context) {
 
 func RegisterUnit(c *gin.Context) {
 	// parse request fields
-	var jsonRequest RegisterRequest
+	var jsonRequest models.RegisterRequest
 	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -528,7 +507,7 @@ func RegisterUnit(c *gin.Context) {
 		password := jsonRequest.Password
 
 		// read credentials from file
-		var credentials LoginRequest
+		var credentials models.LoginRequest
 		jsonString, errRead := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.UnitId)
 
 		// credentials exists, update only if username matches
@@ -582,13 +561,13 @@ func RegisterUnit(c *gin.Context) {
 
 func DeleteUnit(c *gin.Context) {
 	// get unit id
-	UnitId := c.Param("unit_id")
+	unitId := c.Param("unit_id")
 
 	// kill vpn connection
-	_ = socket.Write("kill " + UnitId)
+	_ = socket.Write("kill " + unitId)
 
 	// revoke certificate
-	cmdRevoke := exec.Command(configuration.Config.EasyRSAPath, "revoke", UnitId)
+	cmdRevoke := exec.Command(configuration.Config.EasyRSAPath, "revoke", unitId)
 	cmdRevoke.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
@@ -596,7 +575,7 @@ func DeleteUnit(c *gin.Context) {
 	if err := cmdRevoke.Run(); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "cannot revoke certificate for: " + UnitId,
+			Message: "cannot revoke certificate for: " + unitId,
 			Data:    err.Error(),
 		}))
 		return
@@ -618,12 +597,12 @@ func DeleteUnit(c *gin.Context) {
 	}
 
 	// delete reservation/auth file
-	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + UnitId); err == nil {
-		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + UnitId)
+	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + unitId); err == nil {
+		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + unitId)
 		if errDeleteAuth != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    403,
-				Message: "error in deletion auth file for: " + UnitId,
+				Message: "error in deletion auth file for: " + unitId,
 				Data:    errDeleteAuth.Error(),
 			}))
 			return
@@ -631,12 +610,12 @@ func DeleteUnit(c *gin.Context) {
 	}
 
 	// delete traefik conf
-	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + UnitId + ".yaml"); err == nil {
-		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + UnitId + ".yaml")
+	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml"); err == nil {
+		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml")
 		if errDeleteProxy != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    403,
-				Message: "error in deletion proxy file for: " + UnitId,
+				Message: "error in deletion proxy file for: " + unitId,
 				Data:    errDeleteProxy.Error(),
 			}))
 			return

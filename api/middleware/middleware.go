@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Nethesis S.r.l.
+ * Copyright (C) 2024 Nethesis S.r.l.
  * http://www.nethesis.it - info@nethesis.it
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -11,10 +11,7 @@ package middleware
 
 import (
 	"bytes"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"strings"
@@ -32,6 +29,8 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 )
 
 type login struct {
@@ -69,27 +68,32 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			username := loginVals.Username
 			password := loginVals.Password
 
-			// calculate sha256 of password
-			h := sha256.New()
-			h.Write([]byte(password))
-			sha256Hash := hex.EncodeToString(h.Sum(nil))
+			// read user password hash
+			passwordHash := storage.GetPassword(username)
 
-			// check login
-			if username == configuration.Config.AdminUsername && sha256Hash == configuration.Config.AdminPassword {
-				// login ok action
-				logs.Logs.Println("[INFO][AUTH] authentication success for user " + username)
+			// check login for admin
+			if username == configuration.Config.AdminUsername {
+				passwordHash = configuration.Config.AdminPassword
+			}
 
-				// return user auth model
-				return &models.UserAuthorizations{
-					Username: username,
-				}, nil
-			} else {
+			// check password
+			valid := utils.CheckPasswordHash(password, passwordHash)
+
+			if !valid {
 				// login fail action
 				logs.Logs.Println("[INFO][AUTH] authentication failed for user " + username)
 
 				// return JWT error
 				return nil, jwt.ErrFailedAuthentication
 			}
+
+			// login ok action
+			logs.Logs.Println("[INFO][AUTH] authentication success for user " + username)
+
+			// return user auth model
+			return &models.UserAuthorizations{
+				Username: username,
+			}, nil
 
 		},
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
@@ -181,8 +185,6 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			tokenObj, _ := InstanceJWT().ParseTokenString(token)
 			claims := jwt.ExtractClaimsFromToken(tokenObj)
 
-			fmt.Println("save token", claims["id"].(string), token)
-
 			// set token to valid
 			methods.SetTokenValidation(claims["id"].(string), token)
 
@@ -216,7 +218,6 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				Message: message,
 				Data:    nil,
 			}))
-			return
 		},
 		TokenLookup:   "header: Authorization, token: jwt",
 		TokenHeadName: "Bearer",

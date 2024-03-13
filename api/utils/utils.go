@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2023 Nethesis S.r.l.
+ * Copyright (C) 2024 Nethesis S.r.l.
  * http://www.nethesis.it - info@nethesis.it
  *
  * SPDX-License-Identifier: GPL-2.0-only
@@ -12,6 +12,8 @@ package utils
 import (
 	"net"
 	"strconv"
+
+	"golang.org/x/crypto/bcrypt"
 )
 
 func inc(ip net.IP) {
@@ -74,4 +76,14 @@ func ListIPs(ipArg string, netmaskArg string) ([]string, error) {
 	default:
 		return ips[1 : len(ips)-1], nil
 	}
+}
+
+func HashPassword(password string) string {
+	bytes, _ := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	return string(bytes)
+}
+
+func CheckPasswordHash(password, hash string) bool {
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
+	return err == nil
 }
