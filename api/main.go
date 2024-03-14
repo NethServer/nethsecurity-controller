@@ -98,6 +98,7 @@ func main() {
 			accounts.POST("", methods.AddAccount)
 			accounts.PUT("/:account_id", methods.UpdateAccount)
 			accounts.POST("/change-password", methods.UpdatePassword)
+			accounts.POST("/generate-ssh-keys", methods.GenerateSSHKeys)
 			accounts.DELETE("/:account_id", methods.DeleteAccount)
 		}
 

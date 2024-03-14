@@ -20,7 +20,6 @@ type LoginResponse struct {
 	Token  string `json:"token" binding:"required"`
 }
 
-type PasswordChange struct {
-	OldPassword string `json:"old_password" binding:"required"`
-	NewPassword string `json:"new_password" binding:"required"`
+type SSHGenerate struct {
+	Passphrase string `json:"passphrase" binding:"required"`
 }
