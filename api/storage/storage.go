@@ -249,13 +249,13 @@ func UpdatePassword(accountUsername string, newPassword string) error {
 	return err
 }
 
-func AddUnit(unitID string, unitName string, version string, subscriptionType string, systemID string) error {
+func AddOrUpdateUnit(unitID string, unitName string, version string, subscriptionType string, systemID string) error {
 	// get db
 	db := Instance()
 
 	// define query
 	_, err := db.Exec(
-		"INSERT INTO units (id, name, version, subscription_type, system_id) VALUES (?, ?, ?, ?, ?)",
+		"REPLACE INTO units (id, name, version, subscription_type, system_id) VALUES (?, ?, ?, ?, ?)",
 		unitID,
 		unitName,
 		version,
@@ -265,29 +265,7 @@ func AddUnit(unitID string, unitName string, version string, subscriptionType st
 
 	// check error
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][ADD_UNIT] error in insert units query: " + err.Error())
-	}
-
-	return err
-}
-
-func UpdateUnit(unitID string, unitName string, version string, subscriptionType string, systemID string) error {
-	// get db
-	db := Instance()
-
-	// define query
-	_, err := db.Exec(
-		"UPDATE units set name = ?, version = ?, subscription_type = ?, system_id = ? WHERE id = ?",
-		unitName,
-		version,
-		subscriptionType,
-		systemID,
-		unitID,
-	)
-
-	// check error
-	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][UPDATE_UNIT] error in update units query: " + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][ADD_OR_UPDATE_UNIT] error in insert units query: " + err.Error())
 	}
 
 	return err
@@ -317,7 +295,7 @@ func GetUnit(unitId string) (models.Unit, error) {
 	return result, err
 }
 
-func GetUnits() (map[string]models.Unit, error) {
+func GetUnits() ([]models.Unit, error) {
 	// get db
 	db := Instance()
 
@@ -341,11 +319,6 @@ func GetUnits() (map[string]models.Unit, error) {
 		results = append(results, unitRow)
 	}
 
-	unitMap := make(map[string]models.Unit)
-	for _, unitRow := range results {
-		unitMap[unitRow.ID] = unitRow
-	}
-
 	// return results
-	return unitMap, err
+	return results, err
 }

@@ -74,7 +74,11 @@ func GetUnits(c *gin.Context) {
 	}
 
 	// get unit data from database
-	db_info, _ := storage.GetUnits()
+	unitRows, _ := storage.GetUnits()
+	dbInfo := make(map[string]models.Unit)
+	for _, unitRow := range unitRows {
+		dbInfo[unitRow.ID] = unitRow
+	}
 
 	// loop through units
 	var results []gin.H
@@ -108,6 +112,14 @@ func GetUnits(c *gin.Context) {
 			result["vpn"] = gin.H{}
 		}
 
+		// add db info
+		info, ok := dbInfo[e.Name()]
+		if ok {
+			result["info"] = info
+		} else {
+			result["info"] = gin.H{}
+		}
+
 		// append to array
 		results = append(results, result)
 	}
@@ -129,7 +141,7 @@ func GetUnits(c *gin.Context) {
 		}
 
 		// add db info
-		info, ok := db_info[id]
+		info, ok := dbInfo[id]
 		if ok {
 			result["info"] = info
 		} else {
@@ -557,7 +569,7 @@ func RegisterUnit(c *gin.Context) {
 			return
 		}
 
-		errAdd := storage.UpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
+		errAdd := storage.AddOrUpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
 		if errAdd != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
@@ -580,7 +592,7 @@ func RegisterUnit(c *gin.Context) {
 			"password": jsonRequest.Password,
 		}
 
-		errAdd := storage.AddUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
+		errAdd := storage.AddOrUpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
 		if errAdd != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
