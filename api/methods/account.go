@@ -279,7 +279,32 @@ func UpdatePassword(c *gin.Context) {
 
 }
 
-func GenerateSSHKeys(c *gin.Context) {
+func GetSSHKeys(c *gin.Context) {
+	// get username
+	username := jwt.ExtractClaims(c)["id"].(string)
+
+	// get path for ssh keys
+	keysPath := configuration.Config.DataDir + "/" + username + ".key"
+
+	// read key.pub
+	keyPub, err := os.ReadFile(keysPath + ".pub")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "access ssh directory keys file failed",
+			Data:    err.Error(),
+		}))
+	}
+
+	// return ok
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "success",
+		Data:    gin.H{"key.pub": string(keyPub)},
+	}))
+}
+
+func AddSSHKeys(c *gin.Context) {
 	// get passphrase field
 	var json models.SSHGenerate
 	if err := c.BindJSON(&json); err != nil {
@@ -291,7 +316,7 @@ func GenerateSSHKeys(c *gin.Context) {
 	username := jwt.ExtractClaims(c)["id"].(string)
 
 	// create path for key and key.pub
-	keysPath := configuration.Config.DataDir + "/" + username + "-key"
+	keysPath := configuration.Config.DataDir + "/" + username + ".key"
 
 	// execute command
 	args := []string{"-t", "rsa", "-q", "-f", keysPath, "-N", json.Passphrase}
