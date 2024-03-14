@@ -292,3 +292,60 @@ func UpdateUnit(unitID string, unitName string, version string, subscriptionType
 
 	return err
 }
+
+func GetUnit(unitId string) (models.Unit, error) {
+	// get db
+	db := Instance()
+
+	// define query
+	query := "SELECT id, name, version, subscription_type, system_id, created FROM units where id = ?"
+	rows, err := db.Query(query, unitId)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_UNIT] error in query execution:" + err.Error())
+	}
+	defer rows.Close()
+
+	// loop rows
+	var result models.Unit
+	for rows.Next() {
+		if err := rows.Scan(&result.ID, &result.Name, &result.Version, &result.SubscriptionType, &result.SystemID); err != nil {
+			logs.Logs.Println("[ERR][STORAGE][GET_UNIT] error in query row extraction" + err.Error())
+		}
+	}
+
+	// return results
+	return result, err
+}
+
+func GetUnits() (map[string]models.Unit, error) {
+	// get db
+	db := Instance()
+
+	// define query
+	query := "SELECT id, name, version, subscription_type, system_id, created FROM units"
+	rows, err := db.Query(query)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_UNITS] error in query execution:" + err.Error())
+	}
+	defer rows.Close()
+
+	// loop rows
+	var results []models.Unit
+	for rows.Next() {
+		var unitRow models.Unit
+		if err := rows.Scan(&unitRow.ID, &unitRow.Name, &unitRow.Version, &unitRow.SubscriptionType, &unitRow.SystemID, &unitRow.Created); err != nil {
+			logs.Logs.Println("[ERR][STORAGE][GET_UNITS] error in query row extraction" + err.Error())
+		}
+
+		// append results
+		results = append(results, unitRow)
+	}
+
+	unitMap := make(map[string]models.Unit)
+	for _, unitRow := range results {
+		unitMap[unitRow.ID] = unitRow
+	}
+
+	// return results
+	return unitMap, err
+}

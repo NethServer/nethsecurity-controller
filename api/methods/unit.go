@@ -73,6 +73,9 @@ func GetUnits(c *gin.Context) {
 		return
 	}
 
+	// get unit data from database
+	db_info, _ := storage.GetUnits()
+
 	// loop through units
 	var results []gin.H
 	for _, e := range units {
@@ -123,6 +126,14 @@ func GetUnits(c *gin.Context) {
 			result["vpn"] = vpns[id]
 		} else {
 			result["vpn"] = gin.H{}
+		}
+
+		// add db info
+		info, ok := db_info[id]
+		if ok {
+			result["info"] = info
+		} else {
+			result["info"] = gin.H{}
 		}
 
 		// append to array
@@ -200,6 +211,14 @@ func GetUnit(c *gin.Context) {
 		result["vpn"] = vpn
 	} else {
 		result["vpn"] = gin.H{}
+	}
+
+	// retrieve unit info from database
+	info, err := storage.GetUnit(unitId)
+	if err == nil {
+		result["info"] = info
+	} else {
+		result["info"] = gin.H{}
 	}
 
 	// return 200 OK with data
