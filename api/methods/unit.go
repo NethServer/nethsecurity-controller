@@ -23,6 +23,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/global"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 
 	"github.com/fatih/structs"
@@ -72,6 +73,13 @@ func GetUnits(c *gin.Context) {
 		return
 	}
 
+	// get unit data from database
+	unitRows, _ := storage.GetUnits()
+	dbInfo := make(map[string]models.Unit)
+	for _, unitRow := range unitRows {
+		dbInfo[unitRow.ID] = unitRow
+	}
+
 	// loop through units
 	var results []gin.H
 	for _, e := range units {
@@ -104,6 +112,14 @@ func GetUnits(c *gin.Context) {
 			result["vpn"] = gin.H{}
 		}
 
+		// add db info
+		info, ok := dbInfo[e.Name()]
+		if ok {
+			result["info"] = info
+		} else {
+			result["info"] = gin.H{}
+		}
+
 		// append to array
 		results = append(results, result)
 	}
@@ -122,6 +138,14 @@ func GetUnits(c *gin.Context) {
 			result["vpn"] = vpns[id]
 		} else {
 			result["vpn"] = gin.H{}
+		}
+
+		// add db info
+		info, ok := dbInfo[id]
+		if ok {
+			result["info"] = info
+		} else {
+			result["info"] = gin.H{}
 		}
 
 		// append to array
@@ -199,6 +223,14 @@ func GetUnit(c *gin.Context) {
 		result["vpn"] = vpn
 	} else {
 		result["vpn"] = gin.H{}
+	}
+
+	// retrieve unit info from database
+	info, err := storage.GetUnit(unitId)
+	if err == nil {
+		result["info"] = info
+	} else {
+		result["info"] = gin.H{}
 	}
 
 	// return 200 OK with data
@@ -537,6 +569,16 @@ func RegisterUnit(c *gin.Context) {
 			return
 		}
 
+		errAdd := storage.AddOrUpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
+		if errAdd != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot add update to database for: " + jsonRequest.UnitId,
+				Data:    errAdd.Error(),
+			}))
+			return
+		}
+
 		// return 200 OK with data
 		c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 			Code:    200,
@@ -548,6 +590,16 @@ func RegisterUnit(c *gin.Context) {
 		global.WaitingList[jsonRequest.UnitId] = gin.H{
 			"username": jsonRequest.Username,
 			"password": jsonRequest.Password,
+		}
+
+		errAdd := storage.AddOrUpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
+		if errAdd != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot add unit to database for: " + jsonRequest.UnitId,
+				Data:    errAdd.Error(),
+			}))
+			return
 		}
 
 		// return forbidden state
