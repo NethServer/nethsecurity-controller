@@ -120,7 +120,6 @@ CGO_ENABLED=0 go build
             {
                 "ipaddress": "172.23.21.3",
                 "id": "<unit_id>",
-                "name": "fw.nethsecurity.local",
                 "netmask": "255.255.255.0",
                 "registered": true,
                 "vpn": {
@@ -129,8 +128,15 @@ CGO_ENABLED=0 go build
                     "connected_since": "1686312722",
                     "real_address": "192.168.122.220:41445",
                     "virtual_address": "172.23.21.3"
+                },
+                "info": {
+                    "unit_id": "fba703c1-6c2d-4d3d-9dab-5998c7b66700",
+                    "unit_name": "fw.local",
+                    "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
+                    "subscription_type": "enterprise",
+                    "system_id": "XXXXXXXX-XXXX",
+                    "created": "2024-03-14T15:18:08Z"
                 }
-
             },
             ...
             {
@@ -138,7 +144,15 @@ CGO_ENABLED=0 go build
                 "id": "<unit_id>",
                 "netmask": "",
                 "registered": false,
-                "vpn": {}
+                "vpn": {},
+                "info": {
+                    "unit_id": "zzzzzzzz-d9f3-44b7-b277-36d65cf139e6",
+                    "unit_name": "fw.nethsecurity.local",
+                    "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
+                    "subscription_type": "",
+                    "system_id": "",
+                    "created": "2024-03-14T15:16:02Z"
+                }
             }
         ],
         "message": "units listed successfully"
@@ -162,15 +176,22 @@ CGO_ENABLED=0 go build
         "data": {
             "ipaddress": "172.23.21.3",
             "id": "<unit_id>",
-            "name": "fw.nethsecurity.local",
             "netmask": "255.255.255.0",
             "registered": true,
             "vpn": {
-            "bytes_rcvd": "22030",
-            "bytes_sent": "5841",
-            "connected_since": "1686312722",
-            "real_address": "192.168.122.220:41445",
-            "virtual_address": "172.23.21.3"
+                "bytes_rcvd": "22030",
+                "bytes_sent": "5841",
+                "connected_since": "1686312722",
+                "real_address": "192.168.122.220:41445",
+                "virtual_address": "172.23.21.3"
+            },
+            "info": {
+                "unit_id": "fba703c1-6c2d-4d3d-9dab-5998c7b66700",
+                "unit_name": "fw.local",
+                "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
+                "subscription_type": "enterprise",
+                "system_id": "XXXXXXXX-XXXX",
+                "created": "2024-03-14T15:18:08Z"
             }
         },
         "message": "unit listed successfully"
@@ -234,7 +255,10 @@ CGO_ENABLED=0 go build
         "unit_name": "fw.nethsecurity.local",
         "unit_id": "d330b2db-cdfe-4c56-b9b6-f97e5b838748",
         "username": "test",
-        "password": "Nethesis,1234"
+        "password": "Nethesis,1234",
+        "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
+        "subscription_type": "enterprise",
+        "system_id": "XXXXXXXX-XXXX",
      }
     ```
 
