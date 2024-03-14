@@ -290,11 +290,8 @@ func GenerateSSHKeys(c *gin.Context) {
 	// get username
 	username := jwt.ExtractClaims(c)["id"].(string)
 
-	// create hash of username
-	hashUsername := utils.MD5Hash(username)
-
 	// create path for key and key.pub
-	keysPath := configuration.Config.DataDir + "/" + hashUsername + "-key"
+	keysPath := configuration.Config.DataDir + "/" + username + "-key"
 
 	// execute command
 	args := []string{"-t", "rsa", "-q", "-f", keysPath, "-N", json.Passphrase}
@@ -321,20 +318,10 @@ func GenerateSSHKeys(c *gin.Context) {
 		}))
 	}
 
-	// read key
-	keyPrivate, err := os.ReadFile(keysPath)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "access ssh directory keys file failed",
-			Data:    err.Error(),
-		}))
-	}
-
 	// return ok
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "success",
-		Data:    gin.H{"key.pub": string(keyPub), "key": string(keyPrivate)},
+		Data:    gin.H{"key.pub": string(keyPub)},
 	}))
 }
