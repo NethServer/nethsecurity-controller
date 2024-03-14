@@ -14,7 +14,11 @@ type AddRequest struct {
 }
 
 type RegisterRequest struct {
-	UnitId   string `json:"unit_id" binding:"required"`
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required"`
+	UnitId           string `json:"unit_id" binding:"required"`
+	Username         string `json:"username" binding:"required"`
+	Password         string `json:"password" binding:"required"`
+	UnitName         string `json:"unit_name" binding:"required"`
+	Version          string `json:"version"`
+	SubscriptionType string `json:"subscription_type"`
+	SystemId         string `json:"system_id"`
 }

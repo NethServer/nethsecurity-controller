@@ -23,6 +23,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/global"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 
 	"github.com/fatih/structs"
@@ -537,6 +538,16 @@ func RegisterUnit(c *gin.Context) {
 			return
 		}
 
+		errAdd := storage.UpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
+		if errAdd != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot add update to database for: " + jsonRequest.UnitId,
+				Data:    errAdd.Error(),
+			}))
+			return
+		}
+
 		// return 200 OK with data
 		c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 			Code:    200,
@@ -548,6 +559,16 @@ func RegisterUnit(c *gin.Context) {
 		global.WaitingList[jsonRequest.UnitId] = gin.H{
 			"username": jsonRequest.Username,
 			"password": jsonRequest.Password,
+		}
+
+		errAdd := storage.AddUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
+		if errAdd != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "cannot add unit to database for: " + jsonRequest.UnitId,
+				Data:    errAdd.Error(),
+			}))
+			return
 		}
 
 		// return forbidden state
