@@ -44,7 +44,7 @@ type Configuration struct {
 	PromtailPort    string `json:"promtail_port"`
 	PrometheusPath  string `json:"prometheus_path"`
 	WebSSHPath      string `json:"webssh_path"`
-	WebSSHPort      string `json:"webssh_path"`
+	WebSSHPort      string `json:"webssh_port"`
 	GrafanaPath     string `json:"grafana_path"`
 
 	EasyRSAPath string `json:"easy_rsa_path"`
