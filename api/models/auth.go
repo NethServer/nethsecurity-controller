@@ -25,6 +25,8 @@ type SSHGenerate struct {
 }
 
 type SSHConnect struct {
+	Username   string `json:"username"`
+	Port       string `json:"port"`
 	UnitID     string `json:"unit_id" binding:"required"`
 	Passphrase string `json:"passphrase" binding:"required"`
 }

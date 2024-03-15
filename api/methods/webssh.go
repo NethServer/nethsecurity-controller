@@ -27,8 +27,14 @@ import (
 )
 
 func GetWebSSH(c *gin.Context) {
-	// get request fields
+	// define request fields
 	var jsonData models.SSHConnect
+
+	// set defaults
+	jsonData.Username = "root"
+	jsonData.Port = "22"
+
+	// get real params
 	if err := c.BindJSON(&jsonData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "request fields malformed", "error": err.Error()})
 		return
@@ -60,7 +66,7 @@ func GetWebSSH(c *gin.Context) {
 	keysPath := configuration.Config.DataDir + "/" + username + ".key"
 
 	// read key
-	keyPrivate, err := os.ReadFile(keysPath + "")
+	keyPrivate, err := os.ReadFile(keysPath)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -120,8 +126,8 @@ func GetWebSSH(c *gin.Context) {
 	// make post request for websocket id
 	resPost, errPost := client.PostForm(webSSHURL, url.Values{
 		"hostname":   {ipAddress},
-		"port":       {"22"},
-		"username":   {"root"},
+		"port":       {jsonData.Port},
+		"username":   {jsonData.Username},
 		"privatekey": {string(keyPrivate)},
 		"passphrase": {jsonData.Passphrase},
 		"term":       {"xterm-256color"},
@@ -152,6 +158,9 @@ func GetWebSSH(c *gin.Context) {
 
 	// parse body response
 	jsonParsed, _ := gabs.ParseJSON(body)
+
+	// add xsrf token
+	jsonParsed.Set(xsrfToken, "xsrf")
 
 	// check if id exists
 	idFound, _ := jsonParsed.Path("id").Data().(string)
