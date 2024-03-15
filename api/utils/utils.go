@@ -10,11 +10,8 @@
 package utils
 
 import (
-<<<<<<< HEAD
 	"encoding/base64"
 	"encoding/json"
-=======
->>>>>>> 9665b2c (utils. remove md5 hash method)
 	"net"
 	"strconv"
 

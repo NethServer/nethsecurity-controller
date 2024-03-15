@@ -123,6 +123,12 @@ func main() {
 			units.POST("", methods.AddUnit)
 			units.DELETE("/:unit_id", methods.DeleteUnit)
 		}
+
+		// web ssh APIs
+		webssh := api.Group("/webssh")
+		{
+			webssh.POST("", methods.GetWebSSH)
+		}
 	}
 
 	// handle missing endpoint
