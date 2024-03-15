@@ -27,7 +27,7 @@ import (
 )
 
 func GetWebSSH(c *gin.Context) {
-	// get passphrase field
+	// get request fields
 	var jsonData models.SSHConnect
 	if err := c.BindJSON(&jsonData); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"message": "request fields malformed", "error": err.Error()})
