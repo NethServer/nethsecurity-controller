@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/NethServer/nethsecurity-api/response"
@@ -300,7 +301,7 @@ func GetSSHKeys(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "success",
-		Data:    gin.H{"key.pub": string(keyPub)},
+		Data:    gin.H{"key.pub": strings.TrimSuffix(string(keyPub), "\n")},
 	}))
 }
 
