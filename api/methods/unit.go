@@ -416,6 +416,26 @@ func AddUnit(c *gin.Context) {
 }
 
 func RegisterUnit(c *gin.Context) {
+	token := c.GetHeader("RegistrationToken")
+
+	// check if token exists
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, structs.Map(response.StatusBadRequest{
+			Code:    403,
+			Message: "registration token required",
+		}))
+		return
+	}
+
+	// validate token
+	if token != configuration.Config.RegistrationToken {
+		c.JSON(http.StatusUnauthorized, structs.Map(response.StatusBadRequest{
+			Code:    403,
+			Message: "invalid registration token",
+		}))
+		return
+	}
+
 	// parse request fields
 	var jsonRequest models.RegisterRequest
 	if err := c.ShouldBindJSON(&jsonRequest); err != nil {

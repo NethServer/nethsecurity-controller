@@ -81,7 +81,7 @@ func main() {
 	api.POST("/login", middleware.InstanceJWT().LoginHandler)
 	api.POST("/logout", middleware.InstanceJWT().LogoutHandler)
 
-	// define server registration, in waiting list
+	// define server registration
 	api.POST("/units/register", methods.RegisterUnit)
 
 	// define JWT middleware
