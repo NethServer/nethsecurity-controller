@@ -202,6 +202,8 @@ func GetUnit(c *gin.Context) {
 		result["info"] = gin.H{}
 	}
 
+	result["join_code"] = utils.GetJoinCode(unitId)
+
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
@@ -410,7 +412,7 @@ func AddUnit(c *gin.Context) {
 		Code:    200,
 		Message: "unit added successfully",
 		Data: gin.H{
-			"ipaddress": freeIP,
+			"join_code": utils.GetJoinCode(jsonRequest.UnitId),
 		},
 	}))
 }

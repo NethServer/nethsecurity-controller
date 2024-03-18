@@ -10,9 +10,13 @@
 package utils
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"net"
 	"strconv"
 
+	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -86,4 +90,22 @@ func HashPassword(password string) string {
 func CheckPasswordHash(password, hash string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(password))
 	return err == nil
+}
+
+// generate join code
+// the join code is a JSON encoded in base64 with the following fields:
+// - unit_id
+// - registration token
+// - fqdn
+func GetJoinCode(unitId string) string {
+	// compose join code
+	joinCode := gin.H{
+		"unit_id": unitId,
+		"token":   configuration.Config.RegistrationToken,
+		"fqdn":    configuration.Config.FQDN,
+	}
+
+	// encode in base64
+	joinCodeString, _ := json.Marshal(joinCode)
+	return base64.StdEncoding.EncodeToString([]byte(joinCodeString))
 }
