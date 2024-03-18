@@ -287,12 +287,22 @@ func GetSSHKeys(c *gin.Context) {
 	// get path for ssh keys
 	keysPath := configuration.Config.DataDir + "/" + username + ".key"
 
+	// read key
+	keyPrivate, err := os.ReadFile(keysPath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "access ssh private key failed",
+			Data:    err.Error(),
+		}))
+	}
+
 	// read key.pub
 	keyPub, err := os.ReadFile(keysPath + ".pub")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "access ssh directory keys file failed",
+			Message: "access ssh public key failed",
 			Data:    err.Error(),
 		}))
 	}
@@ -301,7 +311,10 @@ func GetSSHKeys(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "success",
-		Data:    gin.H{"key.pub": strings.TrimSuffix(string(keyPub), "\n")},
+		Data: gin.H{
+			"key_pub": strings.TrimSuffix(string(keyPub), "\n"),
+			"key":     strings.TrimSuffix(string(keyPrivate), "\n"),
+		},
 	}))
 }
 
@@ -348,6 +361,6 @@ func AddSSHKeys(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "success",
-		Data:    gin.H{"key.pub": strings.TrimSuffix(string(keyPub), "\n")},
+		Data:    gin.H{"key_pub": strings.TrimSuffix(string(keyPub), "\n")},
 	}))
 }
