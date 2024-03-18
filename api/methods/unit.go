@@ -20,7 +20,6 @@ import (
 
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
-	"github.com/NethServer/nethsecurity-controller/api/global"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
@@ -99,10 +98,9 @@ func GetUnits(c *gin.Context) {
 
 		// compose result
 		result := gin.H{
-			"id":         e.Name(),
-			"ipaddress":  parts[1],
-			"netmask":    parts[2],
-			"registered": true,
+			"id":        e.Name(),
+			"ipaddress": parts[1],
+			"netmask":   parts[2],
 		}
 
 		// check if vpn data exists
@@ -114,34 +112,6 @@ func GetUnits(c *gin.Context) {
 
 		// add db info
 		info, ok := dbInfo[e.Name()]
-		if ok {
-			result["info"] = info
-		} else {
-			result["info"] = gin.H{}
-		}
-
-		// append to array
-		results = append(results, result)
-	}
-
-	// list units in waiting state
-	for id, _ := range global.WaitingList {
-		result := gin.H{
-			"id":         id,
-			"ipaddress":  "",
-			"netmask":    "",
-			"registered": false,
-		}
-
-		// check if vpn data exists
-		if vpns[id] != nil {
-			result["vpn"] = vpns[id]
-		} else {
-			result["vpn"] = gin.H{}
-		}
-
-		// add db info
-		info, ok := dbInfo[id]
 		if ok {
 			result["info"] = info
 		} else {
@@ -212,10 +182,9 @@ func GetUnit(c *gin.Context) {
 
 	// compose result
 	result := gin.H{
-		"id":         unitId,
-		"ipaddress":  parts[1],
-		"netmask":    parts[2],
-		"registered": true,
+		"id":        unitId,
+		"ipaddress": parts[1],
+		"netmask":   parts[2],
 	}
 
 	// check if vpn data exists
@@ -232,6 +201,8 @@ func GetUnit(c *gin.Context) {
 	} else {
 		result["info"] = gin.H{}
 	}
+
+	result["join_code"] = utils.GetJoinCode(unitId)
 
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
@@ -436,38 +407,37 @@ func AddUnit(c *gin.Context) {
 		return
 	}
 
-	// get unit from waiting list and save credentials
-	waiter := global.WaitingList[jsonRequest.UnitId]
-
-	// check if unit was in waiting list
-	if waiter != nil {
-		// write new credentials
-		newCredentials, _ := json.Marshal(waiter)
-		errSave := os.WriteFile(configuration.Config.CredentialsDir+"/"+jsonRequest.UnitId, newCredentials, 0644)
-		if errSave != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    400,
-				Message: "cannot write waiter credentials file for: " + jsonRequest.UnitId,
-				Data:    errSave.Error(),
-			}))
-			return
-		}
-
-		// remove element from waiting list
-		delete(global.WaitingList, jsonRequest.UnitId)
-	}
-
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "unit added successfully",
 		Data: gin.H{
-			"ipaddress": freeIP,
+			"join_code": utils.GetJoinCode(jsonRequest.UnitId),
 		},
 	}))
 }
 
 func RegisterUnit(c *gin.Context) {
+	token := c.GetHeader("RegistrationToken")
+
+	// check if token exists
+	if token == "" {
+		c.JSON(http.StatusUnauthorized, structs.Map(response.StatusBadRequest{
+			Code:    403,
+			Message: "registration token required",
+		}))
+		return
+	}
+
+	// validate token
+	if token != configuration.Config.RegistrationToken {
+		c.JSON(http.StatusUnauthorized, structs.Map(response.StatusBadRequest{
+			Code:    403,
+			Message: "invalid registration token",
+		}))
+		return
+	}
+
 	// parse request fields
 	var jsonRequest models.RegisterRequest
 	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
@@ -586,26 +556,10 @@ func RegisterUnit(c *gin.Context) {
 			Data:    config,
 		}))
 	} else {
-		// add to waiting list
-		global.WaitingList[jsonRequest.UnitId] = gin.H{
-			"username": jsonRequest.Username,
-			"password": jsonRequest.Password,
-		}
-
-		errAdd := storage.AddOrUpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
-		if errAdd != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    400,
-				Message: "cannot add unit to database for: " + jsonRequest.UnitId,
-				Data:    errAdd.Error(),
-			}))
-			return
-		}
-
 		// return forbidden state
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
-			Message: "unit added to waiting list",
+			Message: "unit not allowed",
 			Data:    "",
 		}))
 	}

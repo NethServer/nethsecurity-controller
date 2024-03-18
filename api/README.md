@@ -192,7 +192,8 @@ CGO_ENABLED=0 go build
                 "subscription_type": "enterprise",
                 "system_id": "XXXXXXXX-XXXX",
                 "created": "2024-03-14T15:18:08Z"
-            }
+            },
+            "join_code": "eyJmcWRuIjoiY29udHJvbGxlci5ncy5uZXRoc2VydmVyLm5ldCIsInRva2VuIjoiMTIzNCIsInVuaXRfaWQiOiI5Njk0Y2Y4ZC03ZmE5LTRmN2EtYjFjNC1iY2Y0MGUzMjhjMDIifQ=="
         },
         "message": "unit listed successfully"
      }
@@ -239,7 +240,7 @@ CGO_ENABLED=0 go build
      {
         "code": 200,
         "data": {
-            "ipaddress": "172.21.0.5"
+            "join_code": "eyJmcWRuIjoiY29udHJvbGxlci5ncy5uZXRoc2VydmVyLm5ldCIsInRva2VuIjoiMTIzNCIsInVuaXRfaWQiOiI2OThhMDQzZC02MGRiLTQyNmMtODRjZi1lODZhMTZmM2QxMzMifQ=="
         },
         "message": "unit added successfully"
      }

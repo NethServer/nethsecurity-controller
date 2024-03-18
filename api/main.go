@@ -20,7 +20,6 @@ import (
 
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
-	"github.com/NethServer/nethsecurity-controller/api/global"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"
 	"github.com/NethServer/nethsecurity-controller/api/middleware"
@@ -52,9 +51,6 @@ func main() {
 	// init storage
 	storage.Init()
 
-	// init globa vars
-	global.Init()
-
 	// init socket connection
 	socket.Init()
 
@@ -85,7 +81,7 @@ func main() {
 	api.POST("/login", middleware.InstanceJWT().LoginHandler)
 	api.POST("/logout", middleware.InstanceJWT().LogoutHandler)
 
-	// define server registration, in waiting list
+	// define server registration
 	api.POST("/units/register", methods.RegisterUnit)
 
 	// define JWT middleware
