@@ -44,7 +44,6 @@ type Configuration struct {
 	PromtailPort    string `json:"promtail_port"`
 	PrometheusPath  string `json:"prometheus_path"`
 	WebSSHPath      string `json:"webssh_path"`
-	WebSSHPort      string `json:"webssh_port"`
 	GrafanaPath     string `json:"grafana_path"`
 
 	EasyRSAPath string `json:"easy_rsa_path"`
@@ -180,12 +179,6 @@ func Init() {
 		Config.WebSSHPath = os.Getenv("WEBSSH_PATH")
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] WEBSSH_PATH variable is empty")
-		os.Exit(1)
-	}
-	if os.Getenv("WEBSSH_PORT") != "" {
-		Config.WebSSHPort = os.Getenv("WEBSSH_PORT")
-	} else {
-		logs.Logs.Println("[CRITICAL][ENV] WEBSSH_PORT variable is empty")
 		os.Exit(1)
 	}
 	if os.Getenv("GRAFANA_PATH") != "" {
