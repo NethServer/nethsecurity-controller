@@ -5,6 +5,7 @@ repobase="ghcr.io/nethserver"
 
 images=()
 container=$(buildah from docker.io/alpine:3.16)
+ui_version="0.53.0"
 
 trap "buildah rm ${container} ${container_api} ${container_proxy}" EXIT
 
@@ -42,7 +43,7 @@ images+=("${repobase}/nethsecurity-proxy")
 
 container_ui=$(buildah from docker.io/alpine:3.17)
 buildah run ${container_ui} apk add --no-cache lighttpd git nodejs npm
-buildah run ${container_ui} git clone https://github.com/NethServer/nethsecurity-ui.git
+buildah run ${container_ui} git clone --depth 1 --branch ${ui_version} https://github.com/NethServer/nethsecurity-ui.git
 buildah config --workingdir /nethsecurity-ui ${container_ui}
 buildah run ${container_ui} sh -c "sed -i 's/standalone/controller/g' .env.production"
 buildah run ${container_ui} sh -c "npm ci && npm run build"
