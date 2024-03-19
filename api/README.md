@@ -313,3 +313,209 @@ CGO_ENABLED=0 go build
         "message": "unit deleted successfully"
      }
     ```
+### Accounts
+- `GET /accounts`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": {
+            "accounts": [
+            {
+                "id": 2,
+                "username": "test1",
+                "password": "",
+                "display_name": "Test 1",
+                "created": "2024-03-14T09:37:28+01:00"
+            },
+            ...
+            {
+                "id": 6,
+                "username": "test2",
+                "password": "",
+                "display_name": "Test 2",
+                "created": "2024-03-14T11:43:33+01:00"
+            }
+            ],
+            "total": 5
+        },
+        "message": "success"
+     }
+
+    ```
+- `GET /accounts/<account_id>`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": {
+            "account": {
+            "id": 2,
+            "username": "test3",
+            "password": "",
+            "display_name": "Test 3",
+            "created": "2024-03-14T09:37:28+01:00"
+            }
+        },
+        "message": "success"
+     }
+    ```
+- `POST /accounts`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+
+     {
+        "username": "test1",
+        "password": "Nethesis,1234",
+        "display_name": "Test 1"
+     }
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 201 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 201,
+        "data": null,
+        "message": "success"
+     }
+    ```
+- `PUT /accounts/<account_id>`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+
+     {
+        "password": "Nethesis,4321",
+        "display_name": "Test 5"
+     }
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": null,
+        "message": "success"
+     }
+    ```
+- `PUT /accounts/password`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+
+     {
+        "old_password": "Nethesis,1234",
+        "new_password": "Nethesis,4321"
+     }
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": null,
+        "message": "success"
+     }
+    ```
+- `DELETE /accounts/<account_id>`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": "",
+        "message": "success"
+     }
+    ```
+- `GET /accounts/ssh-keys`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": {
+            "key": "-----BEGIN OPENSSH PRIVATE KEY-----\nb3BlbnNza...m3XHi7DiRCmyqbwdp86eV\n-----END OPENSSH PRIVATE KEY-----",
+            "key_pub": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDVled...UxVF6O0Esc3gFe0XMUT9Y+GtqM1O2s= test@local.domain"
+        },
+        "message": "success"
+     }
+    ```
+- `POST /accounts/ssh-keys`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+
+     {
+        "passphrase": "Nethesis,2222"
+     }
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 201 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": {
+            "key_pub": "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQDVled...UxVF6O0Esc3gFe0XMUT9Y+GtqM1O2s= test@local.domain"
+        },
+        "message": "success"
+     }
+    ```
