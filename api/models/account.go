@@ -15,7 +15,7 @@ import (
 
 type Account struct {
 	ID          int       `json:"id" structs:"id"`
-	Username    string    `json:"username" structs:"username" binding:"required"`
+	Username    string    `json:"username" structs:"username" binding:"required,excludesall= "`
 	Password    string    `json:"password" structs:"password" db:"-" binding:"required"`
 	DisplayName string    `json:"display_name" structs:"display_name"`
 	Created     time.Time `json:"created" structs:"created"`
@@ -24,4 +24,9 @@ type Account struct {
 type AccountUpdate struct {
 	Password    string `json:"password" structs:"password"`
 	DisplayName string `json:"display_name" structs:"display_name"`
+}
+
+type PasswordChange struct {
+	OldPassword string `json:"old_password" binding:"required"`
+	NewPassword string `json:"new_password" binding:"required"`
 }

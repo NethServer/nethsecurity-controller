@@ -131,10 +131,7 @@ func GetUnits(c *gin.Context) {
 
 }
 
-func GetUnit(c *gin.Context) {
-	// get unit id
-	unitId := c.Param("unit_id")
-
+func readUnitFile(unitId string) ([]byte, gin.H, error) {
 	// execute status command on openvpn socket
 	var lines []string
 	outSocket := socket.Write("status 3")
@@ -168,14 +165,12 @@ func GetUnit(c *gin.Context) {
 
 	// read unit file
 	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "access CCD directory unit file failed",
-			Data:    err.Error(),
-		}))
-	}
 
+	// return results
+	return unitFile, vpn, err
+}
+
+func parseUnitFile(unitId string, unitFile []byte, vpn gin.H) gin.H {
 	// parse unit file
 	parts := strings.Split(string(unitFile), "\n")
 	parts = strings.Split(parts[0], " ")
@@ -203,6 +198,25 @@ func GetUnit(c *gin.Context) {
 	}
 
 	result["join_code"] = utils.GetJoinCode(unitId)
+	return result
+}
+
+func GetUnit(c *gin.Context) {
+	// get unit id
+	unitId := c.Param("unit_id")
+
+	// read unit file
+	unitFile, vpn, err := readUnitFile(unitId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "access CCD directory unit file failed",
+			Data:    err.Error(),
+		}))
+	}
+
+	// parse unit file
+	result := parseUnitFile(unitId, unitFile, vpn)
 
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{

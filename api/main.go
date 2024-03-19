@@ -93,12 +93,19 @@ func main() {
 		// accounts APIs
 		accounts := api.Group("/accounts")
 		{
+			// accounts CRUD
 			accounts.GET("", methods.GetAccounts)
 			accounts.GET("/:account_id", methods.GetAccount)
 			accounts.POST("", methods.AddAccount)
 			accounts.PUT("/:account_id", methods.UpdateAccount)
-			accounts.POST("/change-password", methods.UpdatePassword)
 			accounts.DELETE("/:account_id", methods.DeleteAccount)
+
+			// account password change
+			accounts.PUT("/password", methods.UpdatePassword)
+
+			// ssh keys read and write
+			accounts.GET("/ssh-keys", methods.GetSSHKeys)
+			accounts.POST("/ssh-keys", methods.AddSSHKeys)
 		}
 
 		// default APIs

@@ -11,9 +11,13 @@ package methods
 
 import (
 	"net/http"
+	"os"
+	"os/exec"
+	"strings"
 	"time"
 
 	"github.com/NethServer/nethsecurity-api/response"
+	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
@@ -274,4 +278,89 @@ func UpdatePassword(c *gin.Context) {
 		Data:    nil,
 	}))
 
+}
+
+func GetSSHKeys(c *gin.Context) {
+	// get username
+	username := jwt.ExtractClaims(c)["id"].(string)
+
+	// get path for ssh keys
+	keysPath := configuration.Config.DataDir + "/" + username + ".key"
+
+	// read key
+	keyPrivate, err := os.ReadFile(keysPath)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "access ssh private key failed",
+			Data:    err.Error(),
+		}))
+	}
+
+	// read key.pub
+	keyPub, err := os.ReadFile(keysPath + ".pub")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "access ssh public key failed",
+			Data:    err.Error(),
+		}))
+	}
+
+	// return ok
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "success",
+		Data: gin.H{
+			"key_pub": strings.TrimSuffix(string(keyPub), "\n"),
+			"key":     strings.TrimSuffix(string(keyPrivate), "\n"),
+		},
+	}))
+}
+
+func AddSSHKeys(c *gin.Context) {
+	// get passphrase field
+	var json models.SSHGenerate
+	if err := c.BindJSON(&json); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"message": "request fields malformed", "error": err.Error()})
+		return
+	}
+
+	// get username
+	username := jwt.ExtractClaims(c)["id"].(string)
+
+	// create path for key and key.pub
+	keysPath := configuration.Config.DataDir + "/" + username + ".key"
+
+	// execute command
+	args := []string{"-t", "rsa", "-q", "-f", keysPath, "-N", json.Passphrase}
+	cmd := exec.Command("/usr/bin/ssh-keygen", args...)
+
+	// check error
+	err := cmd.Run()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "generate ssh pair failed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// read key.pub
+	keyPub, err := os.ReadFile(keysPath + ".pub")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "access ssh directory keys file failed",
+			Data:    err.Error(),
+		}))
+	}
+
+	// return ok
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "success",
+		Data:    gin.H{"key_pub": strings.TrimSuffix(string(keyPub), "\n")},
+	}))
 }

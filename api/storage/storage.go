@@ -286,7 +286,7 @@ func GetUnit(unitId string) (models.Unit, error) {
 	// loop rows
 	var result models.Unit
 	for rows.Next() {
-		if err := rows.Scan(&result.ID, &result.Name, &result.Version, &result.SubscriptionType, &result.SystemID); err != nil {
+		if err := rows.Scan(&result.ID, &result.Name, &result.Version, &result.SubscriptionType, &result.SystemID, &result.Created); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_UNIT] error in query row extraction" + err.Error())
 		}
 	}

@@ -87,7 +87,7 @@ func Init() {
 	if os.Getenv("SENSITIVE_LIST") != "" {
 		Config.SensitiveList = strings.Split(os.Getenv("SENSITIVE_LIST"), ",")
 	} else {
-		Config.SensitiveList = []string{"password", "secret", "token"}
+		Config.SensitiveList = []string{"password", "secret", "token", "passphrase", "private", "key"}
 	}
 	if os.Getenv("REGISTRATION_TOKEN") != "" {
 		Config.RegistrationToken = os.Getenv("REGISTRATION_TOKEN")
