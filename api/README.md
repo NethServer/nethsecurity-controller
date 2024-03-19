@@ -519,3 +519,28 @@ CGO_ENABLED=0 go build
         "message": "success"
      }
     ```
+### Defaults
+- `GET /defaults`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": {
+            "fqdn": "controller.ns8.local",
+            "grafana_path": "/grafana",
+            "prometheus_path": "/prometheus",
+            "webssh_path": "/webssh"
+        },
+        "message": "success"
+     }
+    ```
