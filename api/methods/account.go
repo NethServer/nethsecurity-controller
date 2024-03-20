@@ -295,6 +295,7 @@ func GetSSHKeys(c *gin.Context) {
 			Message: "access ssh private key failed",
 			Data:    err.Error(),
 		}))
+		return
 	}
 
 	// read key.pub
@@ -305,6 +306,7 @@ func GetSSHKeys(c *gin.Context) {
 			Message: "access ssh public key failed",
 			Data:    err.Error(),
 		}))
+		return
 	}
 
 	// return ok
@@ -355,6 +357,7 @@ func AddSSHKeys(c *gin.Context) {
 			Message: "access ssh directory keys file failed",
 			Data:    err.Error(),
 		}))
+		return
 	}
 
 	// return ok
