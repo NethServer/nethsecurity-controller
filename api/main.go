@@ -106,6 +106,7 @@ func main() {
 			// ssh keys read and write
 			accounts.GET("/ssh-keys", methods.GetSSHKeys)
 			accounts.POST("/ssh-keys", methods.AddSSHKeys)
+			accounts.DELETE("/ssh-keys", methods.DeleteSSHKeys)
 		}
 
 		// default APIs

@@ -519,6 +519,25 @@ CGO_ENABLED=0 go build
         "message": "success"
      }
     ```
+- `DELETE /accounts/ssh-keys`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": "",
+        "message": "success"
+     }
+    ```
 ### Defaults
 - `GET /defaults`
 

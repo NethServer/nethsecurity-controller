@@ -288,26 +288,8 @@ func GetSSHKeys(c *gin.Context) {
 	keysPath := configuration.Config.DataDir + "/" + username + ".key"
 
 	// read key
-	keyPrivate, err := os.ReadFile(keysPath)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "access ssh private key failed",
-			Data:    err.Error(),
-		}))
-		return
-	}
-
-	// read key.pub
-	keyPub, err := os.ReadFile(keysPath + ".pub")
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "access ssh public key failed",
-			Data:    err.Error(),
-		}))
-		return
-	}
+	keyPrivate, _ := os.ReadFile(keysPath)
+	keyPub, _ := os.ReadFile(keysPath + ".pub")
 
 	// return ok
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
@@ -365,5 +347,24 @@ func AddSSHKeys(c *gin.Context) {
 		Code:    200,
 		Message: "success",
 		Data:    gin.H{"key_pub": strings.TrimSuffix(string(keyPub), "\n")},
+	}))
+}
+
+func DeleteSSHKeys(c *gin.Context) {
+	// get username
+	username := jwt.ExtractClaims(c)["id"].(string)
+
+	// get path for ssh keys
+	keysPath := configuration.Config.DataDir + "/" + username + ".key"
+
+	// remove both keys
+	_ = os.Remove(keysPath)
+	_ = os.Remove(keysPath + ".pub")
+
+	// return ok
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "success",
+		Data:    nil,
 	}))
 }
