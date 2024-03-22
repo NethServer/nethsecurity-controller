@@ -35,20 +35,14 @@ The server will be available at `http://<fqdn>:8080/ui`.
 
 ## How it works
 
-General work-flow without waiting list:
+General workflow:
 
-- access the controller and add a new machine using the `add` API below
-- connect the NethSecurity and execute `/etc/init.d/ns-plug start`
-- go back to the controller and retrieve a token for the NethSecurity: `curl http://localhost:8080/api/servers/login/clientX`,
-  use the token to invoke Luci APIs: `curl http://localhost:8080/clientX/cgi-bin/luci/rpc/...`
+1. Access the controller and add a new machine using the `add` API below. This will generate a join code containing the FQDN of the controller, a registration token, and the unit UUID.
+2. Connect the NethSecurity unit and register the machine using the join code.
+3. Return to the controller and manage the unit.
+  - The UI retrieves a token for the NethSecurity unit: `curl http://localhost:8080/api/servers/login/clientX`
+  - THe UI Uses the token to invoke Luci APIs: `curl http://localhost:8080/clientX/cgi-bin/luci/rpc/...`
 
-General work-flow with waiting list:
-
-- connect the NethSecurity and execute `/etc/init.d/ns-plug start`
-- access the controller and check the list of waiting clients `curl http://localhost:8080/api/servers` (JWT auth is required)
-- add the client using the `add` API below
-- retrieve a token for the NethSecurity: `curl http://localhost:8080/api/servers/login/clientX`,
-  use the token to invoke Luci APIs: `curl http://localhost:8080/clientX/cgi-bin/luci/rpc/...`
 
 ### Services
 
