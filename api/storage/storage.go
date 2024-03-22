@@ -66,6 +66,25 @@ func Init() *sql.DB {
 		}
 	}
 
+	// check if user admin exists
+	results, _ := GetAccount(configuration.Config.AdminUsername)
+	exists := len(results) > 0
+
+	// add admin account, if not exists
+	if !exists {
+		// define admin account
+		admin := models.Account{
+			ID:          1,
+			Username:    configuration.Config.AdminUsername,
+			Password:    configuration.Config.AdminPassword,
+			DisplayName: "Super Admin user",
+			Created:     time.Now(),
+		}
+
+		// add admin account
+		_ = AddAccount(admin)
+	}
+
 	return db
 }
 
@@ -73,11 +92,19 @@ func AddAccount(account models.Account) error {
 	// get db
 	db := Instance()
 
+	// hash account password
+	password := utils.HashPassword(account.Password)
+
+	// admin password is already hashed
+	if account.ID == 1 {
+		password = account.Password
+	}
+
 	// define query
 	_, err := db.Exec(
 		"INSERT INTO accounts (id, username, password, display_name, created) VALUES (null, ?, ?, ?, ?)",
 		account.Username,
-		utils.HashPassword(account.Password),
+		password,
 		account.DisplayName,
 		account.Created.Format(time.RFC3339),
 	)
@@ -126,11 +153,6 @@ func UpdateAccount(accountID string, account models.AccountUpdate) error {
 }
 
 func IsAdmin(accountUsername string) (bool, string) {
-	// check if is admin
-	if accountUsername == configuration.Config.AdminUsername {
-		return true, ""
-	}
-
 	// get db
 	db := Instance()
 
@@ -144,8 +166,8 @@ func IsAdmin(accountUsername string) (bool, string) {
 		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
 	}
 
-	// check if user it's me
-	return false, id
+	// check if user is admin or other user
+	return id == "1", id
 }
 
 func GetAccounts() ([]models.Account, error) {
