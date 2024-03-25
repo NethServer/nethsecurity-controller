@@ -66,6 +66,25 @@ func Init() *sql.DB {
 		}
 	}
 
+	// check if user admin exists
+	results, _ := GetAccount(configuration.Config.AdminUsername)
+	exists := len(results) > 0
+
+	// add admin account, if not exists
+	if !exists {
+		// define admin account
+		admin := models.Account{
+			ID:          1,
+			Username:    configuration.Config.AdminUsername,
+			Password:    configuration.Config.AdminPassword,
+			DisplayName: "Administrator",
+			Created:     time.Now(),
+		}
+
+		// add admin account
+		_ = AddAccount(admin)
+	}
+
 	return db
 }
 
@@ -126,11 +145,6 @@ func UpdateAccount(accountID string, account models.AccountUpdate) error {
 }
 
 func IsAdmin(accountUsername string) (bool, string) {
-	// check if is admin
-	if accountUsername == configuration.Config.AdminUsername {
-		return true, ""
-	}
-
 	// get db
 	db := Instance()
 
@@ -144,8 +158,8 @@ func IsAdmin(accountUsername string) (bool, string) {
 		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
 	}
 
-	// check if user it's me
-	return false, id
+	// check if user is admin or other user
+	return id == "1", id
 }
 
 func GetAccounts() ([]models.Account, error) {

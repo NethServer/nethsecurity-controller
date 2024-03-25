@@ -70,11 +70,6 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			// read user password hash
 			passwordHash := storage.GetPassword(username)
 
-			// check login for admin
-			if username == configuration.Config.AdminUsername {
-				passwordHash = configuration.Config.AdminPassword
-			}
-
 			// check password
 			valid := utils.CheckPasswordHash(password, passwordHash)
 
