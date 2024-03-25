@@ -77,7 +77,7 @@ func Init() *sql.DB {
 			ID:          1,
 			Username:    configuration.Config.AdminUsername,
 			Password:    configuration.Config.AdminPassword,
-			DisplayName: "Super Admin user",
+			DisplayName: "Administrator",
 			Created:     time.Now(),
 		}
 
@@ -92,12 +92,12 @@ func AddAccount(account models.Account) error {
 	// get db
 	db := Instance()
 
-	// hash account password
-	password := utils.HashPassword(account.Password)
+	// get account password
+	password := account.Password
 
-	// admin password is already hashed
-	if account.ID == 1 {
-		password = account.Password
+	// admin password is already hashed, for normal user hash it
+	if account.ID != 1 {
+		password = utils.HashPassword(account.Password)
 	}
 
 	// define query
