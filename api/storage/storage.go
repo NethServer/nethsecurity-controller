@@ -92,19 +92,11 @@ func AddAccount(account models.Account) error {
 	// get db
 	db := Instance()
 
-	// get account password
-	password := account.Password
-
-	// admin password is already hashed, for normal user hash it
-	if account.ID != 1 {
-		password = utils.HashPassword(account.Password)
-	}
-
 	// define query
 	_, err := db.Exec(
 		"INSERT INTO accounts (id, username, password, display_name, created) VALUES (null, ?, ?, ?, ?)",
 		account.Username,
-		password,
+		utils.HashPassword(account.Password),
 		account.DisplayName,
 		account.Created.Format(time.RFC3339),
 	)
