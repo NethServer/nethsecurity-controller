@@ -19,6 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/NethServer/nethsecurity-api/response"
+	"github.com/NethServer/nethsecurity-controller/api/cache"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"
@@ -53,6 +54,9 @@ func main() {
 
 	// init socket connection
 	socket.Init()
+
+	// init cache
+	cache.Init()
 
 	// disable log to stdout when running in release mode
 	if gin.Mode() == gin.ReleaseMode {

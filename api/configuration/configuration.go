@@ -54,6 +54,8 @@ type Configuration struct {
 	LoginEndpoint string `json:"login_endpoint"`
 
 	FQDN string `json:"fqdn"`
+
+	CacheTTL string `json:"cache_ttl"`
 }
 
 var Config = Configuration{}
@@ -219,5 +221,11 @@ func Init() {
 		Config.FQDN = os.Getenv("FQDN")
 	} else {
 		Config.FQDN, _ = fqdn.FqdnHostname()
+	}
+
+	if os.Getenv("CACHE_TTL") != "" {
+		Config.CacheTTL = os.Getenv("CACHE_TTL")
+	} else {
+		Config.CacheTTL = "3600"
 	}
 }
