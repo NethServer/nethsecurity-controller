@@ -118,6 +118,8 @@ func GetUnits(c *gin.Context) {
 			result["info"] = gin.H{}
 		}
 
+		result["join_code"] = utils.GetJoinCode(e.Name())
+
 		// append to array
 		results = append(results, result)
 	}
