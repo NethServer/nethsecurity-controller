@@ -94,8 +94,8 @@ func GetUnitToken(unitId string) (string, string, error) {
 	// set request header
 	r.Header.Add("Content-Type", "application/json")
 
-	// make request
-	client := &http.Client{}
+	// make request, 2 seconds timeout
+	client := &http.Client{Timeout: 2 * time.Second}
 	res, err := client.Do(r)
 	if err != nil {
 		return "", "", errors.New("request failed for: " + unitId)
@@ -151,8 +151,8 @@ func GetRemoteInfo(unitId string) (UnitInfo, error) {
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+token)
 
-	// make request
-	client := &http.Client{}
+	// make request, with 2 seconds timeout
+	client := &http.Client{Timeout: 2 * time.Second}
 	res, err := client.Do(r)
 	if err != nil {
 		return UnitInfo{}, errors.New("error making request")
