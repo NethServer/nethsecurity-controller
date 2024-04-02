@@ -158,6 +158,10 @@ CGO_ENABLED=0 go build
         "message": "units listed successfully"
      }
     ```
+
+    The API takes a query parameter `cache`. If `cache` is set to `true`, the API will return the cached data, if data are fresh enough.
+    If `cache` is set to `false`, the API will always fetch the data from the connected units.
+
 - `GET /units/<unit_id>`
 
     REQ

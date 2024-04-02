@@ -32,6 +32,9 @@ import (
 )
 
 func GetUnits(c *gin.Context) {
+	// get cache query param
+	cache := c.DefaultQuery("cache", "true")
+
 	// execute status command on openvpn socket
 	var lines []string
 	outSocket := socket.Write("status 3")
@@ -119,10 +122,9 @@ func GetUnits(c *gin.Context) {
 		} else {
 			result["info"] = gin.H{}
 		}
-		print("QUI\n")
 		// FIXME: drop info from db, delete table?
 		// add info from unit
-		remote_info, err := GetUnitInfo(e.Name())
+		remote_info, err := GetUnitInfo(e.Name(), cache == "true")
 		if err == nil {
 			result["info"] = remote_info
 		}
@@ -652,11 +654,13 @@ func GetUnitToken(unitId string) (string, string, error) {
 	return loginResponse.Token, loginResponse.Expire, nil
 }
 
-func GetUnitInfo(unitId string) (models.UnitInfo, error) {
+func GetUnitInfo(unitId string, useCache bool) (models.UnitInfo, error) {
 
-	info, error := cache.GetUnitInfo(unitId)
-	if error == nil {
-		return info, nil
+	if useCache {
+		info, error := cache.GetUnitInfo(unitId)
+		if error == nil {
+			return info, nil
+		}
 	}
 
 	// get the unit token and execute the request
@@ -710,7 +714,9 @@ func GetUnitInfo(unitId string) (models.UnitInfo, error) {
 	// FIXME: read all units on register
 	// FIXME: load unit info every hour
 
-	cache.SetUnitInfo(unitId, unitInfo.Data)
+	if useCache {
+		cache.SetUnitInfo(unitId, unitInfo.Data)
+	}
 
 	return unitInfo.Data, nil
 }
