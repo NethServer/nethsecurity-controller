@@ -113,7 +113,7 @@ func GetUnitToken(unitId string) (string, string, error) {
 
 	// check if token is not empty
 	if len(loginResponse.Token) == 0 {
-		return "", "", errors.New("invalid JWT token response for: " + unitId)
+		return "", "", errors.New("invalid token response for: " + unitId)
 	}
 
 	return loginResponse.Token, loginResponse.Expire, nil

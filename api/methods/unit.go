@@ -439,7 +439,7 @@ func RegisterUnit(c *gin.Context) {
 				credentials.Password = password
 			}
 		} else {
-			// update credentials
+			// create credentials
 			credentials.Username = username
 			credentials.Password = password
 		}
@@ -454,12 +454,6 @@ func RegisterUnit(c *gin.Context) {
 				Data:    errWrite.Error(),
 			}))
 			return
-		}
-
-		// cache unit info
-		unitInfo, err := models.GetRemoteInfo(jsonRequest.UnitId)
-		if err != nil {
-			cache.SetUnitInfo(jsonRequest.UnitId, unitInfo)
 		}
 
 		// return 200 OK with data
