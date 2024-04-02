@@ -562,9 +562,8 @@ func GetUnitInfo(unitId string, useCache bool) (models.UnitInfo, error) {
 		return models.UnitInfo{}, err
 	}
 
-	if useCache {
-		cache.SetUnitInfo(unitId, unitInfo)
-	}
+	// cache is always updated
+	cache.SetUnitInfo(unitId, unitInfo)
 
 	return unitInfo, nil
 }
