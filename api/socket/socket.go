@@ -32,6 +32,11 @@ func Init() {
 }
 
 func Write(message string) string {
+	// avoid panic if socket is not initialized
+	if Socket == nil {
+		return ""
+	}
+
 	// compose message
 	_, err := Socket.Write([]byte(message + "\n"))
 
