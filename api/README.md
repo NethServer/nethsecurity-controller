@@ -39,6 +39,9 @@ CGO_ENABLED=0 go build
 
 - `FQDN`: fully qualified domain name of the machine - *default*: `hostname -f`
 
+- `CACHE_TTL`: cache time to live for unit information in seconds - *default*: `7200` (2 hours)
+  Unit information are fetched from the connected units. The cache is refreshed every hour.
+
 ## APIs
 ### Auth
 - `POST /login`

@@ -22,6 +22,28 @@ import (
 
 var Cache *ttlcache.Cache[string, string]
 
+func refreshCache() {
+	// load all units info into cache
+	units, err := models.ListUnits()
+	if err != nil {
+		return
+	}
+
+	for _, unit := range units {
+		unitInfo, err := models.GetRemoteInfo(unit)
+		if err == nil {
+			SetUnitInfo(unit, unitInfo)
+		}
+	}
+}
+
+func refreshCacheLoop() {
+	ticker := time.NewTicker(60 * time.Minute)
+	for range ticker.C {
+		refreshCache()
+	}
+}
+
 func Init() {
 	value, err := strconv.Atoi(configuration.Config.CacheTTL)
 	if err != nil {
@@ -32,6 +54,8 @@ func Init() {
 		ttlcache.WithTTL[string, string](time.Duration(value) * time.Second),
 	)
 	go Cache.Start() // starts automatic expired item deletion
+
+	go refreshCacheLoop() // starts cache refresh loop
 }
 
 func SetUnitInfo(unitId string, unitInfo models.UnitInfo) {
