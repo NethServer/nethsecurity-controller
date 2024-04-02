@@ -17,9 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/cache"
@@ -121,6 +119,7 @@ func GetUnits(c *gin.Context) {
 		} else {
 			result["info"] = gin.H{}
 		}
+		print("QUI\n")
 		// FIXME: drop info from db, delete table?
 		// add info from unit
 		remote_info, err := GetUnitInfo(e.Name())
@@ -655,11 +654,9 @@ func GetUnitToken(unitId string) (string, string, error) {
 
 func GetUnitInfo(unitId string) (models.UnitInfo, error) {
 
-	if cache.Cache.Has(unitId) {
-		data := models.UnitInfo{}
-		item := cache.Cache.Get(unitId)
-		json.Unmarshal([]byte(item.Value()), &data)
-		return data, nil
+	info, error := cache.GetUnitInfo(unitId)
+	if error == nil {
+		return info, nil
 	}
 
 	// get the unit token and execute the request
@@ -709,19 +706,11 @@ func GetUnitInfo(unitId string) (models.UnitInfo, error) {
 	}
 
 	// save to cache
-	// FIXME: move this inside cache package
 	// FIXME: add option to GET /units to ignore the cache
 	// FIXME: read all units on register
 	// FIXME: load unit info every hour
 
-	value, err := strconv.Atoi(configuration.Config.CacheTTL)
-	if err != nil {
-		value = 60
-	}
-	b, err := json.Marshal(unitInfo.Data)
-	if err == nil {
-		cache.Cache.Set(unitId, string(b), time.Duration(value)*time.Second)
-	}
+	cache.SetUnitInfo(unitId, unitInfo.Data)
 
 	return unitInfo.Data, nil
 }
