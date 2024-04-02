@@ -14,12 +14,3 @@ CREATE TABLE accounts (
     `display_name` TEXT,
     `created` TIMESTAMP NOT NULL
 );
-
-CREATE TABLE units (
-    `id` TEXT NOT NULL PRIMARY KEY,
-    `name` TEXT NOT NULL UNIQUE,
-    `version` TEXT NOT NULL,
-    `system_id` TEXT,
-    `subscription_type` TEXT,
-    `created` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-);

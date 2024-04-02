@@ -24,16 +24,13 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
-	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 )
 
-func GetUnits(c *gin.Context) {
-	// get cache query param
-	cache := c.DefaultQuery("cache", "true")
+func getVpnInfo() map[string]gin.H {
 
 	// execute status command on openvpn socket
 	var lines []string
@@ -65,6 +62,15 @@ func GetUnits(c *gin.Context) {
 			"connected_since": parts[8],
 		}
 	}
+	return vpns
+}
+
+func GetUnits(c *gin.Context) {
+	// get cache query param
+	cache := c.DefaultQuery("cache", "true")
+
+	// get vpn info
+	vpns := getVpnInfo()
 
 	// list file in OpenVPNCCDDir
 	units, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
@@ -77,59 +83,18 @@ func GetUnits(c *gin.Context) {
 		return
 	}
 
-	// get unit data from database
-	unitRows, _ := storage.GetUnits()
-	dbInfo := make(map[string]models.Unit)
-	for _, unitRow := range unitRows {
-		dbInfo[unitRow.ID] = unitRow
-	}
-
 	// loop through units
 	var results []gin.H
 	for _, e := range units {
 		// read unit file
-		unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + e.Name())
+		result, err := getUnitInfo(e.Name(), vpns, cache == "true")
 		if err != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
-				Message: "access CCD directory unit file failed",
+				Message: "Can't get unit info for: " + e.Name(),
 				Data:    err.Error(),
 			}))
 		}
-
-		// parse unit file
-		parts := strings.Split(string(unitFile), "\n")
-		parts = strings.Split(parts[0], " ")
-
-		// compose result
-		result := gin.H{
-			"id":        e.Name(),
-			"ipaddress": parts[1],
-			"netmask":   parts[2],
-		}
-
-		// check if vpn data exists
-		if vpns[e.Name()] != nil {
-			result["vpn"] = vpns[e.Name()]
-		} else {
-			result["vpn"] = gin.H{}
-		}
-
-		// add db info
-		info, ok := dbInfo[e.Name()]
-		if ok {
-			result["info"] = info
-		} else {
-			result["info"] = gin.H{}
-		}
-		// FIXME: drop info from db, delete table?
-		// add info from unit
-		remote_info, err := GetUnitInfo(e.Name(), cache == "true")
-		if err == nil {
-			result["info"] = remote_info
-		}
-
-		result["join_code"] = utils.GetJoinCode(e.Name())
 
 		// append to array
 		results = append(results, result)
@@ -141,49 +106,44 @@ func GetUnits(c *gin.Context) {
 		Message: "units listed successfully",
 		Data:    results,
 	}))
-
 }
 
-func readUnitFile(unitId string) ([]byte, gin.H, error) {
-	// execute status command on openvpn socket
-	var lines []string
-	outSocket := socket.Write("status 3")
-
-	// get only necessary lines
-	rawLines := strings.Split(outSocket, "\n")
-	for _, line := range rawLines {
-		if strings.HasPrefix(line, "CLIENT_LIST\t"+unitId) {
-			lines = append(lines, line)
-		}
+func getUnitInfo(unitId string, vpns map[string]gin.H, useCache bool) (gin.H, error) {
+	unitFile, err := readUnitFile(unitId)
+	if err != nil {
+		return gin.H{}, err
 	}
 
-	// define vpns object
-	var vpn gin.H
+	result := parseUnitFile(unitId, unitFile)
 
-	// loop through lines
-	for _, line := range lines {
-
-		// get values from line
-		parts := strings.Split(line, "\t")
-
-		// compose result
-		vpn = gin.H{
-			"real_address":    parts[2],
-			"virtual_address": parts[3],
-			"bytes_rcvd":      parts[5],
-			"bytes_sent":      parts[6],
-			"connected_since": parts[8],
-		}
+	// add info from unit
+	remote_info, err := GetUnitInfo(unitId, useCache)
+	if err == nil {
+		result["info"] = remote_info
 	}
 
+	// add join code
+	result["join_code"] = utils.GetJoinCode(unitId)
+
+	// add vpn info
+	if vpns[unitId] != nil {
+		result["vpn"] = vpns[unitId]
+	} else {
+		result["vpn"] = gin.H{}
+	}
+
+	return result, nil
+}
+
+func readUnitFile(unitId string) ([]byte, error) {
 	// read unit file
 	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
 
 	// return results
-	return unitFile, vpn, err
+	return unitFile, err
 }
 
-func parseUnitFile(unitId string, unitFile []byte, vpn gin.H) gin.H {
+func parseUnitFile(unitId string, unitFile []byte) gin.H {
 	// parse unit file
 	parts := strings.Split(string(unitFile), "\n")
 	parts = strings.Split(parts[0], " ")
@@ -195,48 +155,36 @@ func parseUnitFile(unitId string, unitFile []byte, vpn gin.H) gin.H {
 		"netmask":   parts[2],
 	}
 
-	// check if vpn data exists
-	if vpn != nil {
-		result["vpn"] = vpn
-	} else {
-		result["vpn"] = gin.H{}
-	}
-
-	// retrieve unit info from database
-	info, err := storage.GetUnit(unitId)
-	if err == nil {
-		result["info"] = info
-	} else {
-		result["info"] = gin.H{}
-	}
-
-	result["join_code"] = utils.GetJoinCode(unitId)
 	return result
 }
 
 func GetUnit(c *gin.Context) {
+	// get cache query param
+	cache := c.DefaultQuery("cache", "true")
+
+	// get vpn info
+	vpns := getVpnInfo()
+
 	// get unit id
 	unitId := c.Param("unit_id")
 
-	// read unit file
-	unitFile, vpn, err := readUnitFile(unitId)
+	// parse unit file
+	result, err := getUnitInfo(unitId, vpns, cache == "true")
+
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "access CCD directory unit file failed",
+			Message: "Can't get unit info for: " + unitId,
 			Data:    err.Error(),
 		}))
+	} else {
+		// return 200 OK with data
+		c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+			Code:    200,
+			Message: "unit listed successfully",
+			Data:    result,
+		}))
 	}
-
-	// parse unit file
-	result := parseUnitFile(unitId, unitFile, vpn)
-
-	// return 200 OK with data
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "unit listed successfully",
-		Data:    result,
-	}))
 }
 
 func GetToken(c *gin.Context) {
@@ -508,16 +456,6 @@ func RegisterUnit(c *gin.Context) {
 			return
 		}
 
-		errAdd := storage.AddOrUpdateUnit(jsonRequest.UnitId, jsonRequest.UnitName, jsonRequest.Version, jsonRequest.SubscriptionType, jsonRequest.SystemId)
-		if errAdd != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    400,
-				Message: "cannot add update to database for: " + jsonRequest.UnitId,
-				Data:    errAdd.Error(),
-			}))
-			return
-		}
-
 		// return 200 OK with data
 		c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 			Code:    200,
@@ -710,7 +648,6 @@ func GetUnitInfo(unitId string, useCache bool) (models.UnitInfo, error) {
 	}
 
 	// save to cache
-	// FIXME: add option to GET /units to ignore the cache
 	// FIXME: read all units on register
 	// FIXME: load unit info every hour
 
