@@ -93,10 +93,19 @@ func InitJWT() *jwt.GinJWTMiddleware {
 		PayloadFunc: func(data interface{}) jwt.MapClaims {
 			// read current user
 			if user, ok := data.(*models.UserAuthorizations); ok {
+				// define role
+				role := "user"
+
+				// check if username is admin
+				isAdmin, _ := storage.IsAdmin(user.Username)
+				if isAdmin {
+					role = "admin"
+				}
+
 				// create claims map
 				return jwt.MapClaims{
 					identityKey: user.Username,
-					"role":      "",
+					"role":      role,
 					"actions":   []string{},
 				}
 			}
