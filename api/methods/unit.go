@@ -10,12 +10,15 @@
 package methods
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/cache"
@@ -71,7 +74,7 @@ func GetUnits(c *gin.Context) {
 	vpns := getVpnInfo()
 
 	// list file in OpenVPNCCDDir
-	units, err := models.ListUnits()
+	units, err := ListUnits()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -191,7 +194,7 @@ func GetToken(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
 
-	token, expire, err := models.GetUnitToken(unitId)
+	token, expire, err := GetUnitToken(unitId)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
@@ -553,7 +556,7 @@ func GetUnitInfo(unitId string, useCache bool) (models.UnitInfo, error) {
 	}
 
 	// get remote info
-	unitInfo, err := models.GetRemoteInfo(unitId)
+	unitInfo, err := GetRemoteInfo(unitId)
 	if err != nil {
 		return models.UnitInfo{}, err
 	}
@@ -562,4 +565,120 @@ func GetUnitInfo(unitId string, useCache bool) (models.UnitInfo, error) {
 	cache.SetUnitInfo(unitId, unitInfo)
 
 	return unitInfo, nil
+}
+
+// list unit name from files in OpenVPNCCDDir
+func ListUnits() ([]string, error) {
+	units := []string{}
+	// list file in OpenVPNCCDDir
+	files, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// loop through files
+	for _, file := range files {
+		units = append(units, file.Name())
+	}
+
+	return units, nil
+}
+
+func GetUnitToken(unitId string) (string, string, error) {
+
+	// read credentials
+	var credentials models.LoginRequest
+	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
+	if err != nil {
+		return "", "", errors.New("cannot open credentials file for: " + unitId)
+	}
+
+	// convert json string to struct
+	json.Unmarshal(body, &credentials)
+
+	// compose request URL
+	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitId + configuration.Config.LoginEndpoint
+
+	// create request action
+	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(body))
+	if err != nil {
+		return "", "", errors.New("cannot make request for: " + unitId)
+	}
+
+	// set request header
+	r.Header.Add("Content-Type", "application/json")
+
+	// make request, 2 seconds timeout
+	client := &http.Client{Timeout: 2 * time.Second}
+	res, err := client.Do(r)
+	if err != nil {
+		return "", "", errors.New("request failed for: " + unitId)
+	}
+
+	// close response
+	defer res.Body.Close()
+
+	// convert response to struct
+	loginResponse := &models.LoginResponse{}
+	err = json.NewDecoder(res.Body).Decode(loginResponse)
+	if err != nil {
+		return "", "", errors.New("cannot convert response to struct for: " + unitId)
+	}
+
+	// check if token is not empty
+	if len(loginResponse.Token) == 0 {
+		return "", "", errors.New("invalid token response for: " + unitId)
+	}
+
+	return loginResponse.Token, loginResponse.Expire, nil
+}
+
+func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
+	// get the unit token and execute the request
+	token, _, _ := GetUnitToken(unitId)
+	if token == "" {
+		return models.UnitInfo{}, errors.New("error getting token")
+	}
+
+	// compose request URL
+	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitId + "/api/ubus/call"
+	// prepare the payload: {"path":"ns.don","method":"status","payload":{}}
+	payload := models.UbusCommand{
+		Path:    "ns.controller",
+		Method:  "info",
+		Payload: map[string]interface{}{},
+	}
+
+	// convert payload to JSON byte array
+	payloadBytes, err := json.Marshal(payload)
+	if err != nil {
+		return models.UnitInfo{}, errors.New("error marshalling payload")
+	}
+
+	// create request action
+	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(payloadBytes))
+	if err != nil {
+		return models.UnitInfo{}, errors.New("error creating request")
+	}
+
+	// set request headers
+	r.Header.Add("Content-Type", "application/json")
+	r.Header.Add("Authorization", "Bearer "+token)
+
+	// make request, with 2 seconds timeout
+	client := &http.Client{Timeout: 2 * time.Second}
+	res, err := client.Do(r)
+	if err != nil {
+		return models.UnitInfo{}, errors.New("error making request")
+	}
+	defer res.Body.Close()
+
+	// convert response to struct
+	unitInfo := &models.UbusInfoResponse{}
+	err = json.NewDecoder(res.Body).Decode(unitInfo)
+	if err != nil {
+		return models.UnitInfo{}, errors.New("error decoding response")
+	}
+
+	return unitInfo.Data, nil
 }

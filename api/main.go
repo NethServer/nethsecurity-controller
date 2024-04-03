@@ -12,6 +12,7 @@ package main
 import (
 	"io/ioutil"
 	"net/http"
+	"time"
 
 	"github.com/fatih/structs"
 	"github.com/gin-contrib/cors"
@@ -42,6 +43,24 @@ import (
 // @schemes http
 // @BasePath /api
 
+func refreshCacheLoop() {
+	ticker := time.NewTicker(60 * time.Minute)
+	for range ticker.C {
+		// load all units info into cache
+		units, err := methods.ListUnits()
+		if err != nil {
+			return
+		}
+
+		for _, unit := range units {
+			unitInfo, err := methods.GetRemoteInfo(unit)
+			if err == nil {
+				cache.SetUnitInfo(unit, unitInfo)
+			}
+		}
+	}
+}
+
 func main() {
 	// init logs with syslog
 	logs.Init("nethsecurity_controller")
@@ -57,6 +76,8 @@ func main() {
 
 	// init cache
 	cache.Init()
+
+	go refreshCacheLoop() // starts cache refresh loop
 
 	// disable log to stdout when running in release mode
 	if gin.Mode() == gin.ReleaseMode {
