@@ -226,6 +226,6 @@ func Init() {
 	if os.Getenv("CACHE_TTL") != "" {
 		Config.CacheTTL = os.Getenv("CACHE_TTL")
 	} else {
-		Config.CacheTTL = "3600"
+		Config.CacheTTL = "7200"
 	}
 }

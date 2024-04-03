@@ -39,6 +39,9 @@ CGO_ENABLED=0 go build
 
 - `FQDN`: fully qualified domain name of the machine - *default*: `hostname -f`
 
+- `CACHE_TTL`: cache time to live for unit information in seconds - *default*: `7200` (2 hours)
+  Unit information are fetched from the connected units. The cache is refreshed every hour.
+
 ## APIs
 ### Auth
 - `POST /login`
@@ -121,7 +124,6 @@ CGO_ENABLED=0 go build
                 "ipaddress": "172.23.21.3",
                 "id": "<unit_id>",
                 "netmask": "255.255.255.0",
-                "registered": true,
                 "vpn": {
                     "bytes_rcvd": "21830",
                     "bytes_sent": "5641",
@@ -130,12 +132,12 @@ CGO_ENABLED=0 go build
                     "virtual_address": "172.23.21.3"
                 },
                 "info": {
-                    "unit_id": "fba703c1-6c2d-4d3d-9dab-5998c7b66700",
-                    "unit_name": "fw.local",
+                    "unit_name": "myfw1",
                     "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
                     "subscription_type": "enterprise",
                     "system_id": "XXXXXXXX-XXXX",
-                    "created": "2024-03-14T15:18:08Z"
+                    "ssh_port": 22,
+                    "fqdn": "fw.local",
                 }
             },
             ...
@@ -143,21 +145,24 @@ CGO_ENABLED=0 go build
                 "ipaddress": "",
                 "id": "<unit_id>",
                 "netmask": "",
-                "registered": false,
                 "vpn": {},
                 "info": {
-                    "unit_id": "zzzzzzzz-d9f3-44b7-b277-36d65cf139e6",
-                    "unit_name": "fw.nethsecurity.local",
-                    "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
+                    "unit_name": "",
+                    "version": "",
                     "subscription_type": "",
                     "system_id": "",
-                    "created": "2024-03-14T15:16:02Z"
+                    "ssh_port": 0,
+                    "fqdn": "",
                 }
             }
         ],
         "message": "units listed successfully"
      }
     ```
+
+    The API takes a query parameter `cache`. If `cache` is set to `true`, the API will return the cached data, if data are fresh enough.
+    If `cache` is set to `false`, the API will always fetch the data from the connected units.
+
 - `GET /units/<unit_id>`
 
     REQ
@@ -186,18 +191,22 @@ CGO_ENABLED=0 go build
                 "virtual_address": "172.23.21.3"
             },
             "info": {
-                "unit_id": "fba703c1-6c2d-4d3d-9dab-5998c7b66700",
-                "unit_name": "fw.local",
+                "unit_name": "myfw1",
                 "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
                 "subscription_type": "enterprise",
                 "system_id": "XXXXXXXX-XXXX",
-                "created": "2024-03-14T15:18:08Z"
+                "ssh_port": 22,
+                "fqdn": "fw.local",
             },
             "join_code": "eyJmcWRuIjoiY29udHJvbGxlci5ncy5uZXRoc2VydmVyLm5ldCIsInRva2VuIjoiMTIzNCIsInVuaXRfaWQiOiI5Njk0Y2Y4ZC03ZmE5LTRmN2EtYjFjNC1iY2Y0MGUzMjhjMDIifQ=="
         },
         "message": "unit listed successfully"
      }
     ```
+
+    The API takes a query parameter `cache`. If `cache` is set to `true`, the API will return the cached data, if data are fresh enough.
+    If `cache` is set to `false`, the API will always fetch the data from the connected units.
+
 - `GET /units/<unit_id>/token`
 
     REQ

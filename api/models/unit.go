@@ -9,7 +9,9 @@
 
 package models
 
-import "time"
+import (
+	"time"
+)
 
 type AddRequest struct {
 	UnitId string `json:"unit_id" binding:"required"`
@@ -32,4 +34,13 @@ type Unit struct {
 	SubscriptionType string    `json:"subscription_type" structs:"subscription_type"`
 	SystemID         string    `json:"system_id" structs:"system_id"`
 	Created          time.Time `json:"created" structs:"created"`
+}
+
+type UnitInfo struct {
+	UnitName         string `json:"unit_name"`
+	Version          string `json:"version"`
+	SubscriptionType string `json:"subscription_type"`
+	SystemID         string `json:"system_id"`
+	SSHPort          int    `json:"ssh_port"`
+	FQDN             string `json:"fqdn"`
 }

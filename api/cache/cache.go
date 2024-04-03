@@ -28,27 +28,24 @@ func Init() {
 		value = 3600
 	}
 
-	Cache = ttlcache.New[string, string](
+	Cache = ttlcache.New(
 		ttlcache.WithTTL[string, string](time.Duration(value) * time.Second),
 	)
 	go Cache.Start() // starts automatic expired item deletion
 }
 
 func SetUnitInfo(unitId string, unitInfo models.UnitInfo) {
-	print("SET_CACHE" + unitId + "\n")
 	value, err := strconv.Atoi(configuration.Config.CacheTTL)
 	if err != nil {
 		value = 60
 	}
 	b, err := json.Marshal(unitInfo)
-	print("SET_CACHE" + string(b) + "\n")
 	if err == nil {
 		Cache.Set(unitId, string(b), time.Duration(value)*time.Second)
 	}
 }
 
 func GetUnitInfo(unitId string) (models.UnitInfo, error) {
-	print("searching for unit info in cache " + unitId + "\n")
 	if Cache.Has(unitId) {
 		data := models.UnitInfo{}
 		item := Cache.Get(unitId)

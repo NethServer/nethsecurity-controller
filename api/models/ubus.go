@@ -22,12 +22,3 @@ type UbusInfoResponse struct {
 	Data    UnitInfo `json:"data"`
 	Message string   `json:"message"`
 }
-
-type UnitInfo struct {
-	UnitName         string `json:"unit_name"`
-	Version          string `json:"version"`
-	SubscriptionType string `json:"subscription_type"`
-	SystemID         string `json:"system_id"`
-	SSHPort          int    `json:"ssh_port"`
-	FQDN             string `json:"fqdn"`
-}
