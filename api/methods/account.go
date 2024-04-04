@@ -213,6 +213,16 @@ func DeleteAccount(c *gin.Context) {
 	// get account id
 	accountID := c.Param("account_id")
 
+	// prevent deleting the admin account
+	if accountID == "1" {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't remove super-admin user",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// execute query
 	err := storage.DeleteAccount(accountID)
 
