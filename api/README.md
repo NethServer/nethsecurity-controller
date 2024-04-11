@@ -567,7 +567,8 @@ CGO_ENABLED=0 go build
             "fqdn": "controller.ns8.local",
             "grafana_path": "/grafana",
             "prometheus_path": "/prometheus",
-            "webssh_path": "/webssh"
+            "webssh_path": "/webssh",
+            "valid_subscription": false
         },
         "message": "success"
      }

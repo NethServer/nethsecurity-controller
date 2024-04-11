@@ -24,10 +24,11 @@ func GetDefaults(c *gin.Context) {
 		Code:    200,
 		Message: "success",
 		Data: gin.H{
-			"fqdn":            configuration.Config.FQDN,
-			"prometheus_path": configuration.Config.PrometheusPath,
-			"webssh_path":     configuration.Config.WebSSHPath,
-			"grafana_path":    configuration.Config.GrafanaPath,
+			"fqdn":               configuration.Config.FQDN,
+			"prometheus_path":    configuration.Config.PrometheusPath,
+			"webssh_path":        configuration.Config.WebSSHPath,
+			"grafana_path":       configuration.Config.GrafanaPath,
+			"valid_subscription": configuration.Config.ValidSubscription,
 		},
 	}))
 }

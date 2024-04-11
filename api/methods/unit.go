@@ -228,6 +228,27 @@ func AddUnit(c *gin.Context) {
 		return
 	}
 
+	// if the controller does not have a subscription, limit the number of units to 3
+	if !configuration.Config.ValidSubscription {
+		units, err := ListUnits()
+		if err != nil {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "can't list units",
+				Data:    err.Error(),
+			}))
+			return
+		}
+		if len(units) >= 3 {
+			c.JSON(http.StatusForbidden, structs.Map(response.StatusBadRequest{
+				Code:    403,
+				Message: "subscription limit reached",
+				Data:    "",
+			}))
+			return
+		}
+	}
+
 	// check duplicates
 	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + jsonRequest.UnitId); err == nil {
 		c.JSON(http.StatusConflict, structs.Map(response.StatusConflict{
@@ -365,6 +386,16 @@ func RegisterUnit(c *gin.Context) {
 			Code:    400,
 			Message: "request fields malformed",
 			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// if the controller has a subscription, the unit must have a valid subscription too
+	if configuration.Config.ValidSubscription && jsonRequest.SubscriptionType == "" {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusBadRequest{
+			Code:    403,
+			Message: "subscription is required",
+			Data:    "",
 		}))
 		return
 	}
