@@ -22,7 +22,7 @@ buildah commit "${container}" "${repobase}/nethsecurity-vpn"
 images+=("${repobase}/nethsecurity-vpn")
 
 container_api=$(buildah from docker.io/alpine:3.16)
-buildah run ${container_api} apk add --no-cache go easy-rsa openssh
+buildah run ${container_api} apk add --no-cache go easy-rsa openssh sqlite
 buildah run ${container_api} mkdir /nethsecurity-api
 buildah add "${container_api}" api/ /nethsecurity-api/
 buildah config --workingdir /nethsecurity-api ${container_api}
