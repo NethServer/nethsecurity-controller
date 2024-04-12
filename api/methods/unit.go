@@ -400,6 +400,16 @@ func RegisterUnit(c *gin.Context) {
 		return
 	}
 
+	// if the controller does not have a subscription, the unit must NOT have a valid subscription too
+	if !configuration.Config.ValidSubscription && jsonRequest.SubscriptionType != "" {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusBadRequest{
+			Code:    403,
+			Message: "subscription is not allowed",
+			Data:    "",
+		}))
+		return
+	}
+
 	// check openvpn conf exists
 	if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + jsonRequest.UnitId + ".crt"); err == nil {
 		// read ca
