@@ -56,6 +56,8 @@ type Configuration struct {
 	FQDN string `json:"fqdn"`
 
 	CacheTTL string `json:"cache_ttl"`
+
+	ValidSubscription bool `json:"valid_subscription"`
 }
 
 var Config = Configuration{}
@@ -227,5 +229,11 @@ func Init() {
 		Config.CacheTTL = os.Getenv("CACHE_TTL")
 	} else {
 		Config.CacheTTL = "7200"
+	}
+
+	if os.Getenv("VALID_SUBSCRIPTION") != "" {
+		Config.ValidSubscription = os.Getenv("VALID_SUBSCRIPTION") == "true"
+	} else {
+		Config.ValidSubscription = false
 	}
 }
