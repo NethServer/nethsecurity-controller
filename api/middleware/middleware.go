@@ -197,6 +197,20 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			// return 200 OK
 			c.JSON(200, gin.H{"code": 200, "expire": t, "token": token})
 		},
+		RefreshResponse: func(c *gin.Context, code int, token string, t time.Time) {
+			//get claims
+			tokenObj, _ := InstanceJWT().ParseTokenString(token)
+			claims := jwt.ExtractClaimsFromToken(tokenObj)
+
+			// set token to valid
+			methods.SetTokenValidation(claims["id"].(string), token)
+
+			// write logs
+			logs.Logs.Println("[INFO][AUTH] refresh response success for user " + claims["id"].(string))
+
+			// return 200 OK
+			c.JSON(200, gin.H{"code": 200, "expire": t, "token": token})
+		},
 		LogoutResponse: func(c *gin.Context, code int) {
 			//get claims
 			tokenObj, _ := InstanceJWT().ParseToken(c)
