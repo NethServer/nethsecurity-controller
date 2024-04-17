@@ -2,7 +2,7 @@ name: Update ns-ui package
 
 # **What it does**: Every nigth, at midnight checks if a new version of ns-ui is available.
 # **Why we have it**: To avoid manually updating the package.
-# **Who does it impact**: packages/ns-ui/Makefile and the UI_COMMIT value
+# **Who does it impact**: build.sh and the UI_COMMIT value
 
 on:
   workflow_dispatch:
