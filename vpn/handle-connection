@@ -19,7 +19,7 @@ http:
     service-$username:
       loadBalancer:
         servers:
-        - url: https://$ifconfig_pool_remote_ip/
+        - url: https://$ifconfig_pool_remote_ip:9090/
         passHostHeader: true
 
   # Add middleware
