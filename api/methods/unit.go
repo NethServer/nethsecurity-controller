@@ -54,13 +54,16 @@ func getVpnInfo() map[string]gin.H {
 		// get values from line
 		parts := strings.Split(line, "\t")
 
-		// compose result
-		vpns[parts[1]] = gin.H{
-			"real_address":    parts[2],
-			"virtual_address": parts[3],
-			"bytes_rcvd":      parts[5],
-			"bytes_sent":      parts[6],
-			"connected_since": parts[8],
+		// check if parts exists to avoid out of range
+		if len(parts) > 8 {
+			// compose result
+			vpns[parts[1]] = gin.H{
+				"real_address":    parts[2],
+				"virtual_address": parts[3],
+				"bytes_rcvd":      parts[5],
+				"bytes_sent":      parts[6],
+				"connected_since": parts[8],
+			}
 		}
 	}
 	return vpns
