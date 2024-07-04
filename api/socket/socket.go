@@ -20,7 +20,7 @@ var Socket net.Conn
 
 func Init() {
 	//establish connection
-	connection, err := net.Dial("unix", configuration.Config.OpenVPNMGMTSock)
+	connection, err := net.Dial("tcp", configuration.Config.OpenVPNMGMTSock)
 
 	// check error
 	if err != nil {

@@ -158,7 +158,7 @@ func Init() {
 	if os.Getenv("OVPN_M_SOCK") != "" {
 		Config.OpenVPNMGMTSock = os.Getenv("OVPN_M_SOCK")
 	} else {
-		Config.OpenVPNMGMTSock = Config.OpenVPNDir + "/run/mgmt.sock"
+		Config.OpenVPNMGMTSock = "127.0.0.1:6666"
 	}
 
 	if os.Getenv("PROMTAIL_ADDRESS") != "" {

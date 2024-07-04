@@ -28,7 +28,7 @@ CGO_ENABLED=0 go build
 - `OVPN_C_DIR`: openvpn path of ccd directory - *default*: OVPN_DIR + `/ccd`
 - `OVPN_P_DIR`: openvpn path of proxy directory - *default*: OVPN_DIR + `/proxy`
 - `OVPN_K_DIR`: openvpn path of pki directory - *default*: OVPN_DIR + `/pki`
-- `OVPN_M_SOCK`: opevpn management socket path - *default*: OVPN_DIR + `/run/mgmt.sock`
+- `OVPN_M_SOCK`: opevpn management socket path - *default*: `127.0.0.1:6666`
 
 - `EASYRSA_PATH`: easyrsa command path - *default*: `/usr/share/easy-rsa/easyrsa`
 
