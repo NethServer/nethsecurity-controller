@@ -14,10 +14,10 @@ export CREDENTIALS_DIR="${CREDENTIALS_DIR:-/nethsecurity-api/credentials}"
 export PROMTAIL_ADDRESS="${PROMTAIL_ADDRESS:-127.0.0.1}"
 export PROMTAIL_PORT="${PROMTAIL_PORT:-9900}"
 
-socket=/etc/openvpn/run/mgmt.sock
-limit=60
-while [ ! -e "$socket" ]; do
-    echo "Waiting for $socket to appear ..."
+# check for openvpn socket
+until nc -z 127.0.0.1 6666
+do
+    echo "Waiting for 127.0.0.1:6666 socket to appear ..."
     sleep 1
     limit=$((limit - 1))
     if [ "$limit" -le 0 ]; then
