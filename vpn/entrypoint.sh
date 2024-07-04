@@ -60,7 +60,7 @@ client-connect /usr/local/bin/handle-connection
 remote-cert-ku e0 80
 remote-cert-eku "TLS Web Client Authentication"
 
-management /etc/openvpn/run/mgmt.sock unix
+management 127.0.0.1 6666
 
 errors-to-stderr
 keepalive 20 120
