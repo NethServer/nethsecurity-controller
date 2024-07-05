@@ -506,7 +506,7 @@ func ListUnits() ([]string, error) {
 	return units, nil
 }
 
-func ListUnitsConnected() ([]string, error) {
+func ListConnectedUnits() ([]string, error) {
 	// list unit name from files in OpenVPNStatusDir
 	units := []string{}
 

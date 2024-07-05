@@ -18,10 +18,10 @@ import (
 
 func RefreshRemoteInfoLoop() {
 	// TODO change
-	ticker := time.NewTicker(10 * time.Second)
+	ticker := time.NewTicker(1 * time.Hour)
 	for range ticker.C {
 		// load all units info into cache
-		units, err := methods.ListUnitsConnected()
+		units, err := methods.ListConnectedUnits()
 		if err != nil {
 			return
 		}
