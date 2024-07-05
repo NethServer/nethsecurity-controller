@@ -17,6 +17,7 @@ import (
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
+	"github.com/gin-gonic/gin"
 	"github.com/jellydator/ttlcache/v3"
 )
 
@@ -53,5 +54,27 @@ func GetUnitInfo(unitId string) (models.UnitInfo, error) {
 		return data, nil
 	} else {
 		return models.UnitInfo{}, errors.New("unit info not found in cache")
+	}
+}
+
+func SetVpnInfo(vpns map[string]gin.H) {
+	value, err := strconv.Atoi(configuration.Config.CacheTTL)
+	if err != nil {
+		value = 60
+	}
+	b, err := json.Marshal(vpns)
+	if err == nil {
+		Cache.Set("vpns", string(b), time.Duration(value)*time.Second)
+	}
+}
+
+func GetVpnInfo() (map[string]gin.H, error) {
+	if Cache.Has("vpns") {
+		data := map[string]gin.H{}
+		item := Cache.Get("vpns")
+		json.Unmarshal([]byte(item.Value()), &data)
+		return data, nil
+	} else {
+		return map[string]gin.H{}, errors.New("vpn info not found in cache")
 	}
 }

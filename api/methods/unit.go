@@ -31,7 +31,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func getVpnInfo() map[string]gin.H {
+func getVpnInfo(useCache bool) map[string]gin.H {
+
+	if useCache {
+		vpns, error := cache.GetVpnInfo()
+		if error == nil {
+			return vpns
+		}
+	}
 
 	// execute status command on openvpn socket
 	var lines []string
@@ -66,6 +73,8 @@ func getVpnInfo() map[string]gin.H {
 			}
 		}
 	}
+
+	cache.SetVpnInfo(vpns)
 	return vpns
 }
 
@@ -74,7 +83,7 @@ func GetUnits(c *gin.Context) {
 	cache := c.DefaultQuery("cache", "true")
 
 	// get vpn info
-	vpns := getVpnInfo()
+	vpns := getVpnInfo(cache == "true")
 
 	// list file in OpenVPNCCDDir
 	units, err := ListUnits()
@@ -169,7 +178,7 @@ func GetUnit(c *gin.Context) {
 	cache := c.DefaultQuery("cache", "true")
 
 	// get vpn info
-	vpns := getVpnInfo()
+	vpns := getVpnInfo(cache == "true")
 
 	// get unit id
 	unitId := c.Param("unit_id")
