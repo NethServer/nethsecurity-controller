@@ -92,7 +92,9 @@ func GetUnits(c *gin.Context) {
 	cache := c.DefaultQuery("cache", "true")
 
 	// get vpn info
-	vpns := getVpnInfo(cache == "true")
+	//vpns := getVpnInfo(cache == "true")
+	// create empty vpns
+	vpns := make(map[string]gin.H)
 
 	// list file in OpenVPNCCDDir
 	logs.Logs.Println("[DEBUG]Listing units")
@@ -632,6 +634,7 @@ func GetUnitInfo(unitId string, useCache bool) (models.UnitInfo, error) {
 
 // list unit name from files in OpenVPNCCDDir
 func ListUnits() ([]string, error) {
+	logs.Logs.Println("[DEBUG]Listing units")
 	units := []string{}
 	// list file in OpenVPNCCDDir
 	files, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
@@ -644,6 +647,7 @@ func ListUnits() ([]string, error) {
 		units = append(units, file.Name())
 	}
 
+	logs.Logs.Println("[DEBUG]Units listed: ", units)
 	return units, nil
 }
 
