@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/gin-gonic/gin"
 	"github.com/jellydator/ttlcache/v3"
@@ -63,6 +64,7 @@ func SetVpnInfo(vpns map[string]gin.H) {
 		value = 60
 	}
 	b, err := json.Marshal(vpns)
+	logs.Logs.Println("[DEBUG]Setting VPN info in cache ", string(b))
 	if err == nil {
 		Cache.Set("vpns", string(b), time.Duration(value)*time.Second)
 	}

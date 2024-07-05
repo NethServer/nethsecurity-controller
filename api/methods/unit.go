@@ -23,6 +23,7 @@ import (
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/cache"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
@@ -34,9 +35,17 @@ import (
 func getVpnInfo(useCache bool) map[string]gin.H {
 
 	if useCache {
+		logs.Logs.Println("[DEBUG]Reading VPN from cache")
+
 		vpns, error := cache.GetVpnInfo()
 		if error == nil {
-			return vpns
+			// log vpns content
+			logs.Logs.Println("[DEBUG]VPN cache content: ", vpns)
+			// check if vpns is not empty
+			if len(vpns) > 0 {
+				logs.Logs.Println("[DEBUG]VPN cache not empty, returning cached data")
+				return vpns
+			}
 		}
 	}
 
@@ -86,6 +95,7 @@ func GetUnits(c *gin.Context) {
 	vpns := getVpnInfo(cache == "true")
 
 	// list file in OpenVPNCCDDir
+	logs.Logs.Println("[DEBUG]Listing units")
 	units, err := ListUnits()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
