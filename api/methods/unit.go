@@ -105,6 +105,7 @@ func GetUnits(c *gin.Context) {
 			Message: "can't list units",
 			Data:    err.Error(),
 		}))
+		logs.Logs.Println("[DEBUG]Listing done!")
 		return
 	}
 
