@@ -4,7 +4,7 @@ set -e
 repobase="ghcr.io/nethserver"
 
 images=()
-container=$(buildah from docker.io/alpine:3.16)
+container=$(buildah from docker.io/alpine:3.20.1)
 ui_version="1.0.13"
 
 trap "buildah rm ${container} ${container_api} ${container_proxy}" EXIT
