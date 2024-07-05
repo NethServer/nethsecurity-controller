@@ -17,7 +17,6 @@ import (
 )
 
 func RefreshRemoteInfoLoop() {
-	// TODO change
 	ticker := time.NewTicker(1 * time.Hour)
 	for range ticker.C {
 		// load all units info into cache
