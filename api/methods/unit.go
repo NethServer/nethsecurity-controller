@@ -105,7 +105,6 @@ func GetUnits(c *gin.Context) {
 			Message: "can't list units",
 			Data:    err.Error(),
 		}))
-		logs.Logs.Println("[DEBUG]Listing done!")
 		return
 	}
 
@@ -126,6 +125,7 @@ func GetUnits(c *gin.Context) {
 		results = append(results, result)
 	}
 
+	logs.Logs.Println("[DEBUG]Units listed DONE: ", results)
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
@@ -154,11 +154,7 @@ func getUnitInfo(unitId string, vpns map[string]gin.H, useCache bool) (gin.H, er
 	result["join_code"] = utils.GetJoinCode(unitId)
 
 	// add vpn info
-	if vpns[unitId] != nil {
-		result["vpn"] = vpns[unitId]
-	} else {
-		result["vpn"] = gin.H{}
-	}
+	result["vpn"] = gin.H{}
 
 	return result, nil
 }
