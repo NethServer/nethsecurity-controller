@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -500,6 +501,27 @@ func ListUnits() ([]string, error) {
 	// loop through files
 	for _, file := range files {
 		units = append(units, file.Name())
+	}
+
+	return units, nil
+}
+
+func ListUnitsConnected() ([]string, error) {
+	// list unit name from files in OpenVPNStatusDir
+	units := []string{}
+
+	// list file in OpenVPNStatusDir
+	files, err := os.ReadDir(configuration.Config.OpenVPNStatusDir)
+	if err != nil {
+		return nil, err
+	}
+
+	// loop through files
+	for _, file := range files {
+
+		if filepath.Ext(file.Name()) == ".vpn" {
+			units = append(units, strings.TrimSuffix(file.Name(), filepath.Ext(file.Name())))
+		}
 	}
 
 	return units, nil

@@ -21,7 +21,7 @@ func RefreshRemoteInfoLoop() {
 	ticker := time.NewTicker(10 * time.Second)
 	for range ticker.C {
 		// load all units info into cache
-		units, err := methods.ListUnits()
+		units, err := methods.ListUnitsConnected()
 		if err != nil {
 			return
 		}
