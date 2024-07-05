@@ -143,12 +143,13 @@ func getUnitInfo(unitId string, vpns map[string]gin.H, useCache bool) (gin.H, er
 	result := parseUnitFile(unitId, unitFile)
 
 	// add info from unit
-	remote_info, err := GetUnitInfo(unitId, useCache)
-	if err == nil {
-		result["info"] = remote_info
-	} else {
-		result["info"] = gin.H{}
-	}
+	// remote_info, err := GetUnitInfo(unitId, useCache)
+	// if err == nil {
+	// 	result["info"] = remote_info
+	// } else {
+	// 	result["info"] = gin.H{}
+	// }
+	result["info"] = gin.H{}
 
 	// add join code
 	result["join_code"] = utils.GetJoinCode(unitId)
