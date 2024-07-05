@@ -12,7 +12,6 @@ package main
 import (
 	"io/ioutil"
 	"net/http"
-	"time"
 
 	"github.com/fatih/structs"
 	"github.com/gin-contrib/cors"
@@ -20,11 +19,11 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/NethServer/nethsecurity-api/response"
-	"github.com/NethServer/nethsecurity-controller/api/cache"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"
 	"github.com/NethServer/nethsecurity-controller/api/middleware"
+	"github.com/NethServer/nethsecurity-controller/api/routines"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
 )
@@ -43,24 +42,6 @@ import (
 // @schemes http
 // @BasePath /api
 
-func refreshCacheLoop() {
-	ticker := time.NewTicker(60 * time.Minute)
-	for range ticker.C {
-		// load all units info into cache
-		units, err := methods.ListUnits()
-		if err != nil {
-			return
-		}
-
-		for _, unit := range units {
-			unitInfo, err := methods.GetRemoteInfo(unit)
-			if err == nil {
-				cache.SetUnitInfo(unit, unitInfo)
-			}
-		}
-	}
-}
-
 func main() {
 	// init logs with syslog
 	logs.Init("nethsecurity_controller")
@@ -74,10 +55,8 @@ func main() {
 	// init socket connection
 	socket.Init()
 
-	// init cache
-	cache.Init()
-
-	go refreshCacheLoop() // starts cache refresh loop
+	// starts remote info loop
+	go routines.RefreshRemoteInfoLoop()
 
 	// disable log to stdout when running in release mode
 	if gin.Mode() == gin.ReleaseMode {

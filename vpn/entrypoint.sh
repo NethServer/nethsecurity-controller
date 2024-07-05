@@ -30,6 +30,10 @@ if [ ! -d /etc/openvpn/proxy ]; then
     mkdir -p /etc/openvpn/proxy
 fi
 
+if [ ! -d /etc/openvpn/status ]; then
+    mkdir -p /etc/openvpn/status
+fi
+
 cat << EOF > /etc/openvpn/server.conf
 dev $tun
 dev-type tun
@@ -55,6 +59,7 @@ key /etc/openvpn/pki/private/server.key
 crl-verify /etc/openvpn/pki/crl.pem
 
 client-connect /usr/local/bin/handle-connection
+client-disconnect /usr/local/bin/handle-disconnection
 
 # configuration for old easy RSA certs
 remote-cert-ku e0 80

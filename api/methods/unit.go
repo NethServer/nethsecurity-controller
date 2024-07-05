@@ -17,11 +17,11 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/NethServer/nethsecurity-api/response"
-	"github.com/NethServer/nethsecurity-controller/api/cache"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
@@ -31,51 +31,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func getVpnInfo() map[string]gin.H {
-
-	// execute status command on openvpn socket
-	var lines []string
-	outSocket := socket.Write("status 3")
-
-	// get only necessary lines
-	rawLines := strings.Split(outSocket, "\n")
-	for _, line := range rawLines {
-		if strings.HasPrefix(line, "CLIENT_LIST") {
-			lines = append(lines, line)
-		}
-	}
-
-	// define vpns object
-	vpns := make(map[string]gin.H)
-
-	// loop through lines
-	for _, line := range lines {
-
-		// get values from line
-		parts := strings.Split(line, "\t")
-
-		// check if parts exists to avoid out of range
-		if len(parts) > 8 {
-			// compose result
-			vpns[parts[1]] = gin.H{
-				"real_address":    parts[2],
-				"virtual_address": parts[3],
-				"bytes_rcvd":      parts[5],
-				"bytes_sent":      parts[6],
-				"connected_since": parts[8],
-			}
-		}
-	}
-	return vpns
-}
-
 func GetUnits(c *gin.Context) {
-	// get cache query param
-	cache := c.DefaultQuery("cache", "true")
-
-	// get vpn info
-	vpns := getVpnInfo()
-
 	// list file in OpenVPNCCDDir
 	units, err := ListUnits()
 	if err != nil {
@@ -89,13 +45,13 @@ func GetUnits(c *gin.Context) {
 
 	// loop through units
 	var results []gin.H
-	for _, e := range units {
+	for _, unit := range units {
 		// read unit file
-		result, err := getUnitInfo(e, vpns, cache == "true")
+		result, err := getUnitInfo(unit)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
-				Message: "Can't get unit info for: " + e,
+				Message: "Can't get unit info for: " + unit,
 				Data:    err.Error(),
 			}))
 		}
@@ -112,70 +68,12 @@ func GetUnits(c *gin.Context) {
 	}))
 }
 
-func getUnitInfo(unitId string, vpns map[string]gin.H, useCache bool) (gin.H, error) {
-	unitFile, err := readUnitFile(unitId)
-	if err != nil {
-		return gin.H{}, err
-	}
-
-	result := parseUnitFile(unitId, unitFile)
-
-	// add info from unit
-	remote_info, err := GetUnitInfo(unitId, useCache)
-	if err == nil {
-		result["info"] = remote_info
-	} else {
-		result["info"] = gin.H{}
-	}
-
-	// add join code
-	result["join_code"] = utils.GetJoinCode(unitId)
-
-	// add vpn info
-	if vpns[unitId] != nil {
-		result["vpn"] = vpns[unitId]
-	} else {
-		result["vpn"] = gin.H{}
-	}
-
-	return result, nil
-}
-
-func readUnitFile(unitId string) ([]byte, error) {
-	// read unit file
-	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
-
-	// return results
-	return unitFile, err
-}
-
-func parseUnitFile(unitId string, unitFile []byte) gin.H {
-	// parse unit file
-	parts := strings.Split(string(unitFile), "\n")
-	parts = strings.Split(parts[0], " ")
-
-	// compose result
-	result := gin.H{
-		"id":        unitId,
-		"ipaddress": parts[1],
-		"netmask":   parts[2],
-	}
-
-	return result
-}
-
 func GetUnit(c *gin.Context) {
-	// get cache query param
-	cache := c.DefaultQuery("cache", "true")
-
-	// get vpn info
-	vpns := getVpnInfo()
-
 	// get unit id
 	unitId := c.Param("unit_id")
 
 	// parse unit file
-	result, err := getUnitInfo(unitId, vpns, cache == "true")
+	result, err := getUnitInfo(unitId)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
@@ -197,7 +95,7 @@ func GetToken(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
 
-	token, expire, err := GetUnitToken(unitId)
+	token, expire, err := getUnitToken(unitId)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
@@ -590,29 +488,8 @@ func DeleteUnit(c *gin.Context) {
 	}))
 }
 
-func GetUnitInfo(unitId string, useCache bool) (models.UnitInfo, error) {
-
-	if useCache {
-		info, error := cache.GetUnitInfo(unitId)
-		if error == nil {
-			return info, nil
-		}
-	}
-
-	// get remote info
-	unitInfo, err := GetRemoteInfo(unitId)
-	if err != nil {
-		return models.UnitInfo{}, err
-	}
-
-	// cache is always updated
-	cache.SetUnitInfo(unitId, unitInfo)
-
-	return unitInfo, nil
-}
-
-// list unit name from files in OpenVPNCCDDir
 func ListUnits() ([]string, error) {
+	// list unit name from files in OpenVPNCCDDir
 	units := []string{}
 	// list file in OpenVPNCCDDir
 	files, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
@@ -628,7 +505,7 @@ func ListUnits() ([]string, error) {
 	return units, nil
 }
 
-func GetUnitToken(unitId string) (string, string, error) {
+func getUnitToken(unitId string) (string, string, error) {
 
 	// read credentials
 	var credentials models.LoginRequest
@@ -677,16 +554,15 @@ func GetUnitToken(unitId string) (string, string, error) {
 	return loginResponse.Token, loginResponse.Expire, nil
 }
 
-func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
+func GetRemoteInfo(unitId string) error {
 	// get the unit token and execute the request
-	token, _, _ := GetUnitToken(unitId)
+	token, _, _ := getUnitToken(unitId)
 	if token == "" {
-		return models.UnitInfo{}, errors.New("error getting token")
+		return errors.New("error getting token")
 	}
 
 	// compose request URL
 	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitId + "/api/ubus/call"
-	// prepare the payload: {"path":"ns.don","method":"status","payload":{}}
 	payload := models.UbusCommand{
 		Path:    "ns.controller",
 		Method:  "info",
@@ -696,13 +572,13 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	// convert payload to JSON byte array
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return models.UnitInfo{}, errors.New("error marshalling payload")
+		return errors.New("error marshalling payload")
 	}
 
 	// create request action
 	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		return models.UnitInfo{}, errors.New("error creating request")
+		return errors.New("error creating request")
 	}
 
 	// set request headers
@@ -713,7 +589,7 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	client := &http.Client{Timeout: 2 * time.Second}
 	res, err := client.Do(r)
 	if err != nil {
-		return models.UnitInfo{}, errors.New("error making request")
+		return errors.New("error making request")
 	}
 	defer res.Body.Close()
 
@@ -721,8 +597,101 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	unitInfo := &models.UbusInfoResponse{}
 	err = json.NewDecoder(res.Body).Decode(unitInfo)
 	if err != nil {
-		return models.UnitInfo{}, errors.New("error decoding response")
+		return errors.New("error decoding response")
 	}
 
-	return unitInfo.Data, nil
+	// write json to file
+	jsonInfo, _ := json.Marshal(unitInfo.Data)
+	errWrite := os.WriteFile(configuration.Config.OpenVPNStatusDir+"/"+unitId+".info", jsonInfo, 0644)
+	if errWrite != nil {
+		return errors.New("error writing info file")
+	}
+
+	return nil
+}
+
+func getUnitInfo(unitId string) (gin.H, error) {
+	// read ccd dir for unit
+	unitFile, err := readUnitFile(unitId)
+	if err != nil {
+		return gin.H{}, err
+	}
+
+	// parse ccd dir file content
+	result := parseUnitFile(unitId, unitFile)
+
+	// add info from unit
+	remote_info := getRemoteInfo(unitId)
+	if remote_info != nil {
+		result["info"] = remote_info
+	} else {
+		result["info"] = gin.H{}
+	}
+
+	// add join code
+	result["join_code"] = utils.GetJoinCode(unitId)
+
+	// add vpn info
+	vpn_info := getVPNInfo(unitId)
+	if vpn_info != nil {
+		result["vpn"] = vpn_info
+	} else {
+		result["vpn"] = gin.H{}
+	}
+
+	return result, nil
+}
+
+func getVPNInfo(unitId string) gin.H {
+	// read unit file
+	statusFile, err := os.ReadFile(configuration.Config.OpenVPNStatusDir + "/" + unitId + ".vpn")
+	if err != nil {
+		return nil
+	}
+
+	// convert timestamp to int
+	time, _ := strconv.Atoi(string(statusFile))
+
+	// return vpn details
+	return gin.H{
+		"connected_since": time,
+	}
+}
+
+func getRemoteInfo(unitId string) gin.H {
+	// read unit file
+	statusFile, err := os.ReadFile(configuration.Config.OpenVPNStatusDir + "/" + unitId + ".info")
+	if err != nil {
+		return nil
+	}
+
+	// convert timestamp to int
+	var result map[string]interface{}
+	_ = json.Unmarshal(statusFile, &result)
+
+	// return vpn details
+	return result
+}
+
+func readUnitFile(unitId string) ([]byte, error) {
+	// read unit file
+	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
+
+	// return results
+	return unitFile, err
+}
+
+func parseUnitFile(unitId string, unitFile []byte) gin.H {
+	// parse unit file
+	parts := strings.Split(string(unitFile), "\n")
+	parts = strings.Split(parts[0], " ")
+
+	// compose result
+	result := gin.H{
+		"id":        unitId,
+		"ipaddress": parts[1],
+		"netmask":   parts[2],
+	}
+
+	return result
 }

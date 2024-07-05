@@ -16,9 +16,10 @@ echo "Setup image"
 buildah add "${container}" vpn/ip /sbin/ip
 buildah add "${container}" vpn/controller-auth /usr/local/bin/controller-auth
 buildah add "${container}" vpn/handle-connection /usr/local/bin/handle-connection
+buildah add "${container}" vpn/handle-disconnection /usr/local/bin/handle-disconnection
 buildah add "${container}" vpn/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/sbin/openvpn", "/etc/openvpn/server.conf"]' ${container}
-buildah commit "${container}" "${repobase}/nethsecurity-vpn"
+buildah commit "${container}" "${repobase}/nethsecurity-vpn-dev"
 images+=("${repobase}/nethsecurity-vpn")
 
 container_api=$(buildah from docker.io/alpine:3.16)
@@ -32,7 +33,7 @@ buildah run ${container_api} rm -rf root/go
 buildah run ${container_api} apk del --no-cache go
 buildah add "${container_api}" api/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["./api"]' ${container_api}
-buildah commit "${container_api}" "${repobase}/nethsecurity-api"
+buildah commit "${container_api}" "${repobase}/nethsecurity-api-dev"
 images+=("${repobase}/nethsecurity-api")
 
 container_proxy=$(buildah from docker.io/library/traefik:v2.6)
