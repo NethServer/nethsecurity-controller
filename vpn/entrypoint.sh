@@ -32,6 +32,8 @@ fi
 
 if [ ! -d /etc/openvpn/status ]; then
     mkdir -p /etc/openvpn/status
+else
+    find  /etc/openvpn/status -name "*.vpn" -delete 2>/dev/null || true
 fi
 
 cat << EOF > /etc/openvpn/server.conf
