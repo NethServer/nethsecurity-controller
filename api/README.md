@@ -207,6 +207,35 @@ CGO_ENABLED=0 go build
     The API takes a query parameter `cache`. If `cache` is set to `true`, the API will return the cached data, if data are fresh enough.
     If `cache` is set to `false`, the API will always fetch the data from the connected units.
 
+- `GET /units/<unit_id>/info`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": {
+            "fqdn": "NethSec",
+            "ssh_port": 22,
+            "subscription_type": "enterprise",
+            "system_id": "XXXXXXXX-XXXX",
+            "unit_name": "NethSec",
+            "version": "NethSecurity 8 23.05.3-ns.1.0.1"
+        },
+        "message": "unit info retrieved successfully"
+     }
+    ```
+
+    The API saves unit information in `OVPN_S_DIR` with `.info` extension. This is useful for retrieving new information of the unit without waiting for cron to store it.
+
 - `GET /units/<unit_id>/token`
 
     REQ
