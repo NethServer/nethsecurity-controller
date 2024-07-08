@@ -123,7 +123,7 @@ func GetUnitInfo(c *gin.Context) {
 	unitId := c.Param("unit_id")
 
 	// get unit info and store it
-	err := GetRemoteInfo(unitId)
+	info, err := GetRemoteInfo(unitId)
 
 	// check errors
 	if err != nil {
@@ -139,7 +139,7 @@ func GetUnitInfo(c *gin.Context) {
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "unit info retrieved successfully",
-		Data:    nil,
+		Data:    info,
 	}))
 
 }
@@ -602,11 +602,11 @@ func getUnitToken(unitId string) (string, string, error) {
 	return loginResponse.Token, loginResponse.Expire, nil
 }
 
-func GetRemoteInfo(unitId string) error {
+func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	// get the unit token and execute the request
 	token, _, _ := getUnitToken(unitId)
 	if token == "" {
-		return errors.New("error getting token")
+		return models.UnitInfo{}, errors.New("error getting token")
 	}
 
 	// compose request URL
@@ -620,13 +620,13 @@ func GetRemoteInfo(unitId string) error {
 	// convert payload to JSON byte array
 	payloadBytes, err := json.Marshal(payload)
 	if err != nil {
-		return errors.New("error marshalling payload")
+		return models.UnitInfo{}, errors.New("error marshalling payload")
 	}
 
 	// create request action
 	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(payloadBytes))
 	if err != nil {
-		return errors.New("error creating request")
+		return models.UnitInfo{}, errors.New("error creating request")
 	}
 
 	// set request headers
@@ -637,7 +637,7 @@ func GetRemoteInfo(unitId string) error {
 	client := &http.Client{Timeout: 2 * time.Second}
 	res, err := client.Do(r)
 	if err != nil {
-		return errors.New("error making request")
+		return models.UnitInfo{}, errors.New("error making request")
 	}
 	defer res.Body.Close()
 
@@ -645,17 +645,17 @@ func GetRemoteInfo(unitId string) error {
 	unitInfo := &models.UbusInfoResponse{}
 	err = json.NewDecoder(res.Body).Decode(unitInfo)
 	if err != nil {
-		return errors.New("error decoding response")
+		return models.UnitInfo{}, errors.New("error decoding response")
 	}
 
 	// write json to file
 	jsonInfo, _ := json.Marshal(unitInfo.Data)
 	errWrite := os.WriteFile(configuration.Config.OpenVPNStatusDir+"/"+unitId+".info", jsonInfo, 0644)
 	if errWrite != nil {
-		return errors.New("error writing info file")
+		return models.UnitInfo{}, errors.New("error writing info file")
 	}
 
-	return nil
+	return unitInfo.Data, nil
 }
 
 func getUnitInfo(unitId string) (gin.H, error) {

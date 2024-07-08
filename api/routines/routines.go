@@ -26,7 +26,7 @@ func RefreshRemoteInfoLoop() {
 		}
 
 		for _, unit := range units {
-			err := methods.GetRemoteInfo(unit)
+			_, err := methods.GetRemoteInfo(unit)
 			if err != nil {
 				logs.Logs.Println("[ERR][ROUTINE] loop for remote info failed: " + err.Error())
 			}

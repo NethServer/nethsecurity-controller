@@ -222,7 +222,14 @@ CGO_ENABLED=0 go build
 
      {
         "code": 200,
-        "data": null,
+        "data": {
+            "FQDN": "NethSec",
+            "SSHPort": 22,
+            "SubscriptionType": "enterprise",
+            "SystemID": "7DD2C9A8-9346-4B05-B286-30C4AE6977AE",
+            "UnitName": "NethSec",
+            "Version": "NethSecurity 8 23.05.3-ns.1.0.1"
+        },
         "message": "unit info retrieved successfully"
      }
     ```
