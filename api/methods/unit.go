@@ -122,7 +122,7 @@ func GetUnitInfo(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
 
-	// parse unit file
+	// get unit info and store it
 	err := GetRemoteInfo(unitId)
 
 	// check errors
@@ -135,7 +135,7 @@ func GetUnitInfo(c *gin.Context) {
 		return
 	}
 
-	// return 200 OK with data
+	// return 200 OK
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "unit info retrieved successfully",
