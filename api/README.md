@@ -207,6 +207,26 @@ CGO_ENABLED=0 go build
     The API takes a query parameter `cache`. If `cache` is set to `true`, the API will return the cached data, if data are fresh enough.
     If `cache` is set to `false`, the API will always fetch the data from the connected units.
 
+- `GET /units/<unit_id>/info`
+
+    REQ
+    ```json
+     Content-Type: application/json
+     Authorization: Bearer <JWT_TOKEN>
+    ```
+
+    RES
+    ```json
+     HTTP/1.1 200 OK
+     Content-Type: application/json; charset=utf-8
+
+     {
+        "code": 200,
+        "data": null,
+        "message": "unit info retrieved successfully"
+     }
+    ```
+
 - `GET /units/<unit_id>/token`
 
     REQ
