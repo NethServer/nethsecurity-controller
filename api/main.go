@@ -124,6 +124,7 @@ func main() {
 		{
 			units.GET("", methods.GetUnits)
 			units.GET("/:unit_id", methods.GetUnit)
+			units.GET("/:unit_id/info", methods.GetUnitInfo)
 			units.GET("/:unit_id/token", methods.GetToken)
 			units.POST("", methods.AddUnit)
 			units.DELETE("/:unit_id", methods.DeleteUnit)

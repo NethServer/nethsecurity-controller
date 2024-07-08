@@ -79,7 +79,7 @@ func GetUnit(c *gin.Context) {
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "Can't get unit info for: " + unitId,
+			Message: "can't get unit info for: " + unitId,
 			Data:    err.Error(),
 		}))
 	} else {
@@ -116,6 +116,32 @@ func GetToken(c *gin.Context) {
 			"expire": expire,
 		},
 	}))
+}
+
+func GetUnitInfo(c *gin.Context) {
+	// get unit id
+	unitId := c.Param("unit_id")
+
+	// parse unit file
+	err := GetRemoteInfo(unitId)
+
+	// check errors
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "can't get unit info for: " + unitId,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// return 200 OK with data
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit listed successfully",
+		Data:    nil,
+	}))
+
 }
 
 func AddUnit(c *gin.Context) {
