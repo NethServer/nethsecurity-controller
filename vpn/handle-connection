@@ -31,3 +31,4 @@ http:
 EOF
 
 echo -n "$ifconfig_pool_remote_ip" > /etc/openvpn/clients/$username
+echo -n $(date +%s) > /etc/openvpn/status/$username.vpn

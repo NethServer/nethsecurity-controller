@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Remove openvpn instance
+username=$common_name
+rm -f /etc/openvpn/status/$username.vpn
+rm -f /etc/openvpn/status/$username.info

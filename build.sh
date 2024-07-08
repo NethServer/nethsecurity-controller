@@ -16,6 +16,7 @@ echo "Setup image"
 buildah add "${container}" vpn/ip /sbin/ip
 buildah add "${container}" vpn/controller-auth /usr/local/bin/controller-auth
 buildah add "${container}" vpn/handle-connection /usr/local/bin/handle-connection
+buildah add "${container}" vpn/handle-disconnection /usr/local/bin/handle-disconnection
 buildah add "${container}" vpn/entrypoint.sh /entrypoint.sh
 buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/sbin/openvpn", "/etc/openvpn/server.conf"]' ${container}
 buildah commit "${container}" "${repobase}/nethsecurity-vpn"
