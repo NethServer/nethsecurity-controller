@@ -138,7 +138,7 @@ func GetUnitInfo(c *gin.Context) {
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "unit listed successfully",
+		Message: "unit info retrieved successfully",
 		Data:    nil,
 	}))
 
