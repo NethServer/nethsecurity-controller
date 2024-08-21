@@ -51,6 +51,7 @@ func main() {
 
 	// init storage
 	storage.Init()
+	storage.InitReportDb()
 
 	// init socket connection
 	socket.Init()
@@ -129,6 +130,17 @@ func main() {
 			units.POST("", methods.AddUnit)
 			units.DELETE("/:unit_id", methods.DeleteUnit)
 		}
+	}
+
+	// report APIs
+	reports := router.Group("/reports")
+	reports.Use(middleware.ReportAuth())
+	{
+		reports.POST("/mwan-events", methods.UpdateMwanSeries)
+		reports.POST("/ts-attacks", methods.UpdateTsAttacks)
+		reports.POST("/ts-malware", methods.UpdateTsMalware)
+		reports.POST("/ovpnrw-connections", methods.UpdateOvpnConnections)
+		reports.POST("/dpi-stats", methods.UpdateDpiStats)
 	}
 
 	// handle missing endpoint

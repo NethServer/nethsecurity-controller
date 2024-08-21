@@ -14,6 +14,8 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -256,4 +258,44 @@ func InitJWT() *jwt.GinJWTMiddleware {
 
 	// return object
 	return authMiddleware
+}
+
+func ReportAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		token := c.GetHeader("RegistrationToken")
+		unit_id := c.GetHeader("UnitId")
+		if token == "" || unit_id == "" {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusUnauthorized{
+				Code:    400,
+				Message: "missing token or unit id",
+				Data:    nil,
+			}))
+			c.Abort()
+			return
+		}
+		// validate registration token against configured one
+		if token != configuration.Config.RegistrationToken {
+			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusBadRequest{
+				Code:    401,
+				Message: "invalid registration token",
+			}))
+			c.Abort()
+			return
+		}
+
+		// UnitId is invalid if there is no certificate issued for it
+		if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + unit_id + ".crt"); err != nil {
+			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusUnauthorized{
+				Code:    401,
+				Message: "invalid unit id",
+				Data:    nil,
+			}))
+			c.Abort()
+			return
+		}
+		c.Set("UnitId", unit_id)
+		c.Next()
+	}
+
 }

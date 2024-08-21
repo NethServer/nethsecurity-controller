@@ -59,6 +59,8 @@ type Configuration struct {
 	CacheTTL string `json:"cache_ttl"`
 
 	ValidSubscription bool `json:"valid_subscription"`
+
+	ReportDbUri string `json:"report_db_uri"`
 }
 
 var Config = Configuration{}
@@ -241,5 +243,12 @@ func Init() {
 		Config.ValidSubscription = os.Getenv("VALID_SUBSCRIPTION") == "true"
 	} else {
 		Config.ValidSubscription = false
+	}
+
+	if os.Getenv("REPORT_DB_URI") != "" {
+		Config.ReportDbUri = os.Getenv("REPORT_DB_URI")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] REPORT_DB_URI variable is empty")
+		os.Exit(1)
 	}
 }

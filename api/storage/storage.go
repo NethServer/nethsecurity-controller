@@ -10,6 +10,7 @@
 package storage
 
 import (
+	"context"
 	"database/sql"
 	_ "embed"
 	"os"
@@ -19,15 +20,21 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
+var dbpool *pgxpool.Pool
+var dbctx context.Context
 var err error
 
 //go:embed schema.sql
 var schemaSQL string
+
+//go:embed report_schema.sql
+var reportSchemaSQL string
 
 func Instance() *sql.DB {
 	if db == nil {
@@ -261,4 +268,32 @@ func UpdatePassword(accountUsername string, newPassword string) error {
 	)
 
 	return err
+}
+
+func InitReportDb() (*pgxpool.Pool, context.Context) {
+	dbctx = context.Background()
+	dbpool, err = pgxpool.New(dbctx, configuration.Config.ReportDbUri)
+	if err != nil {
+		logs.Logs.Println("[WARN][DB] error in db connection:" + err.Error())
+	}
+
+	err = dbpool.Ping(dbctx)
+	if err != nil {
+		logs.Logs.Println("[WARN][DB] error in db connection:" + err.Error())
+	}
+
+	// execute create tables
+	_, errExecute := dbpool.Exec(dbctx, reportSchemaSQL)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+	}
+
+	return dbpool, dbctx
+}
+
+func ReportInstance() (*pgxpool.Pool, context.Context) {
+	if dbpool == nil {
+		dbpool, dbctx = InitReportDb()
+	}
+	return dbpool, dbctx
 }
