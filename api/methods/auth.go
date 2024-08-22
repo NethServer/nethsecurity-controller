@@ -10,7 +10,6 @@
 package methods
 
 import (
-	"io/ioutil"
 	"os"
 	"strings"
 
@@ -19,7 +18,7 @@ import (
 
 func CheckTokenValidation(username string, token string) bool {
 	// read whole file
-	secrestListB, err := ioutil.ReadFile(configuration.Config.TokensDir + "/" + username)
+	secrestListB, err := os.ReadFile(configuration.Config.TokensDir + "/" + username)
 	if err != nil {
 		return false
 	}
@@ -43,7 +42,7 @@ func SetTokenValidation(username string, token string) bool {
 
 func DelTokenValidation(username string, token string) bool {
 	// read whole file
-	secrestListB, errR := ioutil.ReadFile(configuration.Config.TokensDir + "/" + username)
+	secrestListB, errR := os.ReadFile(configuration.Config.TokensDir + "/" + username)
 	if errR != nil {
 		return false
 	}

@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"strings"
@@ -153,8 +152,8 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				// extract body
 				var buf bytes.Buffer
 				tee := io.TeeReader(c.Request.Body, &buf)
-				body, _ := ioutil.ReadAll(tee)
-				c.Request.Body = ioutil.NopCloser(&buf)
+				body, _ := io.ReadAll(tee)
+				c.Request.Body = io.NopCloser(&buf)
 
 				// convert to map and flat it
 				var jsonDyn map[string]interface{}
@@ -162,7 +161,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				in, _ := flat.Flatten(jsonDyn, nil)
 
 				// search for sensitve data, in sensitive list
-				for k, _ := range in {
+				for k := range in {
 					for _, s := range configuration.Config.SensitiveList {
 						if strings.Contains(strings.ToLower(k), strings.ToLower(s)) {
 							in[k] = "XXX"

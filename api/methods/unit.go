@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"io/ioutil"
 	"net/http"
 	"os"
 	"os/exec"
@@ -399,7 +398,7 @@ func RegisterUnit(c *gin.Context) {
 
 		// read credentials from file
 		var credentials models.LoginRequest
-		jsonString, errRead := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.UnitId)
+		jsonString, errRead := os.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.UnitId)
 
 		// credentials exists, update only if username matches
 		if errRead == nil {
@@ -557,7 +556,7 @@ func getUnitToken(unitId string) (string, string, error) {
 
 	// read credentials
 	var credentials models.LoginRequest
-	body, err := ioutil.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
+	body, err := os.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
 	if err != nil {
 		return "", "", errors.New("cannot open credentials file for: " + unitId)
 	}
