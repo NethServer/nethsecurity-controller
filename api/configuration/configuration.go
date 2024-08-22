@@ -61,6 +61,8 @@ type Configuration struct {
 	ValidSubscription bool `json:"valid_subscription"`
 
 	ReportDbUri string `json:"report_db_uri"`
+
+	GeoIPDbDir string `json:"geoip_db_dir"`
 }
 
 var Config = Configuration{}
@@ -250,5 +252,12 @@ func Init() {
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] REPORT_DB_URI variable is empty")
 		os.Exit(1)
+	}
+
+	// Assuming the file is named GeoLite2-Country.mmdb
+	if os.Getenv("GEOIP_DB_DIR") != "" {
+		Config.GeoIPDbDir = os.Getenv("GEOIP_DB_DIR")
+	} else {
+		Config.GeoIPDbDir = "."
 	}
 }

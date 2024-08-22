@@ -26,6 +26,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/routines"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 )
 
 // @title NethSecurity Controller API Server
@@ -55,6 +56,9 @@ func main() {
 
 	// init socket connection
 	socket.Init()
+
+	// init geoip
+	utils.InitGeoIP()
 
 	// starts remote info loop
 	go routines.RefreshRemoteInfoLoop()

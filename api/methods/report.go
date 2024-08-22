@@ -10,6 +10,7 @@
 package methods
 
 import (
+	"net"
 	"net/http"
 	"time"
 
@@ -17,6 +18,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
@@ -125,12 +127,14 @@ func UpdateTsAttacks(c *gin.Context) {
 	batch := &pgx.Batch{}
 
 	for _, attack := range req.Data {
+		country := ""
 		// skip invalid objects
 		if attack.Timestamp == 0 || attack.Ip == "" {
 			logs.Logs.Println("[WARN][TSATTACKS] skipping invalid object")
 			continue
 		}
-		batch.Queue("INSERT INTO ts_attacks (time, unit_id, ip) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING", time.Unix(attack.Timestamp, 0), unit_id, attack.Ip)
+		country = utils.GetCountryShort(attack.Ip)
+		batch.Queue("INSERT INTO ts_attacks (time, unit_id, ip) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", time.Unix(attack.Timestamp, 0), unit_id, attack.Ip, country)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
@@ -180,12 +184,27 @@ func UpdateTsMalware(c *gin.Context) {
 	// CopyFrom can't handle conflict resolution, so use batch insert instead
 	batch := &pgx.Batch{}
 	for _, malware := range req.Data {
+		country := ""
 		// skip invalid objects
 		if malware.Timestamp == 0 || malware.Src == "" || malware.Dst == "" || malware.Category == "" || malware.Chain == "" {
 			logs.Logs.Println("[WARN][TSMALWARE] skipping invalid object")
 			continue
 		}
-		batch.Queue("INSERT INTO ts_malware (time, unit_id, src, dst, category, chain) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT DO NOTHING", time.Unix(malware.Timestamp, 0), unit_id, malware.Src, malware.Dst, malware.Category, malware.Chain)
+
+		// GeoIP info
+		if malware.Chain == "inp-wan" {
+			// Retrieve GeoIP country code for source when traffic is destined to the WAN
+			country = utils.GetCountryShort(malware.Src)
+		} else {
+			// Retrieve GeoIP country code for non-private IP when traffic is forwarded
+			if !net.ParseIP(malware.Dst).IsPrivate() {
+				country = utils.GetCountryShort(malware.Dst)
+			} else if !net.ParseIP(malware.Src).IsPrivate() {
+				country = utils.GetCountryShort(malware.Src)
+			}
+		}
+
+		batch.Queue("INSERT INTO ts_malware (time, unit_id, src, dst, category, chain, country) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING", time.Unix(malware.Timestamp, 0), unit_id, malware.Src, malware.Dst, malware.Category, malware.Chain, country)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
@@ -235,12 +254,15 @@ func UpdateOvpnConnections(c *gin.Context) {
 	// CopyFrom can't handle conflict resolution, so use batch insert instead
 	batch := &pgx.Batch{}
 	for _, connection := range req.Data {
+		country := ""
 		// skip invalid objects
 		if connection.Timestamp == 0 || connection.Instance == "" || connection.CommonName == "" || connection.StartTime == 0 {
 			logs.Logs.Println("[WARN][OVPNCONNECTIONS] skipping invalid object")
 			continue
 		}
-		batch.Queue("INSERT INTO ovpnrw_connections (time, unit_id, instance, common_name, virtual_ip_addr, remote_ip_addr, start_time, duration, bytes_received, bytes_sent) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) ON CONFLICT  (time, unit_id, instance, common_name) DO UPDATE SET duration=EXCLUDED.duration, bytes_received=EXCLUDED.bytes_received, bytes_sent=EXCLUDED.bytes_sent", time.Unix(connection.Timestamp, 0), unit_id, connection.Instance, connection.CommonName, connection.VirtualIpAddr, connection.RemoteIpAddr, connection.StartTime, connection.Duration, connection.BytesReceived, connection.BytesSent)
+		// GeoIP info for the remote IP
+		country = utils.GetCountryShort(connection.RemoteIpAddr)
+		batch.Queue("INSERT INTO ovpnrw_connections (time, unit_id, instance, common_name, virtual_ip_addr, remote_ip_addr, start_time, duration, bytes_received, bytes_sent, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT  (time, unit_id, instance, common_name) DO UPDATE SET duration=EXCLUDED.duration, bytes_received=EXCLUDED.bytes_received, bytes_sent=EXCLUDED.bytes_sent", time.Unix(connection.Timestamp, 0), unit_id, connection.Instance, connection.CommonName, connection.VirtualIpAddr, connection.RemoteIpAddr, connection.StartTime, connection.Duration, connection.BytesReceived, connection.BytesSent, country)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()

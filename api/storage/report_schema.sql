@@ -29,6 +29,7 @@ CREATE TABLE IF NOT EXISTS ts_malware (
     dst TEXT NOT NULL,
     category TEXT NOT NULL,
     chain TEXT NOT NULL,
+    country VARCHAR(2),
     UNIQUE (time, unit_id),
     CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
 );
@@ -44,6 +45,7 @@ CREATE TABLE IF NOT EXISTS ovpnrw_connections (
     duration BIGINT,
     bytes_received BIGINT,
     bytes_sent BIGINT,
+    country VARCHAR(2),
     UNIQUE (time, unit_id, instance, common_name),
     CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
 );
@@ -52,6 +54,7 @@ CREATE TABLE IF NOT EXISTS ts_attacks (
     time TIMESTAMPTZ NOT NULL,
     unit_id INTEGER NOT NULL references units(id),
     ip TEXT NOT NULL,
+    country VARCHAR(2),
     UNIQUE (time, unit_id, ip),
     CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
 );
