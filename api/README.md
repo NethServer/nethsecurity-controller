@@ -138,6 +138,7 @@ CGO_ENABLED=0 go build
                     "system_id": "XXXXXXXX-XXXX",
                     "ssh_port": 22,
                     "fqdn": "fw.local",
+                    "api_version": "1.0.0"
                 }
             },
             ...
@@ -153,6 +154,7 @@ CGO_ENABLED=0 go build
                     "system_id": "",
                     "ssh_port": 0,
                     "fqdn": "",
+                    "api_version": "1.0.0"
                 }
             }
         ],
@@ -197,6 +199,7 @@ CGO_ENABLED=0 go build
                 "system_id": "XXXXXXXX-XXXX",
                 "ssh_port": 22,
                 "fqdn": "fw.local",
+                "api_version": "1.0.0"
             },
             "join_code": "eyJmcWRuIjoiY29udHJvbGxlci5ncy5uZXRoc2VydmVyLm5ldCIsInRva2VuIjoiMTIzNCIsInVuaXRfaWQiOiI5Njk0Y2Y4ZC03ZmE5LTRmN2EtYjFjNC1iY2Y0MGUzMjhjMDIifQ=="
         },
@@ -229,6 +232,7 @@ CGO_ENABLED=0 go build
             "system_id": "XXXXXXXX-XXXX",
             "unit_name": "NethSec",
             "version": "NethSecurity 8 23.05.3-ns.1.0.1"
+            "api_version": "1.0.0"
         },
         "message": "unit info retrieved successfully"
      }
