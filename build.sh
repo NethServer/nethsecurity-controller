@@ -5,7 +5,7 @@ repobase="ghcr.io/nethserver"
 
 images=()
 container=$(buildah from docker.io/alpine:3.16)
-ui_version="1.2.1"
+ui_version="1.2.2"
 
 trap "buildah rm ${container} ${container_api} ${container_proxy}" EXIT
 
