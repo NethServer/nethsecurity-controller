@@ -165,7 +165,7 @@ func UpdateTsAttacks(c *gin.Context) {
 			continue
 		}
 		country = utils.GetCountryShort(attack.Ip)
-		batch.Queue("INSERT INTO ts_attacks (time, unit_id, ip) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", time.Unix(attack.Timestamp, 0), unit_id, attack.Ip, country)
+		batch.Queue("INSERT INTO ts_attacks (time, unit_id, ip, country) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", time.Unix(attack.Timestamp, 0), unit_id, attack.Ip, country)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
