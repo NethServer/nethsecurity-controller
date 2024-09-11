@@ -80,3 +80,7 @@ type DpiStats []DpiStat
 type DpiStatsRequest struct {
 	Data DpiStats `json:"data" binding:"required"`
 }
+
+type UnitNameRequest struct {
+	Name string `json:"name" binding:"required"`
+}

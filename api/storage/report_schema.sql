@@ -12,7 +12,7 @@
 CREATE TABLE IF NOT EXISTS units (
     id SERIAL PRIMARY KEY,
     uuid TEXT NOT NULL,
-    name TEXT NOT NULL,
+    name TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

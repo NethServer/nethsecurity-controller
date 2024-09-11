@@ -145,6 +145,7 @@ func main() {
 		reports.POST("/ts-malware", methods.UpdateTsMalware)
 		reports.POST("/ovpnrw-connections", methods.UpdateOvpnConnections)
 		reports.POST("/dpi-stats", methods.UpdateDpiStats)
+		reports.POST("/unit-name", methods.SetUnitName)
 	}
 
 	// handle missing endpoint

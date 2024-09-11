@@ -24,6 +24,37 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+func SetUnitName(c *gin.Context) {
+	// bind json
+	var req models.UnitNameRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "Invalid request",
+			Data:    err.Error(),
+		}))
+		return
+	}
+	unitId := c.MustGet("UnitId").(string)
+	var id int
+	dbpool, dbctx := storage.ReportInstance()
+	// check if unit_id is valid
+	err := dbpool.QueryRow(dbctx, "SELECT id FROM units WHERE uuid = $1", unitId).Scan(&id)
+	if err != nil {
+		// insert a new unit and return the id
+		err := dbpool.QueryRow(dbctx, "INSERT INTO units (uuid, name) VALUES ($1, $2) RETURNING id", unitId, req.Name).Scan(&id)
+		if err != nil {
+			logs.Logs.Println("[ERR][UNITNAME] error inserting unit name: " + err.Error())
+		}
+	} else {
+		// update the unit name
+		_, err := dbpool.Exec(dbctx, "UPDATE units SET name = $1 WHERE uuid = $2", req.Name, unitId)
+		if err != nil {
+			logs.Logs.Println("[ERR][UNITNAME] error updating unit name: " + err.Error())
+		}
+	}
+}
+
 func getUnitId(unitId string) int {
 	if unitId == "" {
 		return -1
