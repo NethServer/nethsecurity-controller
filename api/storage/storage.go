@@ -36,6 +36,8 @@ var schemaSQL string
 //go:embed report_schema.sql
 var reportSchemaSQL string
 
+var reportDbIsInitialized = false
+
 func Instance() *sql.DB {
 	if db == nil {
 		db = Init()
@@ -270,6 +272,17 @@ func UpdatePassword(accountUsername string, newPassword string) error {
 	return err
 }
 
+func loadReportSchema(*pgxpool.Pool, context.Context) bool {
+	// execute create tables
+	logs.Logs.Println("[INFO][STORAGE] creating report tables")
+	_, errExecute := dbpool.Exec(dbctx, reportSchemaSQL)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+	return true
+}
+
 func InitReportDb() (*pgxpool.Pool, context.Context) {
 	dbctx = context.Background()
 	dbpool, err = pgxpool.New(dbctx, configuration.Config.ReportDbUri)
@@ -282,11 +295,7 @@ func InitReportDb() (*pgxpool.Pool, context.Context) {
 		logs.Logs.Println("[WARN][DB] error in db connection:" + err.Error())
 	}
 
-	// execute create tables
-	_, errExecute := dbpool.Exec(dbctx, reportSchemaSQL)
-	if errExecute != nil {
-		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
-	}
+	reportDbIsInitialized = loadReportSchema(dbpool, dbctx)
 
 	return dbpool, dbctx
 }
@@ -294,6 +303,19 @@ func InitReportDb() (*pgxpool.Pool, context.Context) {
 func ReportInstance() (*pgxpool.Pool, context.Context) {
 	if dbpool == nil {
 		dbpool, dbctx = InitReportDb()
+
+	}
+	if !reportDbIsInitialized {
+		// check if 'units' table exists, if not call initialization
+		query := `SELECT EXISTS (
+				SELECT FROM information_schema.tables
+				WHERE  table_schema = 'schema_name'
+				AND    table_name   = 'units'
+			)`
+		dbpool.QueryRow(dbctx, query).Scan(&reportDbIsInitialized)
+		if !reportDbIsInitialized {
+			reportDbIsInitialized = loadReportSchema(dbpool, dbctx)
+		}
 	}
 	return dbpool, dbctx
 }
