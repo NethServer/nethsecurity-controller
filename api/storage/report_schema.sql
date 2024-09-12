@@ -46,7 +46,7 @@ SELECT add_retention_policy('mwan_events', drop_after => INTERVAL '30 days', if_
 -- Continuous aggregates and retention policy
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_mwan_events_hourly 
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    wan,
@@ -93,7 +93,7 @@ SELECT add_retention_policy('ts_malware', drop_after => INTERVAL '30 days', if_n
 -- Continuous aggregates
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_direction
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    src,
@@ -113,7 +113,7 @@ SELECT remove_retention_policy('ca_ts_malware_hourly_direction', if_exists => TR
 SELECT add_retention_policy('ca_ts_malware_hourly_direction', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_category
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    category,
@@ -133,7 +133,7 @@ SELECT remove_retention_policy('ca_ts_malware_hourly_category', if_exists => TRU
 SELECT add_retention_policy('ca_ts_malware_hourly_category', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_chain
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    chain,
@@ -153,7 +153,7 @@ SELECT remove_retention_policy('ca_ts_malware_hourly_chain', if_exists => TRUE);
 SELECT add_retention_policy('ca_ts_malware_hourly_chain', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_country
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    country,
@@ -202,7 +202,7 @@ SELECT add_retention_policy('ovpnrw_connections', drop_after => INTERVAL '30 day
 -- Continuous aggregates
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ovpnrw_connections_hourly_count
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    common_name,
@@ -223,7 +223,7 @@ SELECT remove_retention_policy('ca_ovpnrw_connections_hourly_count', if_exists =
 SELECT add_retention_policy('ca_ovpnrw_connections_hourly_count', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ovpnrw_connections_hourly_bytes
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    common_name,
@@ -267,7 +267,7 @@ SELECT add_retention_policy('ts_attacks', drop_after => INTERVAL '30 days', if_n
 -- Continuous aggregates
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_attacks_hourly
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    count(ip) as count,
@@ -313,13 +313,16 @@ SELECT add_retention_policy('dpi_stats', drop_after => INTERVAL '30 days', if_no
 -- Continuous aggregates
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_bytes
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    sum(bytes) as bytes
 FROM dpi_stats
 GROUP BY unit_id, bucket
 WITH NO DATA;
+
+ALTER MATERIALIZED VIEW table_ca_dpi_stats_hourly_bytesname set (timescaledb.materialized_only = false);
+
 
 SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_bytes',
   start_offset => NULL,
@@ -332,7 +335,7 @@ SELECT remove_retention_policy('ca_dpi_stats_hourly_bytes', if_exists => TRUE);
 SELECT add_retention_policy('ca_dpi_stats_hourly_bytes', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_protocol
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    protocol,
@@ -353,7 +356,7 @@ SELECT remove_retention_policy('ca_dpi_stats_hourly_protocol', if_exists => TRUE
 SELECT add_retention_policy('ca_dpi_stats_hourly_protocol', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_host
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    host,
@@ -374,7 +377,7 @@ SELECT remove_retention_policy('ca_dpi_stats_hourly_host', if_exists => TRUE);
 SELECT add_retention_policy('ca_dpi_stats_hourly_host', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_application
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    application,
@@ -395,7 +398,7 @@ SELECT remove_retention_policy('ca_dpi_stats_hourly_application', if_exists => T
 SELECT add_retention_policy('ca_dpi_stats_hourly_application', drop_after => INTERVAL '60 days', if_not_exists => TRUE);
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_client
-WITH (timescaledb.continuous) AS
+WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT unit_id,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    client_address,
