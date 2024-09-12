@@ -321,7 +321,7 @@ FROM dpi_stats
 GROUP BY unit_id, bucket
 WITH NO DATA;
 
-ALTER MATERIALIZED VIEW table_ca_dpi_stats_hourly_bytesname set (timescaledb.materialized_only = false);
+ALTER MATERIALIZED VIEW ca_dpi_stats_hourly_bytes set (timescaledb.materialized_only = false);
 
 
 SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_bytes',
