@@ -65,6 +65,8 @@ type Configuration struct {
 	GeoIPDbDir string `json:"geoip_db_dir"`
 
 	GrafanaPostgresPassword string `json:"grafana_postgres_password"`
+
+	RetentionDays string `json:"retention_days"`
 }
 
 var Config = Configuration{}
@@ -268,5 +270,11 @@ func Init() {
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] GRAFANA_POSTGRES_PASSWORD variable is empty")
 		os.Exit(1)
+	}
+
+	if os.Getenv("RETENTION_DAYS") != "" {
+		Config.RetentionDays = os.Getenv("RETENTION_DAYS")
+	} else {
+		Config.RetentionDays = "60"
 	}
 }

@@ -35,7 +35,7 @@ var err error
 //go:embed schema.sql
 var schemaSQL string
 
-//go:embed report_schema.sql
+//go:embed report_schema.sql.tmpl
 var reportSchemaSQL string
 
 //go:embed grafana_user.sql.tmpl
@@ -280,20 +280,28 @@ func UpdatePassword(accountUsername string, newPassword string) error {
 func loadReportSchema(*pgxpool.Pool, context.Context) bool {
 	// execute create tables
 	logs.Logs.Println("[INFO][STORAGE] creating report tables")
-	_, errExecute := dbpool.Exec(dbctx, reportSchemaSQL)
+	reportTemplate, _ := template.New("report_schema").Parse(reportSchemaSQL)
+	var executedReportTemplate bytes.Buffer
+	errExecute := reportTemplate.Execute(&executedReportTemplate, configuration.Config)
 	if errExecute != nil {
 		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
 		return false
 	}
+	_, errExecute = dbpool.Exec(dbctx, reportSchemaSQL)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+
 	logs.Logs.Println("[INFO][STORAGE] creating grafana user")
-	tmpl, _ := template.New("grafana_user").Parse(grafanaUserSQL)
-	var executedTemplate bytes.Buffer
-	errExecute = tmpl.Execute(&executedTemplate, configuration.Config)
+	grafanaUserTemplate, _ := template.New("grafana_user").Parse(grafanaUserSQL)
+	var executedGrafanaUserReport bytes.Buffer
+	errExecute = grafanaUserTemplate.Execute(&executedGrafanaUserReport, configuration.Config)
 	if errExecute != nil {
 		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
 		return false
 	}
-	_, errExecute = dbpool.Exec(dbctx, executedTemplate.String())
+	_, errExecute = dbpool.Exec(dbctx, executedGrafanaUserReport.String())
 	if errExecute != nil {
 		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
 		return false

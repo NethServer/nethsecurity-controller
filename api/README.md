@@ -44,6 +44,8 @@ CGO_ENABLED=0 go build
 - `CACHE_TTL`: cache time to live for unit information in seconds - *default*: `7200` (2 hours)
   Unit information are fetched from the connected units. The cache is refreshed every hour.
 
+- `RETENTION_DAYS`: configure how many days the metrics should be kept - *default*: `60`
+
 ## APIs
 ### Auth
 - `POST /login`
