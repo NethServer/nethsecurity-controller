@@ -17,6 +17,8 @@ CGO_ENABLED=0 go build
 - `PROMTAIL_ADDRESS`: promtail address
 - `PROMTAIL_PORT`: promtail port
 
+- `GRAFANA_POSTGRES_PASSWORD`: password to access grafana postgres database 
+
 **Optional**
 - `LISTEN_ADDRESS`: listend address of server - *default*: `127.0.0.1:5000`
 

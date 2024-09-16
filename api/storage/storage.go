@@ -10,9 +10,11 @@
 package storage
 
 import (
+	"bytes"
 	"context"
 	"database/sql"
 	_ "embed"
+	"html/template"
 	"os"
 	"time"
 
@@ -35,6 +37,9 @@ var schemaSQL string
 
 //go:embed report_schema.sql
 var reportSchemaSQL string
+
+//go:embed grafana_user.sql.tmpl
+var grafanaUserSQL string
 
 var reportDbIsInitialized = false
 
@@ -276,6 +281,24 @@ func loadReportSchema(*pgxpool.Pool, context.Context) bool {
 	// execute create tables
 	logs.Logs.Println("[INFO][STORAGE] creating report tables")
 	_, errExecute := dbpool.Exec(dbctx, reportSchemaSQL)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+	logs.Logs.Println("[INFO][STORAGE] creating grafana user")
+	tmpl, _ := template.New("grafana_user").Parse(grafanaUserSQL)
+	var executedTemplate bytes.Buffer
+	errExecute = tmpl.Execute(&executedTemplate, configuration.Config)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+	_, errExecute = dbpool.Exec(dbctx, executedTemplate.String())
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+	_, errExecute = dbpool.Exec(dbctx, grafanaUserSQL)
 	if errExecute != nil {
 		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
 		return false

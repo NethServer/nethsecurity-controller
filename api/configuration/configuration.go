@@ -63,6 +63,8 @@ type Configuration struct {
 	ReportDbUri string `json:"report_db_uri"`
 
 	GeoIPDbDir string `json:"geoip_db_dir"`
+
+	GrafanaPostgresPassword string `json:"grafana_postgres_password"`
 }
 
 var Config = Configuration{}
@@ -259,5 +261,12 @@ func Init() {
 		Config.GeoIPDbDir = os.Getenv("GEOIP_DB_DIR")
 	} else {
 		Config.GeoIPDbDir = "."
+	}
+
+	if os.Getenv("GRAFANA_POSTGRES_PASSWORD") != "" {
+		Config.GrafanaPostgresPassword = os.Getenv("GRAFANA_POSTGRES_PASSWORD")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] GRAFANA_POSTGRES_PASSWORD variable is empty")
+		os.Exit(1)
 	}
 }
