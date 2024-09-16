@@ -298,11 +298,6 @@ func loadReportSchema(*pgxpool.Pool, context.Context) bool {
 		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
 		return false
 	}
-	_, errExecute = dbpool.Exec(dbctx, grafanaUserSQL)
-	if errExecute != nil {
-		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
-		return false
-	}
 	return true
 }
 
