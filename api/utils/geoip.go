@@ -15,7 +15,9 @@ import (
 	"github.com/oschwald/geoip2-golang"
 	"log"
 	"net"
+	"os"
 	"os/exec"
+	"time"
 )
 
 var db *geoip2.Reader
@@ -53,9 +55,13 @@ func GetCountryShort(ip string) string {
 }
 
 func DownloadGeoIpDatabase() {
-	err := exec.Command(
+	databaseFile, err := os.Stat(configuration.Config.GeoIPDbDir + "/GeoLite2-Country.mmdb")
+	if err == nil && time.Since(databaseFile.ModTime()).Hours() < 24 {
+		logs.Logs.Println("[INFO][GEOIP] geoip db file is up to date")
+		return
+	}
+	err = exec.Command(
 		"curl",
-		"-v",
 		"-L",
 		"--fail",
 		"--retry", "5",
@@ -77,5 +83,4 @@ func DownloadGeoIpDatabase() {
 		logs.Logs.Println("[ERR][GEOIP] error extracting geoip db file :" + err.Error())
 		return
 	}
-
 }
