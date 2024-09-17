@@ -10,6 +10,7 @@
 package methods
 
 import (
+	"errors"
 	"net"
 	"net/http"
 	"time"
@@ -38,11 +39,11 @@ func SetUnitName(c *gin.Context) {
 	unitId := c.MustGet("UnitId").(string)
 	var id int
 	dbpool, dbctx := storage.ReportInstance()
-	// check if unit_id is valid
-	err := dbpool.QueryRow(dbctx, "SELECT id FROM units WHERE uuid = $1", unitId).Scan(&id)
+	// check if uuid is valid
+	err := dbpool.QueryRow(dbctx, "SELECT * FROM units WHERE uuid = $1", unitId).Scan(&id)
 	if err != nil {
 		// insert a new unit and return the id
-		err := dbpool.QueryRow(dbctx, "INSERT INTO units (uuid, name) VALUES ($1, $2) RETURNING id", unitId, req.Name).Scan(&id)
+		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid, name) VALUES ($1, $2) RETURNING id", unitId, req.Name)
 		if err != nil {
 			logs.Logs.Println("[ERR][UNITNAME] error inserting unit name: " + err.Error())
 		}
@@ -55,24 +56,23 @@ func SetUnitName(c *gin.Context) {
 	}
 }
 
-func getUnitId(unitId string) int {
+func checkUnitId(unitId string) error {
 	if unitId == "" {
-		return -1
+		return errors.New("uuid is empty")
 	}
-	var id int
 	dbpool, dbctx := storage.ReportInstance()
 
-	// check if unit_id is valid
-	err := dbpool.QueryRow(dbctx, "SELECT id FROM units WHERE uuid = $1", unitId).Scan(&id)
+	// check if uuid is valid
+	_, err := dbpool.Exec(dbctx, "SELECT uuid FROM units WHERE uuid = $1", unitId)
 	if err != nil {
 		// insert a new unit and return the id
-		err := dbpool.QueryRow(dbctx, "INSERT INTO units (uuid) VALUES ($1) RETURNING id", unitId).Scan(&id)
+		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid) VALUES ($1) RETURNING id", unitId)
 		if err != nil {
-			return -1
+			return errors.New("error inserting unit")
 		}
 	}
 
-	return id
+	return nil
 }
 
 func UpdateMwanSeries(c *gin.Context) {
@@ -87,8 +87,7 @@ func UpdateMwanSeries(c *gin.Context) {
 		return
 	}
 
-	unit_id := getUnitId(c.MustGet("UnitId").(string))
-	if unit_id == -1 {
+	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
 		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
 			Message: "Unit not found",
 			Data:    nil,
@@ -107,7 +106,7 @@ func UpdateMwanSeries(c *gin.Context) {
 			logs.Logs.Println("[WARN][MWANEVENTS] skipping invalid object")
 			continue
 		}
-		batch.Queue("INSERT INTO mwan_events (time, unit_id, wan, event, interface) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING", time.Unix(event.Timestamp, 0), unit_id, event.Wan, event.Event, event.Interface)
+		batch.Queue("INSERT INTO mwan_events (time, uuid, wan, event, interface) VALUES ($1, $2, $3, $4, $5) ON CONFLICT DO NOTHING", time.Unix(event.Timestamp, 0), c.MustGet("UnitId").(string), event.Wan, event.Event, event.Interface)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
@@ -142,8 +141,7 @@ func UpdateTsAttacks(c *gin.Context) {
 		return
 	}
 
-	unit_id := getUnitId(c.MustGet("UnitId").(string))
-	if unit_id == -1 {
+	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
 		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
 			Message: "Unit not found",
 			Data:    nil,
@@ -165,7 +163,7 @@ func UpdateTsAttacks(c *gin.Context) {
 			continue
 		}
 		country = utils.GetCountryShort(attack.Ip)
-		batch.Queue("INSERT INTO ts_attacks (time, unit_id, ip, country) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", time.Unix(attack.Timestamp, 0), unit_id, attack.Ip, country)
+		batch.Queue("INSERT INTO ts_attacks (time, uuid, ip, country) VALUES ($1, $2, $3, $4) ON CONFLICT DO NOTHING", time.Unix(attack.Timestamp, 0), c.MustGet("UnitId").(string), attack.Ip, country)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
@@ -200,8 +198,7 @@ func UpdateTsMalware(c *gin.Context) {
 		return
 	}
 
-	unit_id := getUnitId(c.MustGet("UnitId").(string))
-	if unit_id == -1 {
+	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
 		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
 			Message: "Unit not found",
 			Data:    nil,
@@ -235,7 +232,7 @@ func UpdateTsMalware(c *gin.Context) {
 			}
 		}
 
-		batch.Queue("INSERT INTO ts_malware (time, unit_id, src, dst, category, chain, country) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING", time.Unix(malware.Timestamp, 0), unit_id, malware.Src, malware.Dst, malware.Category, malware.Chain, country)
+		batch.Queue("INSERT INTO ts_malware (time, uuid, src, dst, category, chain, country) VALUES ($1, $2, $3, $4, $5, $6, $7) ON CONFLICT DO NOTHING", time.Unix(malware.Timestamp, 0), c.MustGet("UnitId").(string), malware.Src, malware.Dst, malware.Category, malware.Chain, country)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
@@ -270,8 +267,7 @@ func UpdateOvpnConnections(c *gin.Context) {
 		return
 	}
 
-	unit_id := getUnitId(c.MustGet("UnitId").(string))
-	if unit_id == -1 {
+	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
 		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
 			Message: "Unit not found",
 			Data:    nil,
@@ -293,7 +289,7 @@ func UpdateOvpnConnections(c *gin.Context) {
 		}
 		// GeoIP info for the remote IP
 		country = utils.GetCountryShort(connection.RemoteIpAddr)
-		batch.Queue("INSERT INTO ovpnrw_connections (time, unit_id, instance, common_name, virtual_ip_addr, remote_ip_addr, start_time, duration, bytes_received, bytes_sent, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT  (time, unit_id, instance, common_name) DO UPDATE SET duration=EXCLUDED.duration, bytes_received=EXCLUDED.bytes_received, bytes_sent=EXCLUDED.bytes_sent", time.Unix(connection.Timestamp, 0), unit_id, connection.Instance, connection.CommonName, connection.VirtualIpAddr, connection.RemoteIpAddr, connection.StartTime, connection.Duration, connection.BytesReceived, connection.BytesSent, country)
+		batch.Queue("INSERT INTO ovpnrw_connections (time, uuid, instance, common_name, virtual_ip_addr, remote_ip_addr, start_time, duration, bytes_received, bytes_sent, country) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) ON CONFLICT  (time, uuid, instance, common_name) DO UPDATE SET duration=EXCLUDED.duration, bytes_received=EXCLUDED.bytes_received, bytes_sent=EXCLUDED.bytes_sent", time.Unix(connection.Timestamp, 0), c.MustGet("UnitId").(string), connection.Instance, connection.CommonName, connection.VirtualIpAddr, connection.RemoteIpAddr, connection.StartTime, connection.Duration, connection.BytesReceived, connection.BytesSent, country)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
@@ -328,8 +324,7 @@ func UpdateDpiStats(c *gin.Context) {
 		return
 	}
 
-	unit_id := getUnitId(c.MustGet("UnitId").(string))
-	if unit_id == -1 {
+	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
 		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
 			Message: "Unit not found",
 			Data:    nil,
@@ -349,7 +344,7 @@ func UpdateDpiStats(c *gin.Context) {
 			logs.Logs.Println("[WARN][DPISTATS] skipping invalid object")
 			continue
 		}
-		batch.Queue("INSERT INTO dpi_stats (time, unit_id, client_address, client_name, protocol, host, application, bytes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (time, unit_id, client_address, protocol, host, application) DO UPDATE SET bytes = EXCLUDED.bytes", time.Unix(dpi.Timestamp, 0), unit_id, dpi.ClientAddress, dpi.ClientName, dpi.Protocol, dpi.Host, dpi.Application, dpi.Bytes)
+		batch.Queue("INSERT INTO dpi_stats (time, uuid, client_address, client_name, protocol, host, application, bytes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (time, uuid, client_address, protocol, host, application) DO UPDATE SET bytes = EXCLUDED.bytes", time.Unix(dpi.Timestamp, 0), c.MustGet("UnitId").(string), dpi.ClientAddress, dpi.ClientName, dpi.Protocol, dpi.Host, dpi.Application, dpi.Bytes)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()

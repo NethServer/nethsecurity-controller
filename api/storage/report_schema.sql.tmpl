@@ -10,8 +10,7 @@
 -- Create the schema for the report database
 
 CREATE TABLE IF NOT EXISTS units (
-    id SERIAL PRIMARY KEY,
-    uuid TEXT NOT NULL,
+    uuid UUID PRIMARY KEY,
     name TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -28,12 +27,12 @@ CREATE TABLE IF NOT EXISTS units (
 
 CREATE TABLE IF NOT EXISTS mwan_events (
     time TIMESTAMPTZ NOT NULL,
-    unit_id INTEGER NOT NULL references units(id),
+    uuid UUID NOT NULL references units(uuid),
     wan TEXT NOT NULL,
     event TEXT NOT NULL,
     interface TEXT,
-    UNIQUE (time, unit_id),
-    CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
+    UNIQUE (time, uuid),
+    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
 );
 
 SELECT
@@ -47,13 +46,13 @@ SELECT add_retention_policy('mwan_events', drop_after => INTERVAL '{{ .Retention
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_mwan_events_hourly
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    wan,
    event,
    interface
 FROM mwan_events
-GROUP BY unit_id, bucket, wan, event, interface
+GROUP BY uuid, bucket, wan, event, interface
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_mwan_events_hourly',
@@ -73,14 +72,14 @@ SELECT add_retention_policy('ca_mwan_events_hourly', drop_after => INTERVAL '{{ 
 
 CREATE TABLE IF NOT EXISTS ts_malware (
     time TIMESTAMPTZ NOT NULL,
-    unit_id INTEGER NOT NULL references units(id),
+    uuid UUID NOT NULL references units(uuid),
     src TEXT NOT NULL,
     dst TEXT NOT NULL,
     category TEXT NOT NULL,
     chain TEXT NOT NULL,
     country VARCHAR(2),
-    UNIQUE (time, unit_id),
-    CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
+    UNIQUE (time, uuid),
+    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
 );
 
 SELECT
@@ -94,12 +93,12 @@ SELECT add_retention_policy('ts_malware', drop_after => INTERVAL '{{ .RetentionD
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_direction
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    src,
    dst
 FROM ts_malware
-GROUP BY unit_id, bucket, src, dst
+GROUP BY uuid, bucket, src, dst
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_ts_malware_hourly_direction',
@@ -114,12 +113,12 @@ SELECT add_retention_policy('ca_ts_malware_hourly_direction', drop_after => INTE
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_category
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    category,
    count(category) as count
 FROM ts_malware
-GROUP BY unit_id, bucket, category
+GROUP BY uuid, bucket, category
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_ts_malware_hourly_category',
@@ -134,12 +133,12 @@ SELECT add_retention_policy('ca_ts_malware_hourly_category', drop_after => INTER
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_chain
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    chain,
    count(chain) as count
 FROM ts_malware
-GROUP BY unit_id, bucket, chain
+GROUP BY uuid, bucket, chain
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_ts_malware_hourly_chain',
@@ -154,12 +153,12 @@ SELECT add_retention_policy('ca_ts_malware_hourly_chain', drop_after => INTERVAL
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_malware_hourly_country
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    country,
    count(country) as count
 FROM ts_malware
-GROUP BY unit_id, bucket, country
+GROUP BY uuid, bucket, country
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_ts_malware_hourly_country',
@@ -178,7 +177,7 @@ SELECT add_retention_policy('ca_ts_malware_hourly_country', drop_after => INTERV
 
 CREATE TABLE IF NOT EXISTS ovpnrw_connections (
     time TIMESTAMPTZ NOT NULL,
-    unit_id INTEGER NOT NULL references units(id),
+    uuid UUID NOT NULL references units(uuid),
     instance TEXT NOT NULL,
     common_name TEXT NOT NULL,
     virtual_ip_addr TEXT NOT NULL,
@@ -188,8 +187,8 @@ CREATE TABLE IF NOT EXISTS ovpnrw_connections (
     bytes_received BIGINT,
     bytes_sent BIGINT,
     country VARCHAR(2),
-    UNIQUE (time, unit_id, instance, common_name),
-    CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
+    UNIQUE (time, uuid, instance, common_name),
+    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
 );
 
 SELECT
@@ -203,13 +202,13 @@ SELECT add_retention_policy('ovpnrw_connections', drop_after => INTERVAL '{{ .Re
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ovpnrw_connections_hourly_count
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    common_name,
    instance,
    count(common_name) as count
 FROM ovpnrw_connections
-GROUP BY unit_id, bucket, common_name, instance
+GROUP BY uuid, bucket, common_name, instance
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_ovpnrw_connections_hourly_count',
@@ -224,14 +223,14 @@ SELECT add_retention_policy('ca_ovpnrw_connections_hourly_count', drop_after => 
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ovpnrw_connections_hourly_bytes
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    common_name,
    instance,
    sum(bytes_received) as bytes_received,
    sum(bytes_sent) as bytes_sent
 FROM ovpnrw_connections
-GROUP BY unit_id, bucket, common_name, instance, bytes_received, bytes_sent
+GROUP BY uuid, bucket, common_name, instance, bytes_received, bytes_sent
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_ovpnrw_connections_hourly_bytes',
@@ -250,11 +249,11 @@ SELECT add_retention_policy('ca_ovpnrw_connections_hourly_bytes', drop_after => 
 
 CREATE TABLE IF NOT EXISTS ts_attacks (
     time TIMESTAMPTZ NOT NULL,
-    unit_id INTEGER NOT NULL references units(id),
+    uuid UUID NOT NULL references units(uuid),
     ip TEXT NOT NULL,
     country VARCHAR(2),
-    UNIQUE (time, unit_id, ip),
-    CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
+    UNIQUE (time, uuid, ip),
+    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
 );
 
 SELECT
@@ -268,12 +267,12 @@ SELECT add_retention_policy('ts_attacks', drop_after => INTERVAL '{{ .RetentionD
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_ts_attacks_hourly
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    count(ip) as count,
    country
 FROM ts_attacks
-GROUP BY unit_id, bucket, country
+GROUP BY uuid, bucket, country
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_ts_attacks_hourly',
@@ -292,15 +291,15 @@ SELECT add_retention_policy('ca_ts_attacks_hourly', drop_after => INTERVAL '{{ .
 
 CREATE TABLE IF NOT EXISTS dpi_stats (
     time TIMESTAMPTZ NOT NULL,
-    unit_id INTEGER NOT NULL references units(id),
+    uuid UUID NOT NULL references units(uuid),
     client_address TEXT NOT NULL,
     client_name TEXT,
     protocol TEXT,
     host TEXT,
     application TEXT,
     bytes BIGINT,
-    UNIQUE (time, unit_id, client_address, protocol, host, application),
-    CONSTRAINT fk_unit FOREIGN KEY(unit_id) REFERENCES units(id) ON DELETE CASCADE
+    UNIQUE (time, uuid, client_address, protocol, host, application),
+    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
 );
 
 SELECT
@@ -314,11 +313,11 @@ SELECT add_retention_policy('dpi_stats', drop_after => INTERVAL '{{ .RetentionDa
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_bytes
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    sum(bytes) as bytes
 FROM dpi_stats
-GROUP BY unit_id, bucket
+GROUP BY uuid, bucket
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_bytes',
@@ -333,13 +332,13 @@ SELECT add_retention_policy('ca_dpi_stats_hourly_bytes', drop_after => INTERVAL 
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_protocol
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    protocol,
    sum(bytes) as bytes
 FROM dpi_stats
 WHERE protocol != ''
-GROUP BY unit_id, bucket, protocol
+GROUP BY uuid, bucket, protocol
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_protocol',
@@ -354,13 +353,13 @@ SELECT add_retention_policy('ca_dpi_stats_hourly_protocol', drop_after => INTERV
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_host
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    host,
    sum(bytes) as bytes
 FROM dpi_stats
 WHERE host != ''
-GROUP BY unit_id, bucket, host
+GROUP BY uuid, bucket, host
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_host',
@@ -375,13 +374,13 @@ SELECT add_retention_policy('ca_dpi_stats_hourly_host', drop_after => INTERVAL '
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_application
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    application,
    sum(bytes) as bytes
 FROM dpi_stats
 WHERE application != ''
-GROUP BY unit_id, bucket, application
+GROUP BY uuid, bucket, application
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_application',
@@ -396,14 +395,14 @@ SELECT add_retention_policy('ca_dpi_stats_hourly_application', drop_after => INT
 
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_client
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
-SELECT unit_id,
+SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    client_address,
    client_name,
    sum(bytes) as bytes
 FROM dpi_stats
 WHERE client_address != ''
-GROUP BY unit_id, bucket, client_address, client_name
+GROUP BY uuid, bucket, client_address, client_name
 WITH NO DATA;
 
 SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_client',
