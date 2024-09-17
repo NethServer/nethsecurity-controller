@@ -37,21 +37,30 @@ func SetUnitName(c *gin.Context) {
 		return
 	}
 	unitId := c.MustGet("UnitId").(string)
-	var id int
 	dbpool, dbctx := storage.ReportInstance()
 	// check if uuid is valid
-	err := dbpool.QueryRow(dbctx, "SELECT * FROM units WHERE uuid = $1", unitId).Scan(&id)
+	_, err := dbpool.Exec(dbctx, "SELECT name FROM units WHERE uuid = $1", unitId)
 	if err != nil {
 		// insert a new unit and return the id
 		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid, name) VALUES ($1, $2)", unitId, req.Name)
 		if err != nil {
 			logs.Logs.Println("[ERR][UNITNAME] error inserting unit name: " + err.Error())
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
+				Message: "Error inserting unit name",
+				Data:    err.Error(),
+			}))
 		}
 	} else {
 		// update the unit name
 		_, err := dbpool.Exec(dbctx, "UPDATE units SET name = $1 WHERE uuid = $2", req.Name, unitId)
 		if err != nil {
 			logs.Logs.Println("[ERR][UNITNAME] error updating unit name: " + err.Error())
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
+				Message: "Error updating unit name",
+				Data:    err.Error(),
+			}))
 		}
 	}
 }
