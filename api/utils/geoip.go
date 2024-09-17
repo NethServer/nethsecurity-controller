@@ -17,6 +17,7 @@ import (
 	"net"
 	"os"
 	"os/exec"
+	"strings"
 	"time"
 )
 
@@ -60,7 +61,7 @@ func DownloadGeoIpDatabase() {
 		logs.Logs.Println("[INFO][GEOIP] geoip db file is up to date")
 		return
 	}
-	err = exec.Command(
+	cmd := exec.Command(
 		"curl",
 		"-L",
 		"--fail",
@@ -68,19 +69,24 @@ func DownloadGeoIpDatabase() {
 		"--retry-max-time", "120",
 		"https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key="+configuration.Config.MaxmindLicense+"&suffix=tar.gz",
 		"-o", configuration.Config.GeoIPDbDir+"/GeoLite2-Country.tar.gz",
-	).Run()
+	)
+	var out strings.Builder
+	cmd.Stderr = &out
+	err = cmd.Run()
 	if err != nil {
-		logs.Logs.Println("[ERR][GEOIP] error downloading geoip db file :" + err.Error())
+		logs.Logs.Println("[ERR][GEOIP] error downloading geoip db file: " + out.String())
 		return
 	}
-	err = exec.Command(
+	cmd = exec.Command(
 		"tar",
 		"xvzf",
 		configuration.Config.GeoIPDbDir+"/GeoLite2-Country.tar.gz",
 		"--strip-components=1",
-	).Run()
+	)
+	cmd.Stderr = &out
+	err = cmd.Run()
 	if err != nil {
-		logs.Logs.Println("[ERR][GEOIP] error extracting geoip db file :" + err.Error())
+		logs.Logs.Println("[ERR][GEOIP] error extracting geoip db file: " + out.String())
 		return
 	}
 }
