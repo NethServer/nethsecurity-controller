@@ -46,6 +46,9 @@ CGO_ENABLED=0 go build
 
 - `RETENTION_DAYS`: configure how many days the metrics should be kept - *default*: `60`
 
+- `MAXMIND_LICENSE`: license key for maxmind geolite2 database - *default*: ``
+  If the license key is not set, the geolite2 database will not be downloaded.
+
 ## APIs
 ### Auth
 - `POST /login`
