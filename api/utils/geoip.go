@@ -67,6 +67,8 @@ func DownloadGeoIpDatabase() error {
 		"curl",
 		"-L",
 		"--fail",
+		"--silent",
+		"--show-error",
 		"--retry", "5",
 		"--retry-max-time", "120",
 		"https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key="+configuration.Config.MaxmindLicense+"&suffix=tar.gz",
@@ -81,7 +83,7 @@ func DownloadGeoIpDatabase() error {
 	}
 	cmd = exec.Command(
 		"tar",
-		"xvzf",
+		"xzf",
 		configuration.Config.GeoIPDbDir+"/GeoLite2-Country.tar.gz",
 		"--strip-components=1",
 	)
