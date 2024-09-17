@@ -10,6 +10,7 @@
 package routines
 
 import (
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"time"
 
 	"github.com/NethServer/nethsecurity-controller/api/logs"
@@ -30,6 +31,16 @@ func RefreshRemoteInfoLoop() {
 			if err != nil {
 				logs.Logs.Println("[ERR][ROUTINE] loop for remote info failed: " + err.Error())
 			}
+		}
+	}
+}
+
+func RefreshGeoIPDatabase() {
+	ticker := time.NewTicker(24 * time.Hour)
+	for range ticker.C {
+		err := utils.InitGeoIP()
+		if err != nil {
+			logs.Logs.Println("[ERR][ROUTINE] loop for geoip database failed: " + err.Error())
 		}
 	}
 }

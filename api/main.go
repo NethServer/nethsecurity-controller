@@ -59,6 +59,8 @@ func main() {
 
 	// init geoip
 	utils.InitGeoIP()
+	// start geoip refresh loop
+	go routines.RefreshGeoIPDatabase()
 
 	// starts remote info loop
 	go routines.RefreshRemoteInfoLoop()
