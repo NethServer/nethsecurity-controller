@@ -25,9 +25,11 @@ var db *geoip2.Reader
 
 func InitGeoIP() error {
 	// try to download the GeoLite2-Country.mmdb file
-	DownloadGeoIpDatabase()
-
-	var err error
+	err := DownloadGeoIpDatabase()
+	if err != nil {
+		logs.Logs.Println("[ERR][GEOIP] error downloading geoip db file")
+		return err
+	}
 	// open geoip db, path from config, name is always the same: GeoLite2-Country.mmdb
 	db, err = geoip2.Open(configuration.Config.GeoIPDbDir + "/GeoLite2-Country.mmdb")
 
@@ -55,11 +57,11 @@ func GetCountryShort(ip string) string {
 	return record.Country.IsoCode
 }
 
-func DownloadGeoIpDatabase() {
+func DownloadGeoIpDatabase() error {
 	databaseFile, err := os.Stat(configuration.Config.GeoIPDbDir + "/GeoLite2-Country.mmdb")
-	if err == nil && time.Since(databaseFile.ModTime()).Hours() < 24 {
+	if err == nil && time.Since(databaseFile.ModTime()).Hours() < 72 {
 		logs.Logs.Println("[INFO][GEOIP] geoip db file is up to date")
-		return
+		return nil
 	}
 	cmd := exec.Command(
 		"curl",
@@ -75,7 +77,7 @@ func DownloadGeoIpDatabase() {
 	err = cmd.Run()
 	if err != nil {
 		logs.Logs.Println("[ERR][GEOIP] error downloading geoip db file: " + out.String())
-		return
+		return err
 	}
 	cmd = exec.Command(
 		"tar",
@@ -87,6 +89,8 @@ func DownloadGeoIpDatabase() {
 	err = cmd.Run()
 	if err != nil {
 		logs.Logs.Println("[ERR][GEOIP] error extracting geoip db file: " + out.String())
-		return
+		return err
 	}
+
+	return nil
 }
