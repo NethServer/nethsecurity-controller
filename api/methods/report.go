@@ -43,7 +43,7 @@ func SetUnitName(c *gin.Context) {
 	err := dbpool.QueryRow(dbctx, "SELECT * FROM units WHERE uuid = $1", unitId).Scan(&id)
 	if err != nil {
 		// insert a new unit and return the id
-		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid, name) VALUES ($1, $2) RETURNING id", unitId, req.Name)
+		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid, name) VALUES ($1, $2)", unitId, req.Name)
 		if err != nil {
 			logs.Logs.Println("[ERR][UNITNAME] error inserting unit name: " + err.Error())
 		}
@@ -66,7 +66,7 @@ func checkUnitId(unitId string) error {
 	_, err := dbpool.Exec(dbctx, "SELECT uuid FROM units WHERE uuid = $1", unitId)
 	if err != nil {
 		// insert a new unit and return the id
-		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid) VALUES ($1) RETURNING id", unitId)
+		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid) VALUES ($1)", unitId)
 		if err != nil {
 			return errors.New("error inserting unit")
 		}
