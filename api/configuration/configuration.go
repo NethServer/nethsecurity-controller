@@ -62,7 +62,8 @@ type Configuration struct {
 
 	ReportDbUri string `json:"report_db_uri"`
 
-	GeoIPDbDir string `json:"geoip_db_dir"`
+	GeoIPDbDir     string `json:"geoip_db_dir"`
+	MaxmindLicense string `json:"maxmind_license"`
 
 	GrafanaPostgresPassword string `json:"grafana_postgres_password"`
 
@@ -263,6 +264,13 @@ func Init() {
 		Config.GeoIPDbDir = os.Getenv("GEOIP_DB_DIR")
 	} else {
 		Config.GeoIPDbDir = "."
+	}
+
+	if os.Getenv("MAXMIND_LICENSE") != "" {
+		Config.MaxmindLicense = os.Getenv("MAXMIND_LICENSE")
+	} else {
+		logs.Logs.Println("[WARNING][ENV] MAXMIND_LICENSE variable is empty")
+		Config.MaxmindLicense = ""
 	}
 
 	if os.Getenv("GRAFANA_POSTGRES_PASSWORD") != "" {

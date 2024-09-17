@@ -10,17 +10,20 @@
 package utils
 
 import (
-	"log"
-	"net"
-
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/oschwald/geoip2-golang"
+	"log"
+	"net"
+	"os/exec"
 )
 
 var db *geoip2.Reader
 
 func InitGeoIP() error {
+	// try to download the GeoLite2-Country.mmdb file
+	DownloadGeoIpDatabase()
+
 	var err error
 	// open geoip db, path from config, name is always the same: GeoLite2-Country.mmdb
 	db, err = geoip2.Open(configuration.Config.GeoIPDbDir + "/GeoLite2-Country.mmdb")
@@ -47,4 +50,32 @@ func GetCountryShort(ip string) string {
 	}
 
 	return record.Country.IsoCode
+}
+
+func DownloadGeoIpDatabase() {
+	err := exec.Command(
+		"curl",
+		"-v",
+		"-L",
+		"--fail",
+		"--retry", "5",
+		"--retry-max-time", "120",
+		"https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key="+configuration.Config.MaxmindLicense+"&suffix=tar.gz",
+		"-o", configuration.Config.GeoIPDbDir+"/GeoLite2-Country.tar.gz",
+	).Run()
+	if err != nil {
+		logs.Logs.Println("[ERR][GEOIP] error downloading geoip db file :" + err.Error())
+		return
+	}
+	err = exec.Command(
+		"tar",
+		"xvzf",
+		configuration.Config.GeoIPDbDir+"/GeoLite2-Country.tar.gz",
+		"--strip-components=1",
+	).Run()
+	if err != nil {
+		logs.Logs.Println("[ERR][GEOIP] error extracting geoip db file :" + err.Error())
+		return
+	}
+
 }

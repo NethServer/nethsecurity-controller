@@ -26,13 +26,4 @@ while [ ! -e "$socket" ]; do
     fi
 done
 
-if [ -n "$MAXMIND_LICENSE" ]; then
-    # Download GeoLite database
-    if [ ! -f GeoLite2-Country.mmdb ]; then
-        curl -v -L --fail --retry 5 --retry-max-time 120 \
-            'https://download.maxmind.com/app/geoip_download?edition_id=GeoLite2-Country&license_key='$MAXMIND_LICENSE'&suffix=tar.gz' \
-            -o db.tar.gz && tar xvzf db.tar.gz --strip-components=1
-    fi
-fi
-
 exec "$@"
