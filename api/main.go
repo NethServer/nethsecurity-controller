@@ -148,7 +148,8 @@ func main() {
 		reports.POST("/ovpnrw-connections", methods.UpdateOvpnConnections)
 		reports.POST("/dpi-stats", methods.UpdateDpiStats)
 		reports.POST("/unit-name", methods.SetUnitName)
-		reports.POST("/unit-openvpnrw", methods.SetUnitOpenVPNRW)
+		reports.POST("/unit-openvpn", methods.SetUnitOpenVPNRW)
+		reports.POST("/unit-wan", methods.SetUnitWan)
 	}
 
 	// handle missing endpoint

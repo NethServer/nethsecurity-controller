@@ -97,3 +97,14 @@ type OpenVPNConfigurations []OpenVPNConfiguration
 type UnitOpenVPNRWRequest struct {
 	Data OpenVPNConfigurations `json:"data" binding:"required"`
 }
+
+type Wan struct {
+	Interface string `json:"interface" binding:"required"`
+	Device    string `json:"device" binding:"required"`
+}
+
+type Wans []Wan
+
+type UnitWanRequest struct {
+	Data Wans `json:"data" binding:"required"`
+}

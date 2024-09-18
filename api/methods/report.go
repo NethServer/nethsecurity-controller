@@ -115,6 +115,55 @@ func SetUnitOpenVPNRW(c *gin.Context) {
 	}
 }
 
+func SetUnitWan(c *gin.Context) {
+	// bind json
+	var req models.UnitWanRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "Invalid request",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Message: "Unit not found",
+			Data:    nil,
+			Code:    404,
+		}))
+		return
+	}
+
+	dbpool, dbctx := storage.ReportInstance()
+	// Remove all previous data
+	_, err := dbpool.Exec(dbctx, "DELETE FROM wan_config WHERE uuid = $1", c.MustGet("UnitId").(string))
+	if err != nil {
+		logs.Logs.Println("[ERR][UNITWAN] error deleting previous data: " + err.Error())
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "Error deleting previous data",
+			Data:    err.Error(),
+		}))
+		return
+	}
+	// Insert inside WAN table
+	for _, wan := range req.Data {
+		_, err := dbpool.Exec(dbctx, "INSERT INTO wan_config (uuid, interface, device) VALUES ($1, $2, $3)", c.MustGet("UnitId").(string), wan.Interface, wan.Device)
+		if err != nil {
+			logs.Logs.Println("[ERR][UNITWAN] error inserting data: " + err.Error())
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
+				Message: "Error inserting data",
+				Data:    err.Error(),
+			}))
+			return
+		}
+	}
+
+}
+
 func checkUnitId(unitId string) error {
 	if unitId == "" {
 		return errors.New("uuid is empty")

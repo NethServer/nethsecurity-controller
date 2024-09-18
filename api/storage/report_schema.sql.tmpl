@@ -24,6 +24,13 @@ CREATE TABLE IF NOT EXISTS openvpn_config (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS wan_config (
+    uuid UUID NOT NULL references units(uuid),
+    interface TEXT NOT NULL,
+    device TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- General retention policies
 
 -- Keep raw data for 30 days
