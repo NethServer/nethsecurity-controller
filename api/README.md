@@ -10,6 +10,7 @@ CGO_ENABLED=0 go build
 - `ADMIN_USERNAME`: admin username to login
 - `ADMIN_PASSWORD`: admin password to login
 - `SECRET_JWT`: secret to sing JWT tokens
+- `REGISTRATION_TOKEN`: secret token used to register units
 
 - `TOKENS_DIR`: directory to save authenticated tokens
 - `CREDENTIALS_DIR`: directory to save credentials of connected units
@@ -17,7 +18,11 @@ CGO_ENABLED=0 go build
 - `PROMTAIL_ADDRESS`: promtail address
 - `PROMTAIL_PORT`: promtail port
 
+- `PROMETHEUS_PATH`: prometheus web path
+- `WEBSSH_PATH`: webssh web path
+- `GRAFANA_PATH`: grafana web path
 - `GRAFANA_POSTGRES_PASSWORD`: password to access grafana postgres database 
+- `REPORT_DB_URI`: Timescale database URI for reports
 
 **Optional**
 - `LISTEN_ADDRESS`: listend address of server - *default*: `127.0.0.1:5000`
@@ -48,6 +53,10 @@ CGO_ENABLED=0 go build
 
 - `MAXMIND_LICENSE`: license key for maxmind geolite2 database - *default*: ``
   If the license key is not set, the geolite2 database will not be downloaded.
+- `GEOIP_DB_DIR`: directory to save geolite2 database - *default*: current directory
+
+- `SENSITIVE_LIST`: list of sensitive information to be redacted in logs
+- `VALID_SUBSCRIPTION`: valid subscription status - *default*: `false`
 
 ## APIs
 ### Auth
