@@ -66,6 +66,55 @@ func SetUnitName(c *gin.Context) {
 	}
 }
 
+func SetUnitOpenVPNRW(c *gin.Context) {
+	var req models.UnitOpenVPNRWRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "Invalid request",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Message: "Unit not found",
+			Data:    nil,
+			Code:    404,
+		}))
+		return
+	}
+
+	dbpool, dbctx := storage.ReportInstance()
+
+	// Remove all previous data
+	_, err := dbpool.Exec(dbctx, "DELETE FROM openvpn_config WHERE uuid = $1", c.MustGet("UnitId").(string))
+	if err != nil {
+		logs.Logs.Println("[ERR][UNITOPENVPNRW] error deleting previous data: " + err.Error())
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "Error deleting previous data",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// insert inside OpenVPN table
+	for _, server := range req.Data {
+		_, err := dbpool.Exec(dbctx, "INSERT INTO openvpn_config (uuid, instance, name, device, type) VALUES ($1, $2, $3, $4, $5)", c.MustGet("UnitId").(string), server.Instance, server.Name, server.Device, server.Type)
+		if err != nil {
+			logs.Logs.Println("[ERR][UNITOPENVPNRW] error inserting data: " + err.Error())
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
+				Message: "Error inserting data",
+				Data:    err.Error(),
+			}))
+			return
+		}
+	}
+}
+
 func checkUnitId(unitId string) error {
 	if unitId == "" {
 		return errors.New("uuid is empty")

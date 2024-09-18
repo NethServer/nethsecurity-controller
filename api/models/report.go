@@ -84,3 +84,16 @@ type DpiStatsRequest struct {
 type UnitNameRequest struct {
 	Name string `json:"name" binding:"required"`
 }
+
+type OpenVPNConfiguration struct {
+	Instance string `json:"instance" binding:"required"`
+	Name     string `json:"name" binding:"required"`
+	Device   string `json:"device" binding:"required"`
+	Type     string `json:"type"` // valid values are: rw (for roadwarrior), client (for tunnel client), server (for tunnel server)
+}
+
+type OpenVPNConfigurations []OpenVPNConfiguration
+
+type UnitOpenVPNRWRequest struct {
+	Data OpenVPNConfigurations `json:"data" binding:"required"`
+}
