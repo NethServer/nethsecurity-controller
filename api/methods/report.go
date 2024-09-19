@@ -150,7 +150,7 @@ func SetUnitWan(c *gin.Context) {
 	}
 	// Insert inside WAN table
 	for _, wan := range req.Data {
-		_, err := dbpool.Exec(dbctx, "INSERT INTO wan_config (uuid, interface, device) VALUES ($1, $2, $3)", c.MustGet("UnitId").(string), wan.Interface, wan.Device)
+		_, err := dbpool.Exec(dbctx, "INSERT INTO wan_config (uuid, interface, device, status) VALUES ($1, $2, $3, $4)", c.MustGet("UnitId").(string), wan.Interface, wan.Device, wan.Status)
 		if err != nil {
 			logs.Logs.Println("[ERR][UNITWAN] error inserting data: " + err.Error())
 			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{

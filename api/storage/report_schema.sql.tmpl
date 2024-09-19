@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS wan_config (
     uuid UUID NOT NULL references units(uuid),
     interface TEXT NOT NULL,
     device TEXT,
+    status TEXT,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

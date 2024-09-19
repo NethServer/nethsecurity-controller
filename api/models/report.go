@@ -101,6 +101,7 @@ type UnitOpenVPNRWRequest struct {
 type Wan struct {
 	Interface string `json:"interface" binding:"required"`
 	Device    string `json:"device" binding:"required"`
+	Status    string `json:"status" binding:"required"`
 }
 
 type Wans []Wan
