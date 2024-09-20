@@ -10,6 +10,7 @@
 package methods
 
 import (
+	"context"
 	"errors"
 	"net"
 	"net/http"
@@ -23,185 +24,91 @@ import (
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-func SetUnitName(c *gin.Context) {
+func setUnitName(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	// bind json
 	var req models.UnitNameRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
-	unitId := c.MustGet("UnitId").(string)
-	dbpool, dbctx := storage.ReportInstance()
+
 	// check if uuid is valid
+	unitId := c.MustGet("UnitId").(string)
 	var uuid string
 	err := dbpool.QueryRow(dbctx, "SELECT uuid FROM units WHERE uuid = $1", unitId).Scan(&uuid)
 	if err != nil || uuid != unitId {
 		// insert a new unit and return the id
 		_, err := dbpool.Exec(dbctx, "INSERT INTO units (uuid, name) VALUES ($1, $2)", unitId, req.Name)
 		if err != nil {
-			logs.Logs.Println("[ERR][UNITNAME] error inserting unit name: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Code:    500,
-				Message: "Error inserting unit name",
-				Data:    err.Error(),
-			}))
+			return 500, errors.New("error inserting unit name: " + err.Error())
 		}
 	} else {
 		// update the unit name
 		_, err := dbpool.Exec(dbctx, "UPDATE units SET name = $1 WHERE uuid = $2", req.Name, unitId)
 		if err != nil {
-			logs.Logs.Println("[ERR][UNITNAME] error updating unit name: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Code:    500,
-				Message: "Error updating unit name",
-				Data:    err.Error(),
-			}))
+			return 500, errors.New("error updating unit name: " + err.Error())
 		}
 	}
+	return 200, nil
 }
 
-func SetUnitOpenVPNRW(c *gin.Context) {
+func setUnitOvpnConfig(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	var req models.UnitOpenVPNRWRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
-
-	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Message: "Unit not found",
-			Data:    nil,
-			Code:    404,
-		}))
-		return
-	}
-
-	dbpool, dbctx := storage.ReportInstance()
 
 	// Remove all previous data
 	_, err := dbpool.Exec(dbctx, "DELETE FROM openvpn_config WHERE uuid = $1", c.MustGet("UnitId").(string))
 	if err != nil {
-		logs.Logs.Println("[ERR][UNITOPENVPNRW] error deleting previous data: " + err.Error())
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
-			Message: "Error deleting previous data",
-			Data:    err.Error(),
-		}))
-		return
+		logs.Logs.Println("[ERR][UNITOVPNCONFIG] error deleting previous data: " + err.Error())
+		return 500, errors.New("error deleting previous data")
 	}
 
 	// insert inside OpenVPN table
 	for _, server := range req.Data {
 		_, err := dbpool.Exec(dbctx, "INSERT INTO openvpn_config (uuid, instance, name, device, type) VALUES ($1, $2, $3, $4, $5)", c.MustGet("UnitId").(string), server.Instance, server.Name, server.Device, server.Type)
 		if err != nil {
-			logs.Logs.Println("[ERR][UNITOPENVPNRW] error inserting data: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Code:    500,
-				Message: "Error inserting data",
-				Data:    err.Error(),
-			}))
-			return
+			logs.Logs.Println("[ERR][UNITOVPNCONFIG] error inserting data: " + err.Error())
+			return 500, errors.New("error inserting data")
 		}
 	}
+	return 200, nil
 }
 
-func SetUnitWan(c *gin.Context) {
+func setUnitWan(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	// bind json
 	var req models.UnitWanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
 
-	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Message: "Unit not found",
-			Data:    nil,
-			Code:    404,
-		}))
-		return
-	}
-
-	dbpool, dbctx := storage.ReportInstance()
 	// Remove all previous data
 	_, err := dbpool.Exec(dbctx, "DELETE FROM wan_config WHERE uuid = $1", c.MustGet("UnitId").(string))
 	if err != nil {
 		logs.Logs.Println("[ERR][UNITWAN] error deleting previous data: " + err.Error())
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
-			Message: "Error deleting previous data",
-			Data:    err.Error(),
-		}))
-		return
+		return 500, errors.New("error deleting previous data")
 	}
 	// Insert inside WAN table
 	for _, wan := range req.Data {
 		_, err := dbpool.Exec(dbctx, "INSERT INTO wan_config (uuid, interface, device, status) VALUES ($1, $2, $3, $4)", c.MustGet("UnitId").(string), wan.Interface, wan.Device, wan.Status)
 		if err != nil {
 			logs.Logs.Println("[ERR][UNITWAN] error inserting data: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Code:    500,
-				Message: "Error inserting data",
-				Data:    err.Error(),
-			}))
-			return
+			return 500, errors.New("error inserting data")
 		}
 	}
-
+	return 200, nil
 }
 
-func checkUnitId(unitId string) error {
-	if unitId == "" {
-		return errors.New("uuid is empty")
-	}
-	dbpool, dbctx := storage.ReportInstance()
-
-	// check if uuid is valid
-	var uuid string
-	err := dbpool.QueryRow(dbctx, "SELECT uuid FROM units WHERE uuid = $1", unitId).Scan(&uuid)
-	if err != nil || uuid != unitId {
-		return errors.New("unit not found")
-	}
-
-	return nil
-}
-
-func UpdateMwanSeries(c *gin.Context) {
+func updateMwanSeries(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	// bind json
 	var req models.MwanEventRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
 
-	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Message: "Unit not found",
-			Data:    nil,
-			Code:    404,
-		}))
-		return
-	}
-
-	dbpool, dbctx := storage.ReportInstance()
 	// To prevent performance issues, do not use single insert
 	// CopyFrom can't handle conflict resolution, so use batch insert instead
 	batch := &pgx.Batch{}
@@ -217,45 +124,20 @@ func UpdateMwanSeries(c *gin.Context) {
 		err := dbpool.SendBatch(dbctx, batch).Close()
 		if err != nil {
 			logs.Logs.Println("[ERR][MWANEVENTS] error inserting data: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Message: "Error inserting data",
-				Data:    err.Error(),
-				Code:    500,
-			}))
-			return
+			return 500, errors.New("error inserting data")
 		}
 	}
 
-	// return ok
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "success",
-		Data:    nil,
-	}))
+	return 200, nil
 }
 
-func UpdateTsAttacks(c *gin.Context) {
+func updateTsAttacks(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	// bind json
 	var req models.TsAttackRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request: data field not found",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
 
-	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Message: "Unit not found",
-			Data:    nil,
-			Code:    404,
-		}))
-		return
-	}
-
-	dbpool, dbctx := storage.ReportInstance()
 	// To prevent performance issues, do not use single insert
 	// CopyFrom can't handle conflict resolution, so use batch insert instead
 	batch := &pgx.Batch{}
@@ -274,45 +156,20 @@ func UpdateTsAttacks(c *gin.Context) {
 		err := dbpool.SendBatch(dbctx, batch).Close()
 		if err != nil {
 			logs.Logs.Println("[ERR][TSATTACKS] error inserting data: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Message: "Error inserting data",
-				Data:    err.Error(),
-				Code:    500,
-			}))
-			return
+			return 500, errors.New("error inserting data")
 		}
 	}
 
-	// return ok
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "success",
-		Data:    nil,
-	}))
+	return 200, nil
 }
 
-func UpdateTsMalware(c *gin.Context) {
+func updateTsMalware(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	// bind json
 	var req models.TsMalwareRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request: data field not found",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
 
-	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Message: "Unit not found",
-			Data:    nil,
-			Code:    404,
-		}))
-		return
-	}
-
-	dbpool, dbctx := storage.ReportInstance()
 	// To prevent performance issues, do not use single insert
 	// CopyFrom can't handle conflict resolution, so use batch insert instead
 	batch := &pgx.Batch{}
@@ -343,45 +200,20 @@ func UpdateTsMalware(c *gin.Context) {
 		err := dbpool.SendBatch(dbctx, batch).Close()
 		if err != nil {
 			logs.Logs.Println("[ERR][TSMALWARE] error inserting data: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Message: "Error inserting data",
-				Data:    err.Error(),
-				Code:    500,
-			}))
-			return
+			return 500, errors.New("error inserting data")
 		}
 	}
 
-	// return ok
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "success",
-		Data:    nil,
-	}))
+	return 200, nil
 }
 
-func UpdateOvpnConnections(c *gin.Context) {
+func updateOvpnConnections(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	// bind json
 	var req models.OvpnRwConnectionsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request: data field not found",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
 
-	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Message: "Unit not found",
-			Data:    nil,
-			Code:    404,
-		}))
-		return
-	}
-
-	dbpool, dbctx := storage.ReportInstance()
 	// To prevent performance issues, do not use single insert
 	// CopyFrom can't handle conflict resolution, so use batch insert instead
 	batch := &pgx.Batch{}
@@ -400,45 +232,19 @@ func UpdateOvpnConnections(c *gin.Context) {
 		err := dbpool.SendBatch(dbctx, batch).Close()
 		if err != nil {
 			logs.Logs.Println("[ERR][OVPNCONNECTIONS] error inserting data: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Message: "Error inserting data",
-				Data:    err.Error(),
-				Code:    500,
-			}))
-			return
+			return 500, errors.New("error inserting data")
 		}
 	}
-
-	// return ok
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "success",
-		Data:    nil,
-	}))
+	return 200, nil
 }
 
-func UpdateDpiStats(c *gin.Context) {
+func updateDpiStats(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context) (int, error) {
 	// bind json
 	var req models.DpiStatsRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "Invalid request: data field not found",
-			Data:    err.Error(),
-		}))
-		return
+		return 400, errors.New("invalid request")
 	}
 
-	if checkUnitId(c.MustGet("UnitId").(string)) != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Message: "Unit not found",
-			Data:    nil,
-			Code:    404,
-		}))
-		return
-	}
-
-	dbpool, dbctx := storage.ReportInstance()
 	// To prevent performance issues, do not use single insert
 	// CopyFrom can't handle conflict resolution, so use batch insert instead
 	// do not use CopyFrom
@@ -455,19 +261,66 @@ func UpdateDpiStats(c *gin.Context) {
 		err := dbpool.SendBatch(dbctx, batch).Close()
 		if err != nil {
 			logs.Logs.Println("[ERR][DPISTATS] error inserting data: " + err.Error())
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Message: "Error inserting data",
-				Data:    err.Error(),
-				Code:    500,
-			}))
-			return
+			return 500, errors.New("error inserting data")
 		}
 	}
 
-	// return ok
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "success",
-		Data:    nil,
-	}))
+	return 200, nil
+}
+
+func HandelMonitoring(c *gin.Context) {
+	var err error
+	var code int
+	unitId := c.MustGet("UnitId").(string)
+
+	dbpool, dbctx := storage.ReportInstance()
+
+	firewall_api := c.Param("firewall_api")
+	// setting unit name and creating a unit if it does not exist
+	if firewall_api == "dump-nsplug-config" {
+		code, err = setUnitName(dbpool, dbctx, c)
+	} else {
+		// for all other metrics, check if the unit exists
+		var uuid string
+		err = dbpool.QueryRow(dbctx, "SELECT uuid FROM units WHERE uuid = $1", unitId).Scan(&uuid)
+		if err != nil {
+			err = errors.New("unit not found")
+			code = 404
+		} else {
+			// the unit exists, handle the metric
+			switch firewall_api {
+			case "dump-ovpn-config":
+				code, err = setUnitOvpnConfig(dbpool, dbctx, c)
+			case "dump-wan-config":
+				code, err = setUnitWan(dbpool, dbctx, c)
+			case "dump-ts-malware":
+				code, err = updateTsMalware(dbpool, dbctx, c)
+			case "dump-ts-attacks":
+				code, err = updateTsAttacks(dbpool, dbctx, c)
+			case "dump-mwan-events":
+				code, err = updateMwanSeries(dbpool, dbctx, c)
+			case "dump-dpi-stats":
+				code, err = updateDpiStats(dbpool, dbctx, c)
+			case "dump-ovpn-connections":
+				code, err = updateOvpnConnections(dbpool, dbctx, c)
+			default:
+				code = 404
+				err = errors.New("metric not found")
+			}
+		}
+	}
+
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    code,
+			Message: err.Error(),
+			Data:    nil,
+		}))
+	} else {
+		c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+			Code:    code,
+			Message: "success",
+			Data:    nil,
+		}))
+	}
 }

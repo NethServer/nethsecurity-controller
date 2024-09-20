@@ -689,16 +689,22 @@ CGO_ENABLED=0 go build
    }
   ```
 
-### Reports
+### Ingest
 
-All the below APIs requires the following headers:
+This API is used to ingest metrics from connected units. It requires basic authentication and 
+takes `firewall_api` as a parameter. 
+The `firewall_api` paramater is the name of the firewall API that is sending the metrics.
+The API accepts only POST requests abd requires the following headers:
 
-- `RegistrationToken`: authentication header, it must be the same used during the register API call
-- `UnitId`: authentication header, the unit uuid is valid only if there is a VPN certificate for it
+- `Authorization:`: basic authentication header, where the username is the unit uuid and the password is the registration token
 - `Content-Type: application/json`: the content type must be JSON
 
-All endpoints are POST requests and respond with a 200 status code in case of success.
-Other possible status codes are:
+It responds with a 200 status code in case of success. Success example:
+```json
+{"code":200,"data":null,"message":"success"}
+```
+
+Possible error status codes are:
 
 - 400 if the request is malformed
 - 401 if the authentication headers are missing or invalid
@@ -710,7 +716,7 @@ Error example:
 { "code": 401, "data": null, "message": "invalid unit id" }
 ```
 
-- `POST /reports/unit-name`
+- `POST /ingest/dump-nsplug-config`
 
   Create the unit record where all metrics are connected, it also stores the unit name in the report database.
   This endpoint is mandatory and must be called at least once before sending all other metrics.
@@ -721,7 +727,7 @@ Error example:
   { "name": "fw.test.local" }
   ```
 
-- `POST /reports/mwan-events`
+- `POST /ingest/dump-mwan-events`
 
   Store all multiwan events in the report database.
 
@@ -744,7 +750,7 @@ Error example:
   ]}
   ```
 
-- `POST /reports/ts-attacks`
+- `POST /ingest/dump-ts-attacks`
 
   Store all threat shield brute force blocks (fail2ban-like) in the report database.
 
@@ -759,7 +765,7 @@ Error example:
   ]}
   ```
 
-- `POST /reports/ts-malware`
+- `POST /ingest/dump-ts-malware`
 
   Store all threat shield blocks based on category in the report database.
 
@@ -777,7 +783,7 @@ Error example:
   ]}
   ```
 
-- `POST /reports/ovpnrw-connections`
+- `POST /ingest/dump-ovpn-connections`
 
   Store all openvpn connections in the report database.
 
@@ -799,7 +805,7 @@ Error example:
   ]}
   ```
 
-- `POST /reports/dpi-stats`
+- `POST /ingest/dump-dpi-stats`
 
   Store all network traffic stats in the report database.
 
@@ -819,7 +825,7 @@ Error example:
 
   ```
 
-- `POST /reports/unit-openvpn`
+- `POST /ingest/dump-ovpn-config`
 
   Store the openvpn configuration in the report database.
 
@@ -828,7 +834,7 @@ Error example:
   {"data": [{"instance": "ns_roadwarrior1", "device": "tunrw1", "type": "rw", "name": "srv1"}]}
   ```
 
-- `POST /reports/unit-wan`
+- `POST /ingest/dump-wan-config`
 
   REQ
 

@@ -259,20 +259,19 @@ func InitJWT() *jwt.GinJWTMiddleware {
 	return authMiddleware
 }
 
-func ReportAuth() gin.HandlerFunc {
+func BasicAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
-
-		token := c.GetHeader("RegistrationToken")
-		unit_id := c.GetHeader("UnitId")
-		if token == "" || unit_id == "" {
+		uuid, token, _ := c.Request.BasicAuth()
+		if uuid == "" || token == "" {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusUnauthorized{
 				Code:    400,
-				Message: "missing token or unit id",
+				Message: "missing unit or token",
 				Data:    nil,
 			}))
 			c.Abort()
 			return
 		}
+
 		// validate registration token against configured one
 		if token != configuration.Config.RegistrationToken {
 			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusBadRequest{
@@ -284,7 +283,7 @@ func ReportAuth() gin.HandlerFunc {
 		}
 
 		// UnitId is invalid if there is no certificate issued for it
-		if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + unit_id + ".crt"); err != nil {
+		if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + uuid + ".crt"); err != nil {
 			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusUnauthorized{
 				Code:    401,
 				Message: "invalid unit id",
@@ -293,8 +292,8 @@ func ReportAuth() gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		c.Set("UnitId", unit_id)
+
+		c.Set("UnitId", uuid)
 		c.Next()
 	}
-
 }

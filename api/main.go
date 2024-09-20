@@ -138,19 +138,9 @@ func main() {
 		}
 	}
 
-	// report APIs
-	reports := router.Group("/reports")
-	reports.Use(middleware.ReportAuth())
-	{
-		reports.POST("/mwan-events", methods.UpdateMwanSeries)
-		reports.POST("/ts-attacks", methods.UpdateTsAttacks)
-		reports.POST("/ts-malware", methods.UpdateTsMalware)
-		reports.POST("/ovpnrw-connections", methods.UpdateOvpnConnections)
-		reports.POST("/dpi-stats", methods.UpdateDpiStats)
-		reports.POST("/unit-name", methods.SetUnitName)
-		reports.POST("/unit-openvpn", methods.SetUnitOpenVPNRW)
-		reports.POST("/unit-wan", methods.SetUnitWan)
-	}
+	// Ingest APIs: receive data from firewalls
+	authorized := router.Group("/ingest", middleware.BasicAuth())
+	authorized.POST("/:firewall_api", methods.HandelMonitoring)
 
 	// handle missing endpoint
 	router.NoRoute(func(c *gin.Context) {
