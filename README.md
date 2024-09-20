@@ -73,6 +73,7 @@ The following environment variables can be used to configure the containers:
 - `API_SESSION_DURATION`: JWT session duration in seconds, default is 7 days
 - `PROXY_PORT`: proxy listening port, default is `8080`
 - `PROXY_BIND_IP`: proxy binding IP, default is `0.0.0.0`
+- `REPORT_DB_URI`: Timescale DB URI, like `postgresql://user:password@host:port/dbname`
 
 ## REST API
 
