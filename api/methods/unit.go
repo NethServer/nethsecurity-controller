@@ -226,7 +226,7 @@ func AddUnit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
 			Message: "no IP available for new unit",
-			Data:    err.Error(),
+			Data:    nil,
 		}))
 		return
 	}
