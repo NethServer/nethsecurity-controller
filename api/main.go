@@ -10,7 +10,7 @@
 package main
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"github.com/fatih/structs"
@@ -26,6 +26,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/routines"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 )
 
 // @title NethSecurity Controller API Server
@@ -51,16 +52,22 @@ func main() {
 
 	// init storage
 	storage.Init()
+	storage.InitReportDb()
 
 	// init socket connection
 	socket.Init()
+
+	// init geoip
+	utils.InitGeoIP()
+	// start geoip refresh loop
+	go routines.RefreshGeoIPDatabase()
 
 	// starts remote info loop
 	go routines.RefreshRemoteInfoLoop()
 
 	// disable log to stdout when running in release mode
 	if gin.Mode() == gin.ReleaseMode {
-		gin.DefaultWriter = ioutil.Discard
+		gin.DefaultWriter = io.Discard
 	}
 
 	// init routers
@@ -130,6 +137,10 @@ func main() {
 			units.DELETE("/:unit_id", methods.DeleteUnit)
 		}
 	}
+
+	// Ingest APIs: receive data from firewalls
+	authorized := router.Group("/ingest", middleware.BasicAuth())
+	authorized.POST("/:firewall_api", methods.HandelMonitoring)
 
 	// handle missing endpoint
 	router.NoRoute(func(c *gin.Context) {

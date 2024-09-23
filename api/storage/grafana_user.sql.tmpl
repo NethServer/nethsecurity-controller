@@ -1,0 +1,12 @@
+DO
+$do$
+    BEGIN
+        IF NOT EXISTS (SELECT
+                       FROM pg_catalog.pg_roles
+                       WHERE rolname = 'grafana') THEN
+            CREATE USER grafana WITH PASSWORD '{{ .GrafanaPostgresPassword }}';
+            GRANT USAGE ON SCHEMA public TO grafana;
+            GRANT SELECT ON ALL TABLES IN SCHEMA public TO grafana;
+        END IF;
+    END
+$do$;

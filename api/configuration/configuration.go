@@ -59,6 +59,15 @@ type Configuration struct {
 	CacheTTL string `json:"cache_ttl"`
 
 	ValidSubscription bool `json:"valid_subscription"`
+
+	ReportDbUri string `json:"report_db_uri"`
+
+	GeoIPDbDir     string `json:"geoip_db_dir"`
+	MaxmindLicense string `json:"maxmind_license"`
+
+	GrafanaPostgresPassword string `json:"grafana_postgres_password"`
+
+	RetentionDays string `json:"retention_days"`
 }
 
 var Config = Configuration{}
@@ -241,5 +250,39 @@ func Init() {
 		Config.ValidSubscription = os.Getenv("VALID_SUBSCRIPTION") == "true"
 	} else {
 		Config.ValidSubscription = false
+	}
+
+	if os.Getenv("REPORT_DB_URI") != "" {
+		Config.ReportDbUri = os.Getenv("REPORT_DB_URI")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] REPORT_DB_URI variable is empty")
+		os.Exit(1)
+	}
+
+	// Assuming the file is named GeoLite2-Country.mmdb
+	if os.Getenv("GEOIP_DB_DIR") != "" {
+		Config.GeoIPDbDir = os.Getenv("GEOIP_DB_DIR")
+	} else {
+		Config.GeoIPDbDir = "."
+	}
+
+	if os.Getenv("MAXMIND_LICENSE") != "" {
+		Config.MaxmindLicense = os.Getenv("MAXMIND_LICENSE")
+	} else {
+		logs.Logs.Println("[WARNING][ENV] MAXMIND_LICENSE variable is empty")
+		Config.MaxmindLicense = ""
+	}
+
+	if os.Getenv("GRAFANA_POSTGRES_PASSWORD") != "" {
+		Config.GrafanaPostgresPassword = os.Getenv("GRAFANA_POSTGRES_PASSWORD")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] GRAFANA_POSTGRES_PASSWORD variable is empty")
+		os.Exit(1)
+	}
+
+	if os.Getenv("RETENTION_DAYS") != "" {
+		Config.RetentionDays = os.Getenv("RETENTION_DAYS")
+	} else {
+		Config.RetentionDays = "60"
 	}
 }

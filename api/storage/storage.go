@@ -10,8 +10,11 @@
 package storage
 
 import (
+	"bytes"
+	"context"
 	"database/sql"
 	_ "embed"
+	"html/template"
 	"os"
 	"time"
 
@@ -19,15 +22,26 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
+	"github.com/jackc/pgx/v5/pgxpool"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
 var db *sql.DB
+var dbpool *pgxpool.Pool
+var dbctx context.Context
 var err error
 
 //go:embed schema.sql
 var schemaSQL string
+
+//go:embed report_schema.sql.tmpl
+var reportSchemaSQL string
+
+//go:embed grafana_user.sql.tmpl
+var grafanaUserSQL string
+
+var reportDbIsInitialized = false
 
 func Instance() *sql.DB {
 	if db == nil {
@@ -261,4 +275,73 @@ func UpdatePassword(accountUsername string, newPassword string) error {
 	)
 
 	return err
+}
+
+func loadReportSchema(*pgxpool.Pool, context.Context) bool {
+	// execute create tables
+	logs.Logs.Println("[INFO][STORAGE] creating report tables")
+	reportTemplate, _ := template.New("report_schema").Parse(reportSchemaSQL)
+	var executedReportTemplate bytes.Buffer
+	errExecute := reportTemplate.Execute(&executedReportTemplate, configuration.Config)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+	_, errExecute = dbpool.Exec(dbctx, executedReportTemplate.String())
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+
+	logs.Logs.Println("[INFO][STORAGE] creating grafana user")
+	grafanaUserTemplate, _ := template.New("grafana_user").Parse(grafanaUserSQL)
+	var executedGrafanaUserReport bytes.Buffer
+	errExecute = grafanaUserTemplate.Execute(&executedGrafanaUserReport, configuration.Config)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+	_, errExecute = dbpool.Exec(dbctx, executedGrafanaUserReport.String())
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
+		return false
+	}
+	return true
+}
+
+func InitReportDb() (*pgxpool.Pool, context.Context) {
+	dbctx = context.Background()
+	dbpool, err = pgxpool.New(dbctx, configuration.Config.ReportDbUri)
+	if err != nil {
+		logs.Logs.Println("[WARN][DB] error in db connection:" + err.Error())
+	}
+
+	err = dbpool.Ping(dbctx)
+	if err != nil {
+		logs.Logs.Println("[WARN][DB] error in db connection:" + err.Error())
+	}
+
+	reportDbIsInitialized = loadReportSchema(dbpool, dbctx)
+
+	return dbpool, dbctx
+}
+
+func ReportInstance() (*pgxpool.Pool, context.Context) {
+	if dbpool == nil {
+		dbpool, dbctx = InitReportDb()
+
+	}
+	if !reportDbIsInitialized {
+		// check if 'units' table exists, if not call initialization
+		query := `SELECT EXISTS (
+				SELECT FROM information_schema.tables
+				WHERE  table_schema = 'schema_name'
+				AND    table_name   = 'units'
+			)`
+		dbpool.QueryRow(dbctx, query).Scan(&reportDbIsInitialized)
+		if !reportDbIsInitialized {
+			reportDbIsInitialized = loadReportSchema(dbpool, dbctx)
+		}
+	}
+	return dbpool, dbctx
 }

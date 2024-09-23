@@ -13,7 +13,8 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"io/ioutil"
+	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -151,8 +152,8 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				// extract body
 				var buf bytes.Buffer
 				tee := io.TeeReader(c.Request.Body, &buf)
-				body, _ := ioutil.ReadAll(tee)
-				c.Request.Body = ioutil.NopCloser(&buf)
+				body, _ := io.ReadAll(tee)
+				c.Request.Body = io.NopCloser(&buf)
 
 				// convert to map and flat it
 				var jsonDyn map[string]interface{}
@@ -160,7 +161,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				in, _ := flat.Flatten(jsonDyn, nil)
 
 				// search for sensitve data, in sensitive list
-				for k, _ := range in {
+				for k := range in {
 					for _, s := range configuration.Config.SensitiveList {
 						if strings.Contains(strings.ToLower(k), strings.ToLower(s)) {
 							in[k] = "XXX"
@@ -256,4 +257,43 @@ func InitJWT() *jwt.GinJWTMiddleware {
 
 	// return object
 	return authMiddleware
+}
+
+func BasicAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		uuid, token, _ := c.Request.BasicAuth()
+		if uuid == "" || token == "" {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusUnauthorized{
+				Code:    400,
+				Message: "missing unit or token",
+				Data:    nil,
+			}))
+			c.Abort()
+			return
+		}
+
+		// validate registration token against configured one
+		if token != configuration.Config.RegistrationToken {
+			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusBadRequest{
+				Code:    401,
+				Message: "invalid registration token",
+			}))
+			c.Abort()
+			return
+		}
+
+		// UnitId is invalid if there is no certificate issued for it
+		if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + uuid + ".crt"); err != nil {
+			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusUnauthorized{
+				Code:    401,
+				Message: "invalid unit id",
+				Data:    nil,
+			}))
+			c.Abort()
+			return
+		}
+
+		c.Set("UnitId", uuid)
+		c.Next()
+	}
 }
