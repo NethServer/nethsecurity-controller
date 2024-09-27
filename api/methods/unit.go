@@ -641,11 +641,46 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	defer res.Body.Close()
 
 	// convert response to struct
-	unitInfo := &models.UbusInfoResponse{}
+	unitInfo := &models.UbusResponse[models.UnitInfo]{}
 	err = json.NewDecoder(res.Body).Decode(unitInfo)
 	if err != nil {
 		return models.UnitInfo{}, errors.New("error decoding response")
 	}
+
+	// ask additional info to the unit
+	systemUpdatePayload := models.UbusCommand{
+		Path:    "ns.update",
+		Method:  "check-system-update",
+		Payload: map[string]interface{}{},
+	}
+
+	// convert payload to JSON byte array
+	systemUpdateBytes, _ := json.Marshal(systemUpdatePayload)
+	systemUpdateRequest, err := http.NewRequest("POST", postURL, bytes.NewBuffer(systemUpdateBytes))
+	if err != nil {
+		return models.UnitInfo{}, errors.New("error creating request")
+	}
+
+	// set request headers
+	systemUpdateRequest.Header.Add("Content-Type", "application/json")
+	systemUpdateRequest.Header.Add("Authorization", "Bearer "+token)
+
+	// make request, with 2 seconds timeout
+	systemUpdateResponse, err := client.Do(systemUpdateRequest)
+	if err != nil {
+		return models.UnitInfo{}, errors.New("error making request")
+	}
+	defer systemUpdateResponse.Body.Close()
+
+	// convert response to struct
+	systemUpdateInfo := &models.UbusResponse[models.CheckSystemUpdate]{}
+	err = json.NewDecoder(systemUpdateResponse.Body).Decode(systemUpdateInfo)
+	if err != nil {
+		return models.UnitInfo{}, errors.New("error decoding response")
+	}
+
+	unitInfo.Data.ScheduledUpdate = systemUpdateInfo.Data.ScheduledAt
+	unitInfo.Data.VersionUpdate = systemUpdateInfo.Data.LastVersion
 
 	// write json to file
 	jsonInfo, _ := json.Marshal(unitInfo.Data)
