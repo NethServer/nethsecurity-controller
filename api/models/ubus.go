@@ -16,9 +16,9 @@ type UbusCommand struct {
 }
 
 // Response example:
-// {"code":200,"data":{"fqdn":"NethSec","ssh_port":22,"subscription_type":"","system_id":"","unit_name":"","version":""},"message":"ubus call action success"}
-type UbusInfoResponse struct {
-	Code    int      `json:"code"`
-	Data    UnitInfo `json:"data"`
-	Message string   `json:"message"`
+// {"code":200,"data":{"depends": "on the call"},"message":"ubus call action success"}
+type UbusResponse[T any] struct {
+	Code    int    `json:"code"`
+	Data    T      `json:"data"`
+	Message string `json:"message"`
 }

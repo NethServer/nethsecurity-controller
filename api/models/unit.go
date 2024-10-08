@@ -39,9 +39,17 @@ type Unit struct {
 type UnitInfo struct {
 	UnitName         string `json:"unit_name"`
 	Version          string `json:"version"`
+	VersionUpdate    string `json:"version_update"`
+	ScheduledUpdate  int    `json:"scheduled_update"`
 	SubscriptionType string `json:"subscription_type"`
 	SystemID         string `json:"system_id"`
 	SSHPort          int    `json:"ssh_port"`
 	FQDN             string `json:"fqdn"`
 	APIVersion       string `json:"api_version"`
+}
+
+type CheckSystemUpdate struct {
+	LastVersion    string `json:"lastVersion"`
+	ScheduledAt    int    `json:"scheduledAt"`
+	CurrentVersion string `json:"currentVersion"`
 }
