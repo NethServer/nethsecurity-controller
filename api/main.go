@@ -140,6 +140,7 @@ func main() {
 
 	// Ingest APIs: receive data from firewalls
 	authorized := router.Group("/ingest", middleware.BasicAuth())
+	authorized.POST("/info", methods.AddInfo)
 	authorized.POST("/:firewall_api", methods.HandelMonitoring)
 
 	// handle missing endpoint

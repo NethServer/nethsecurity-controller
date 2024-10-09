@@ -143,6 +143,36 @@ func GetUnitInfo(c *gin.Context) {
 
 }
 
+func AddInfo(c *gin.Context) {
+	unitId := c.MustGet("UnitId").(string)
+	var jsonRequest models.UnitInfo
+	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "request fields malformed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	jsonInfo, _ := json.Marshal(jsonRequest)
+	err := os.WriteFile(configuration.Config.OpenVPNStatusDir+"/"+unitId+".info", jsonInfo, 0644)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "can't write unit info for: " + unitId,
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// return 200 OK
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit info retrieved successfully",
+	}))
+}
+
 func AddUnit(c *gin.Context) {
 	// parse request fields
 	var jsonRequest models.AddRequest
