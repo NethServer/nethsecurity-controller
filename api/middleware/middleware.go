@@ -103,11 +103,15 @@ func InitJWT() *jwt.GinJWTMiddleware {
 					role = "admin"
 				}
 
+				// check if user require 2fa
+				status, _ := methods.GetUserStatus(user.Username)
+
 				// create claims map
 				return jwt.MapClaims{
 					identityKey: user.Username,
 					"role":      role,
 					"actions":   []string{},
+					"2fa":       status == "1",
 				}
 			}
 
@@ -189,8 +193,10 @@ func InitJWT() *jwt.GinJWTMiddleware {
 			tokenObj, _ := InstanceJWT().ParseTokenString(token)
 			claims := jwt.ExtractClaimsFromToken(tokenObj)
 
-			// set token to valid
-			methods.SetTokenValidation(claims["id"].(string), token)
+			// set token to valid, if not 2FA
+			if !claims["2fa"].(bool) {
+				methods.SetTokenValidation(claims["id"].(string), token)
+			}
 
 			// write logs
 			logs.Logs.Println("[INFO][AUTH] login response success for user " + claims["id"].(string))
