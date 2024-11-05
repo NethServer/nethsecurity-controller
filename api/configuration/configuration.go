@@ -131,6 +131,20 @@ func Init() {
 		os.Exit(1)
 	}
 
+	if os.Getenv("ISSUER_2FA") != "" {
+		Config.Issuer2FA = os.Getenv("ISSUER_2FA")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] ISSUER_2FA variable is empty")
+		os.Exit(1)
+	}
+
+	if os.Getenv("SECRETS_DIR") != "" {
+		Config.SecretsDir = os.Getenv("SECRETS_DIR")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] SECRETS_DIR variable is empty")
+		os.Exit(1)
+	}
+
 	if os.Getenv("OVPN_DIR") != "" {
 		Config.OpenVPNDir = os.Getenv("OVPN_DIR")
 	} else {
