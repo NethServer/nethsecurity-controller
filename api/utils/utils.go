@@ -109,3 +109,12 @@ func GetJoinCode(unitId string) string {
 	joinCodeString, _ := json.Marshal(joinCode)
 	return base64.StdEncoding.EncodeToString([]byte(joinCodeString))
 }
+
+func Remove(a string, values []string) []string {
+	for i, v := range values {
+		if v == a {
+			return append(values[:i], values[i+1:]...)
+		}
+	}
+	return values
+}

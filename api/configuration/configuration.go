@@ -40,6 +40,8 @@ type Configuration struct {
 	TokensDir      string `json:"tokens_dir"`
 	CredentialsDir string `json:"credentials_dir"`
 	DataDir        string `json:"data_dir"`
+	Issuer2FA      string `json:"issuer_2fa"`
+	SecretsDir     string `json:"secrets_dir"`
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`

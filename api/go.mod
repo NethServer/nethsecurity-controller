@@ -5,13 +5,16 @@ go 1.21
 toolchain go1.22.6
 
 require (
+	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/NethServer/nethsecurity-api v0.0.0-20230609091000-bf319035cafc
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/appleboy/gin-jwt/v2 v2.9.1
+	github.com/dgryski/dgoogauth v0.0.0-20190221195224-5a805980a5f3
 	github.com/fatih/structs v1.1.0
 	github.com/gin-contrib/cors v1.4.0
 	github.com/gin-contrib/gzip v0.0.6
 	github.com/gin-gonic/gin v1.9.1
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/jackc/pgx/v5 v5.6.0
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/nqd/flat v0.2.0

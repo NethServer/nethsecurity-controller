@@ -92,6 +92,9 @@ func main() {
 	api.POST("/login", middleware.InstanceJWT().LoginHandler)
 	api.POST("/logout", middleware.InstanceJWT().LogoutHandler)
 
+	// 2FA APIs
+	api.POST("/2fa/otp-verify", methods.OTPVerify)
+
 	// define server registration
 	api.POST("/units/register", methods.RegisterUnit)
 
@@ -110,6 +113,11 @@ func main() {
 			accounts.POST("", methods.AddAccount)
 			accounts.PUT("/:account_id", methods.UpdateAccount)
 			accounts.DELETE("/:account_id", methods.DeleteAccount)
+
+			// 2FA APIs
+			api.GET("/2fa", methods.Get2FAStatus)
+			api.DELETE("/2fa", methods.Del2FAStatus)
+			api.GET("/2fa/qr-code", methods.QRCode)
 
 			// account password change
 			accounts.PUT("/password", methods.UpdatePassword)
