@@ -14,6 +14,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"github.com/NethServer/nethsecurity-controller/api/methods"
 	"html/template"
 	"os"
 	"time"
@@ -195,6 +196,13 @@ func GetAccounts() ([]models.Account, error) {
 		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
 		}
+
+		accountStatus, err := methods.GetUserStatus(accountRow.Username)
+		if err != nil {
+			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
+		}
+
+		accountStatus
 
 		// append results
 		results = append(results, accountRow)
