@@ -104,7 +104,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				}
 
 				// check if user require 2fa
-				status, _ := methods.GetUserStatus(user.Username)
+				status, _ := utils.GetUserStatus(user.Username)
 
 				// create claims map
 				return jwt.MapClaims{

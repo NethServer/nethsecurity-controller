@@ -94,9 +94,6 @@ func main() {
 
 	// 2FA APIs
 	api.POST("/2fa/otp-verify", methods.OTPVerify)
-	api.GET("/2fa", methods.Get2FAStatus)
-	api.DELETE("/2fa", methods.Del2FAStatus)
-	api.GET("/2fa/qr-code", methods.QRCode)
 
 	// define server registration
 	api.POST("/units/register", methods.RegisterUnit)
@@ -106,6 +103,11 @@ func main() {
 	{
 		// refresh handler
 		api.GET("/refresh", middleware.InstanceJWT().RefreshHandler)
+
+		// 2FA APIs
+		api.GET("/2fa", methods.Get2FAStatus)
+		api.DELETE("/2fa", methods.Del2FAStatus)
+		api.GET("/2fa/qr-code", methods.QRCode)
 
 		// accounts APIs
 		accounts := api.Group("/accounts")

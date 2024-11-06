@@ -13,7 +13,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"net"
+	"os"
 	"strconv"
+	"strings"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/gin-gonic/gin"
@@ -117,4 +119,11 @@ func Remove(a string, values []string) []string {
 		}
 	}
 	return values
+}
+
+func GetUserStatus(username string) (string, error) {
+	status, err := os.ReadFile(configuration.Config.SecretsDir + "/" + username + "/status")
+	statusS := strings.TrimSpace(string(status[:]))
+
+	return statusS, err
 }
