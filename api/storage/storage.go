@@ -196,6 +196,9 @@ func GetAccounts() ([]models.Account, error) {
 			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
 		}
 
+		accountStatus, _ := utils.GetUserStatus(accountRow.Username)
+		accountRow.TwoFA = accountStatus == "1"
+
 		// append results
 		results = append(results, accountRow)
 	}

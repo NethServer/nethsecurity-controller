@@ -40,6 +40,8 @@ type Configuration struct {
 	TokensDir      string `json:"tokens_dir"`
 	CredentialsDir string `json:"credentials_dir"`
 	DataDir        string `json:"data_dir"`
+	Issuer2FA      string `json:"issuer_2fa"`
+	SecretsDir     string `json:"secrets_dir"`
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
@@ -126,6 +128,20 @@ func Init() {
 		Config.DataDir = os.Getenv("DATA_DIR")
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] DATA_DIR variable is empty")
+		os.Exit(1)
+	}
+
+	if os.Getenv("ISSUER_2FA") != "" {
+		Config.Issuer2FA = os.Getenv("ISSUER_2FA")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] ISSUER_2FA variable is empty")
+		os.Exit(1)
+	}
+
+	if os.Getenv("SECRETS_DIR") != "" {
+		Config.SecretsDir = os.Getenv("SECRETS_DIR")
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] SECRETS_DIR variable is empty")
 		os.Exit(1)
 	}
 

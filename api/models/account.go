@@ -19,6 +19,7 @@ type Account struct {
 	Password    string    `json:"password" structs:"password" db:"-" binding:"required"`
 	DisplayName string    `json:"display_name" structs:"display_name"`
 	Created     time.Time `json:"created" structs:"created"`
+	TwoFA       bool      `json:"two_fa" structs:"two_fa"`
 }
 
 type AccountUpdate struct {
