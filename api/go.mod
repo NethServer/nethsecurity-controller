@@ -19,7 +19,7 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.22
 	github.com/nqd/flat v0.2.0
 	github.com/oschwald/geoip2-golang v1.11.0
-	golang.org/x/crypto v0.17.0
+	golang.org/x/crypto v0.31.0
 )
 
 require (
@@ -47,10 +47,10 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	golang.org/x/arch v0.3.0 // indirect
-	golang.org/x/net v0.10.0 // indirect
-	golang.org/x/sync v0.1.0 // indirect
-	golang.org/x/sys v0.20.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/net v0.33.0 // indirect
+	golang.org/x/sync v0.10.0 // indirect
+	golang.org/x/sys v0.28.0 // indirect
+	golang.org/x/text v0.21.0 // indirect
 	google.golang.org/protobuf v1.30.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
