@@ -19,6 +19,12 @@ jobs:
       IMAGETAG: ${{ github.ref_name }}
     steps:
       - uses: actions/checkout@v3
+      - id: set-imagetag
+        run: |
+          # Avoid bad image tags when dependabot is involved
+          if [[ "${{ github.actor }}" == "dependabot[bot]" ]]; then
+            echo "IMAGETAG=dependabot${{ github.run_id }}" >> $GITHUB_ENV
+          fi
       - id: build
         run: |
           # Build the controller images
