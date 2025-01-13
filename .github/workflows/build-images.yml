@@ -28,6 +28,8 @@ jobs:
           # If it's a PR and the author is renovate bot, use "renovate<PR_NUMBER>" as IMAGETAG
           if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.actor }}" == "renovate[bot]" ]]; then
             export IMAGETAG="renovate${{ github.event.number }}"
+            # set imagetag to the env so it can be used in the next steps
+            echo "IMAGETAG=${IMAGETAG}" >> $GITHUB_ENV
           fi
       - id: publish
         run: |
