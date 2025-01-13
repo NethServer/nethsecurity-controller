@@ -1,0 +1,15 @@
+{
+  "extends": ["config:base"],
+  "dependencyDashboard": true,
+  "labels": ["dependencies"],
+  "packageRules": [
+    {
+      "matchDepTypes": ["dependencies"],
+      "extends": ["schedule:weekly"]
+    },
+    {
+      "matchUpdateTypes": ["security"],
+      "automerge": false
+    }
+  ]
+}
