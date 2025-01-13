@@ -14,6 +14,7 @@ import (
 	"encoding/json"
 	"net"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -126,4 +127,14 @@ func GetUserStatus(username string) (string, error) {
 	statusS := strings.TrimSpace(string(status[:]))
 
 	return statusS, err
+}
+
+func IsSafePath(path string) bool {
+	cleanPath := filepath.Clean(path)
+
+	return !filepath.IsAbs(cleanPath) &&
+		cleanPath == path && !strings.Contains(cleanPath, "..") &&
+		!strings.Contains(cleanPath, "..") &&
+		!strings.Contains(cleanPath, "/") &&
+		!strings.Contains(cleanPath, "\\")
 }

@@ -787,6 +787,9 @@ func getRemoteInfo(unitId string) gin.H {
 
 func readUnitFile(unitId string) ([]byte, error) {
 	// read unit file
+	if !utils.IsSafePath(unitId) {
+		return nil, errors.New("unit id is not safe")
+	}
 	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
 
 	// return results
