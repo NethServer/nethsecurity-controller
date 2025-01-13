@@ -26,10 +26,9 @@ jobs:
       - id: fix-imagetag
         run: |
           # Fix imagetag
-          # If it's a PR and the author is renovate bot, use "renovate<PR_NUMBER>" as IMAGETAG
-            if [[ "${{ github.actor }}" == "renovate[bot]" && "${{ github.ref_name }}" != "main" ]]; then
-            export IMAGETAG="renovate${{ github.event.number }}"
-            # set imagetag to the env so it can be used in the next steps
+          # If it's a PR and the author is renovate bot, use "renovate<number>" as IMAGETAG
+          if [[ "${{ github.actor }}" == "renovate[bot]" && "${{ github.ref_name }}" != "main" ]]; then
+            export IMAGETAG="renovate${{ github.run_id }}"
             echo "IMAGETAG=${IMAGETAG}" >> $GITHUB_ENV
           fi
       - id: publish
