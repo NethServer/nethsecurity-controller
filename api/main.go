@@ -43,7 +43,7 @@ import (
 // @schemes http
 // @BasePath /api
 
-func main() {
+func setup() *gin.Engine {
 	// init logs with syslog
 	logs.Init("nethsecurity_controller")
 
@@ -160,6 +160,11 @@ func main() {
 		}))
 	})
 
+	return router
+}
+
+func main() {
+	router := setup()
 	// run server
 	router.Run(configuration.Config.ListenAddress)
 }
