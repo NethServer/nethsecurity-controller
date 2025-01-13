@@ -4,6 +4,8 @@ github.com/Jeffail/gabs/v2 v2.7.0/go.mod h1:dp5ocw1FvBBQYssgHsG7I1WYsiLRtkUaB1FE
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/NethServer/nethsecurity-api v0.0.0-20230609091000-bf319035cafc h1:0PruTZEu2eCjJVNrVzH7zlu1mB0NQoOvNWc4nSx0v8A=
 github.com/NethServer/nethsecurity-api v0.0.0-20230609091000-bf319035cafc/go.mod h1:BS9ciZ+WG8SM5zqo0iTaKn7E7bpDnSh1XKSPc6Hy89Q=
+github.com/NethServer/nethsecurity-api v0.0.0-20241002122635-8157091120e5 h1:yBttZobscZce41QM5zluFn6Yees2jEnp67WwdHT71Tw=
+github.com/NethServer/nethsecurity-api v0.0.0-20241002122635-8157091120e5/go.mod h1:J7avk5KJCxBC1xKnE7dhbi0Kh9v8UNO+KFUNFg6dG8Q=
 github.com/NethServer/ns8-core/core/api-server v0.0.0-20230511093202-c2f91171c039/go.mod h1:pMPGsATL4dPazf1RPv8EqJuvPJ/+hVEZIGzUYzHzXwY=
 github.com/PuerkitoBio/purell v1.1.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/purell v1.1.1/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
@@ -213,6 +215,7 @@ github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINE
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pmezard/go-difflib v1.0.0 h1:4DBwDE0NGyQoBHbLQYPwSUPoCMWR5BEzIk/f1lZbAQM=
 github.com/pmezard/go-difflib v1.0.0/go.mod h1:iKH77koFhYxTK1pcRnkKkqfTogsbg7gZNVY4sRDYZ/4=
+github.com/robfig/cron/v3 v3.0.0/go.mod h1:eQICP3HwyT7UooqI/z+Ov+PtYAWygg1TEWWzGIFLtro=
 github.com/rogpeppe/go-internal v1.6.1/go.mod h1:xXDCJY+GAPziupqXw64V24skbSoqbTEfhy4qGm1nDQc=
 github.com/rogpeppe/go-internal v1.8.0 h1:FCbCCtXNOY3UtUuHUYaghJg4y7Fd14rXifAYUAtL9R8=
 github.com/rogpeppe/go-internal v1.8.0/go.mod h1:WmiCO8CzOY8rg0OYDC4/i/2WRWAB6poM+XZ2dLUbcbE=
