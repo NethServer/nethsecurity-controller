@@ -30,7 +30,7 @@ jobs:
           NEW_TAG=$(curl https://api.github.com/repos/NethServer/nethsecurity-ui/tags | jq -r .[0].name)
           sed -i "s/ui_version=.*/ui_version=\"$NEW_TAG\"/g" build.sh
       - name: Commit and create PR
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v7
         with:
           title: 'build(deps): Update ns-ui package (automated)'
           branch: 'build-update-ns-ui-package-automated'
