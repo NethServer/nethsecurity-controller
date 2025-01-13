@@ -23,6 +23,12 @@ jobs:
         run: |
           # Build the controller images
           bash build.sh
+      - id: fix-imagetag
+        run: |
+          # If it's a PR and the author is renovate bot, use "renovate<PR_NUMBER>" as IMAGETAG
+          if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.actor }}" == "renovate[bot]" ]]; then
+            export IMAGETAG="renovate${{ github.event.number }}"
+          fi
       - id: publish
         run: |
           # Publish the branch
