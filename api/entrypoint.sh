@@ -8,7 +8,7 @@ cd /nethsecurity-api
 
 export ADMIN_USERNAME="${ADMIN_USERNAME:-admin}"
 export ADMIN_PASSWORD="${ADMIN_PASSWORD:-8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918}" # sha256sum of "admin"
-export SECRET_JWT="${SECRET_JWT:-test}"
+export SECRET_JWT=$(head /dev/urandom | sha256sum) # regenerate SECRET at each restart to invalidate all tokens
 export TOKENS_DIR="${TOKENS_DIR:-/nethsecurity-api/tokens}"
 export CREDENTIALS_DIR="${CREDENTIALS_DIR:-/nethsecurity-api/credentials}"
 export PROMTAIL_ADDRESS="${PROMTAIL_ADDRESS:-127.0.0.1}"
