@@ -11,7 +11,7 @@ require (
 	github.com/appleboy/gin-jwt/v2 v2.10.1
 	github.com/dgryski/dgoogauth v0.0.0-20190221195224-5a805980a5f3
 	github.com/fatih/structs v1.1.0
-	github.com/gin-contrib/cors v1.6.0
+	github.com/gin-contrib/cors v1.7.3
 	github.com/gin-contrib/gzip v1.2.0
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
