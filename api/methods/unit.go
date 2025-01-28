@@ -606,8 +606,8 @@ func getUnitToken(unitId string) (string, string, error) {
 	// set request header
 	r.Header.Add("Content-Type", "application/json")
 
-	// make request, 2 seconds timeout
-	client := &http.Client{Timeout: 2 * time.Second}
+	// make request, 10 seconds timeout
+	client := &http.Client{Timeout: 10 * time.Second}
 	res, err := client.Do(r)
 	if err != nil {
 		return "", "", errors.New("request failed for: " + unitId)
@@ -662,8 +662,8 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	r.Header.Add("Content-Type", "application/json")
 	r.Header.Add("Authorization", "Bearer "+token)
 
-	// make request, with 2 seconds timeout
-	client := &http.Client{Timeout: 2 * time.Second}
+	// make request, with 10 seconds timeout
+	client := &http.Client{Timeout: 10 * time.Second}
 	res, err := client.Do(r)
 	if err != nil {
 		return models.UnitInfo{}, errors.New("error making request")
@@ -695,7 +695,7 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	systemUpdateRequest.Header.Add("Content-Type", "application/json")
 	systemUpdateRequest.Header.Add("Authorization", "Bearer "+token)
 
-	// make request, with 2 seconds timeout
+	// make request, with 10 seconds timeout
 	systemUpdateResponse, err := client.Do(systemUpdateRequest)
 	if err != nil {
 		return models.UnitInfo{}, errors.New("error making request")
