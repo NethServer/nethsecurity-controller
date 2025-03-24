@@ -1,15 +1,22 @@
 {
-  "extends": ["config:base"],
-  "dependencyDashboard": true,
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:base",
+    "customManagers:dockerfileVersions"
+  ],
+  "dependencyDashboard": false,
   "labels": ["dependencies"],
-  "packageRules": [
+  "customManagers": [
     {
-      "matchDepTypes": ["dependencies"],
-      "extends": ["schedule:weekly"]
-    },
-    {
-      "matchUpdateTypes": ["security"],
-      "automerge": false
+      "customType": "regex",
+      "fileMatch": [
+        "build.sh"
+      ],
+      "matchStrings": [
+        "ui_version=(?<currentValue>.*?)\\n"
+      ],
+      "depNameTemplate": "NethServer/nethsecurity-ui",
+      "datasourceTemplate": "github-releases"
     }
   ]
 }
