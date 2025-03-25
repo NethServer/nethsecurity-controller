@@ -2,21 +2,24 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:base",
-    "customManagers:dockerfileVersions"
+    "customManagers:dockerfileVersions",
+    ":automergeMinor",
+    ":disableRateLimiting",
+    ":enableVulnerabilityAlerts",
+    "schedule:earlyMondays"
   ],
+  "branchPrefix": "renovate-",
   "dependencyDashboard": false,
-  "labels": ["dependencies"],
-  "customManagers": [
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
     {
-      "customType": "regex",
-      "fileMatch": [
-        "build.sh"
+      "matchDepNames": [
+        "NethServer/nethsecurity-ui"
       ],
-      "matchStrings": [
-        "ui_version=(?<currentValue>.*?)\\n"
-      ],
-      "depNameTemplate": "NethServer/nethsecurity-ui",
-      "datasourceTemplate": "github-releases"
+      "matchUpdateTypes": "minor",
+      "automerge": false
     }
   ]
 }
