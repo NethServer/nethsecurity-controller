@@ -22,6 +22,11 @@ jobs:
         run: |
           # Build the controller images
           bash build.sh
+      - id: fix-imagetag
+        if: github.event_name == 'pull_request'
+        run: |
+          export IMAGETAG="${{ github.sha }}"
+          echo "IMAGETAG=${IMAGETAG}" >> $GITHUB_ENV
       - id: publish
         run: |
           # Publish the branch
