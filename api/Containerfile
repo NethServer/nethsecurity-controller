@@ -1,0 +1,38 @@
+FROM docker.io/golang:1.24.1 AS build
+WORKDIR /build
+COPY go.mod .
+COPY go.sum .
+RUN go mod download
+COPY configuration configuration
+COPY logs logs
+COPY methods methods
+COPY middleware middleware
+COPY models models
+COPY response response
+COPY routines routines
+COPY socket socket
+COPY storage storage
+COPY utils utils
+COPY main.go .
+COPY main_test.go .
+ENV GOOS=linux
+ENV GOARCH=amd64
+ENV CGO_ENABLED=1
+RUN go build -ldflags='-extldflags=-static' -tags sqlite_omit_load_extension
+
+FROM build AS test
+RUN go test
+
+FROM docker.io/alpine:3.21.3 AS dist
+RUN apk add --no-cache \
+      curl \
+      easy-rsa \
+      oath-toolkit-oathtool \
+      openssh \
+      sqlite
+WORKDIR /nethsecurity-api
+COPY --from=build /build/api /nethsecurity-api/api
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["./api"]
+

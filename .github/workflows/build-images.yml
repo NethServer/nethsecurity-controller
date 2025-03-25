@@ -1,12 +1,11 @@
 name: "Publish controller images"
 
 on:
-  workflow_dispatch:
   push:
-    paths:
-      - 'api/**'
-      - 'vpn/**'
-      - 'build.sh'
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   packages: write
@@ -24,13 +23,10 @@ jobs:
           # Build the controller images
           bash build.sh
       - id: fix-imagetag
+        if: github.event_name == 'pull_request'
         run: |
-          # Fix imagetag
-          # If it's a PR and the author is renovate bot, use "renovate<number>" as IMAGETAG
-          if [[ "${{ github.actor }}" == "renovate[bot]" && "${{ github.ref_name }}" != "main" ]]; then
-            export IMAGETAG="renovate${{ github.run_id }}"
-            echo "IMAGETAG=${IMAGETAG}" >> $GITHUB_ENV
-          fi
+          export IMAGETAG="${{ github.sha }}"
+          echo "IMAGETAG=${IMAGETAG}" >> $GITHUB_ENV
       - id: publish
         run: |
           # Publish the branch

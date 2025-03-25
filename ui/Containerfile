@@ -1,0 +1,19 @@
+FROM docker.io/alpine:3.21.3 AS build
+RUN apk add --no-cache  \
+      git \
+      nodejs \
+      npm
+WORKDIR /build
+# renovate: datasource=github-releases depName=NethServer/nethsecurity-ui
+ARG UI_VERSION=1.20.3
+# FIXME: when git 2.49 is available in alpine, use --revision="$UI_VERSION" instead of --branch="$UI_VERSION"
+RUN git clone --depth=1 --branch="$UI_VERSION" https://github.com/NethServer/nethsecurity-ui . \
+    && npm ci \
+    && sed -i 's/standalone/controller/g' .env.production \
+    && npm run build
+
+FROM docker.io/alpine:3.21.3 AS dist
+RUN apk add --no-cache lighttpd
+COPY entrypoint.sh /entrypoint.sh
+ENTRYPOINT ["/entrypoint.sh"]
+COPY --from=build /build/dist /var/www/localhost/htdocs
