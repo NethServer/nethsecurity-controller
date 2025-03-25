@@ -500,6 +500,7 @@ func DeleteUnit(c *gin.Context) {
 	cmdGen.Env = append(os.Environ(),
 		"EASYRSA_BATCH=1",
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
+		"EASYRSA_CRL_DAYS=3650",
 	)
 	if err := cmdGen.Run(); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
