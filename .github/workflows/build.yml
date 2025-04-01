@@ -10,8 +10,9 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   packages: write
+  security-events: write
 
 jobs:
   images:
@@ -51,6 +52,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Build image
+        id: build
         uses: docker/build-push-action@v4
         with:
           push: true
@@ -61,4 +63,35 @@ jobs:
           cache-to: type=gha,mode=max,scope=${{ matrix.directory }}
           cache-from: type=gha,scope=${{ matrix.directory }}
           file: ${{ matrix.directory }}/Containerfile
-          sbom: true
+      - name: Generate image output
+        run: |
+          echo "built_image_sha=${{ fromJSON(steps.build.outputs.metadata)['image.name'] }}@${{ fromJSON(steps.build.outputs.metadata)['containerimage.digest'] }}" >> $GITHUB_ENV
+      - name: Generate sarif scan
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.built_image_sha }}
+          format: sarif
+          output: ${{ matrix.directory }}.sarif
+      - name: Upload sarif scan
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: ${{ matrix.directory }}.sarif
+          category: ${{ matrix.directory }}
+      - name: Update GitHub dependency tree
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.built_image_sha }}
+          format: 'github'
+      - name: Generate SBOM
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: aquasecurity/trivy-action@0.30.0
+        with:
+          image-ref: ${{ env.built_image_sha }}
+          format: 'cyclonedx'
+          output: ${{ matrix.directory }}.cdx.json
+      - name: Upload SBOM to release
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.ref }} ${{ matrix.directory }}.cdx.json
