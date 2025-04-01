@@ -43,11 +43,6 @@ podman build \
     ui
 images+=("${repobase}/nethsecurity-ui")
 
-if [[ -n "${CI}" ]]; then
-    # Set output value for Github Actions
-    echo "images=${images[*]}" >> "$GITHUB_OUTPUT"
-else
-    printf "Publish the images with:\n\n"
-    for image in "${images[@]}"; do printf "  buildah push %s docker://%s:latest\n" "${image}" "${image}" ; done
-    printf "\n"
-fi
+printf "Publish the images with:\n\n"
+for image in "${images[@]}"; do printf "  buildah push %s docker://%s:latest\n" "${image}" "${image}" ; done
+printf "\n"
