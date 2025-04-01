@@ -58,7 +58,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           target: dist
-          cache-to: type=gha,mode=max
-          cache-from: type=gha
+          cache-to: type=gha,mode=max,scope=${{ matrix.directory }}
+          cache-from: type=gha,scope=${{ matrix.directory }}
           file: ${{ matrix.directory }}/Containerfile
           sbom: true
