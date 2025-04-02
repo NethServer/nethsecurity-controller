@@ -100,7 +100,7 @@ See the [API documentation](api/README.md) for more details.
 
 ## Build
 
-Each container is build using a Containerfile, which is both compatible with `docker build` command and `podman build`.
+Each container is built using a Containerfile, which is both compatible with `docker build` command and `podman build`.
 
 To build the images using podman, you can use the following:
 
@@ -108,6 +108,6 @@ To build the images using podman, you can use the following:
 podman build --target dist --layers --force-rm --jobs 0 <directory>
 ```
 
-Where `<directory>` is the path to any of the directory to build the container of.
+Where `<directory>` is the path to any of the directory to build.
 
 Optionally, you can add the `--tag <imagetag>` to tag the image with a specific name.
