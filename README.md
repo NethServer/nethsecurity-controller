@@ -100,18 +100,14 @@ See the [API documentation](api/README.md) for more details.
 
 ## Build
 
-Requirements:
-- [podman](https://podman.io/)
-- [buildah](https://buildah.io/)
+Each container is build using a Containerfile, which is both compatible with `docker build` command and `podman build`.
 
-To build the image, use:
-```
-./build.sh
-```
+To build the images using podman, you can use the following:
 
-To load the UI from a local dir, use:
-```
-./start.sh <ui_path>
+```bash
+podman build --target dist --layers --force-rm --jobs 0 <directory>
 ```
 
-Every time a commit us pushed to the master, a GitHub actions will automatically build new images.
+Where `<directory>` is the path to any of the directory to build the container of.
+
+Optionally, you can add the `--tag <imagetag>` to tag the image with a specific name.
