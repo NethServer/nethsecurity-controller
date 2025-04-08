@@ -16,7 +16,7 @@ require (
 	github.com/gin-gonic/gin v1.10.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/jackc/pgx/v5 v5.7.4
-	github.com/mattn/go-sqlite3 v1.14.24
+	github.com/mattn/go-sqlite3 v1.14.27
 	github.com/nqd/flat v0.2.0
 	github.com/oschwald/geoip2-golang v1.11.0
 	github.com/stretchr/testify v1.10.0
