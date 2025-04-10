@@ -63,7 +63,7 @@ jobs:
           file: ${{ matrix.directory }}/Containerfile
       - name: Generate image output
         run: |
-          echo "built_image_sha=${{ fromJSON(steps.build.outputs.metadata)['image.name'] }}@${{ fromJSON(steps.build.outputs.metadata)['containerimage.digest'] }}" >> $GITHUB_ENV
+          echo "built_image_sha=${{ fromJSON(steps.meta.outputs.json).tags[0] }}@${{ steps.build.outputs.imageid }}" >> $GITHUB_ENV
       - name: Generate sarif scan
         uses: aquasecurity/trivy-action@0.30.0
         with:
@@ -93,4 +93,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          gh release upload ${{ github.ref }} ${{ matrix.directory }}.cdx.json
+          gh release upload ${{ github.ref_name }} ${{ matrix.directory }}.cdx.json
