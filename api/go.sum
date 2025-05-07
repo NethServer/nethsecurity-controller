@@ -6,6 +6,8 @@ github.com/NethServer/nethsecurity-api v0.0.0-20230609091000-bf319035cafc h1:0Pr
 github.com/NethServer/nethsecurity-api v0.0.0-20230609091000-bf319035cafc/go.mod h1:BS9ciZ+WG8SM5zqo0iTaKn7E7bpDnSh1XKSPc6Hy89Q=
 github.com/NethServer/nethsecurity-api v0.0.0-20241002122635-8157091120e5 h1:yBttZobscZce41QM5zluFn6Yees2jEnp67WwdHT71Tw=
 github.com/NethServer/nethsecurity-api v0.0.0-20241002122635-8157091120e5/go.mod h1:J7avk5KJCxBC1xKnE7dhbi0Kh9v8UNO+KFUNFg6dG8Q=
+github.com/NethServer/nethsecurity-api v0.0.0-20250507150548-5c3308efcb5c h1:6d8rKJ/lAeQNbPQG3qKqOHQy/nZGQPcMmTGW6IbD9ME=
+github.com/NethServer/nethsecurity-api v0.0.0-20250507150548-5c3308efcb5c/go.mod h1:sDpqpJmef5iZ8Yh/Q7STcQdI7rfjUnO8fKvD/mG1soY=
 github.com/NethServer/ns8-core/core/api-server v0.0.0-20230511093202-c2f91171c039/go.mod h1:pMPGsATL4dPazf1RPv8EqJuvPJ/+hVEZIGzUYzHzXwY=
 github.com/PuerkitoBio/purell v1.1.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/purell v1.1.1/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
