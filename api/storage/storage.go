@@ -27,13 +27,9 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-var db *sql.DB
 var dbpool *pgxpool.Pool
 var dbctx context.Context
 var err error
-
-//go:embed schema.sql
-var schemaSQL string
 
 //go:embed report_schema.sql.tmpl
 var reportSchemaSQL string
@@ -43,240 +39,240 @@ var grafanaUserSQL string
 
 var reportDbIsInitialized = false
 
-func Instance() *sql.DB {
-	if db == nil {
-		db = Init()
-	}
-	return db
-}
+func Init() *pgxpool.Pool {
+	// Initialize PostgreSQL connection and schema
+	dbpool, dbctx = InitReportDb()
 
-func Init() *sql.DB {
-	// check if file exists
-	initSchema := false
-	if _, err := os.Stat(configuration.Config.DataDir + "/db.sqlite"); os.IsNotExist(err) {
-		initSchema = true
-	}
+	// Migrate users from SQLite to Postgres if needed
+	MigrateUsersFromSqliteToPostgres()
 
-	// try connection
-	db, err = sql.Open("sqlite3", configuration.Config.DataDir+"/db.sqlite")
+	// Initialize PostgreSQL connection
+	dbctx = context.Background()
+	dbpool, err = pgxpool.New(dbctx, configuration.Config.ReportDbUri)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE] error in storage db file creation:" + err.Error())
+		logs.Logs.Println("[ERR][STORAGE] error in Postgres db connection:" + err.Error())
 		os.Exit(1)
 	}
 
-	// check connectivity
-	err = db.Ping()
+	err = dbpool.Ping(dbctx)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE] error in storage db connection:" + err.Error())
+		logs.Logs.Println("[ERR][STORAGE] error in Postgres db ping:" + err.Error())
 		os.Exit(1)
 	}
 
-	// init schema if true
-	if initSchema {
-		// execute create tables
-		_, errExecute := db.Exec(schemaSQL)
-		if errExecute != nil {
-			logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
-		}
+	// Check if admin user exists
+	var exists bool
+	err = dbpool.QueryRow(dbctx, "SELECT EXISTS (SELECT 1 FROM accounts WHERE username = $1)", configuration.Config.AdminUsername).Scan(&exists)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE] error checking admin user: " + err.Error())
+		os.Exit(1)
 	}
-
-	// check if user admin exists
-	results, _ := GetAccount(configuration.Config.AdminUsername)
-	exists := len(results) > 0
-
-	// add admin account, if not exists
 	if !exists {
-		// define admin account
 		admin := models.Account{
-			ID:          1,
 			Username:    configuration.Config.AdminUsername,
 			Password:    configuration.Config.AdminPassword,
 			DisplayName: "Administrator",
 			Created:     time.Now(),
 		}
-
-		// add admin account
 		_ = AddAccount(admin)
 	}
 
-	return db
+	return dbpool
 }
 
-func AddAccount(account models.Account) error {
-	// get db
-	db := Instance()
+// MigrateUsersFromSqliteToPostgres migrates users from SQLite to PostgreSQL if needed
+func MigrateUsersFromSqliteToPostgres() {
+	// 1. Check if SQLite DB exists
+	sqlitePath := configuration.Config.DataDir + "/db.sqlite"
+	if _, err := os.Stat(sqlitePath); os.IsNotExist(err) {
+		return // No SQLite DB, nothing to migrate
+	}
 
-	// define query
-	_, err := db.Exec(
-		"INSERT INTO accounts (id, username, password, display_name, created) VALUES (null, ?, ?, ?, ?)",
+	// 2. Open SQLite DB
+	sqliteDB, err := sql.Open("sqlite3", sqlitePath)
+	if err != nil {
+		logs.Logs.Println("[ERR][MIGRATION] cannot open SQLite DB: " + err.Error())
+		return
+	}
+	defer sqliteDB.Close()
+
+	// 3. Check if SQLite has users
+	rows, err := sqliteDB.Query("SELECT id, username, password, display_name, created FROM accounts")
+	if err != nil {
+		logs.Logs.Println("[ERR][MIGRATION] cannot query SQLite accounts: " + err.Error())
+		return
+	}
+	defer rows.Close()
+	var users []models.Account
+	for rows.Next() {
+		var acc models.Account
+		var createdStr string
+		if err := rows.Scan(&acc.ID, &acc.Username, &acc.Password, &acc.DisplayName, &createdStr); err != nil {
+			logs.Logs.Println("[ERR][MIGRATION] error scanning SQLite user: " + err.Error())
+			continue
+		}
+		acc.Created, _ = time.Parse(time.RFC3339, createdStr)
+		users = append(users, acc)
+	}
+	if len(users) == 0 {
+		return // No users to migrate
+	}
+
+	// 4. Check if admin user exists in Postgres
+	pgpool, pgctx := ReportInstance()
+	var adminExists bool
+	err = pgpool.QueryRow(pgctx, `SELECT EXISTS (SELECT 1 FROM accounts WHERE username = $1)`, configuration.Config.AdminUsername).Scan(&adminExists)
+	if err != nil {
+		logs.Logs.Println("[ERR][MIGRATION] error checking admin user in Postgres: " + err.Error())
+		return
+	}
+	if adminExists {
+		return // Admin user exists, nothing to do
+	}
+
+	// 5. Create accounts table in Postgres
+	_, err = pgpool.Exec(pgctx, `CREATE TABLE IF NOT EXISTS accounts (
+		id SERIAL PRIMARY KEY,
+		username TEXT NOT NULL UNIQUE,
+		password TEXT NOT NULL,
+		display_name TEXT,
+		created TIMESTAMP NOT NULL
+	)`)
+	if err != nil {
+		logs.Logs.Println("[ERR][MIGRATION] error creating accounts table in Postgres: " + err.Error())
+		return
+	}
+
+	// 6. Insert users into Postgres
+	for _, acc := range users {
+		_, err := pgpool.Exec(pgctx, `INSERT INTO accounts (username, password, display_name, created) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING`,
+			acc.Username, acc.Password, acc.DisplayName, acc.Created)
+		if err != nil {
+			logs.Logs.Println("[ERR][MIGRATION] error inserting user into Postgres: " + err.Error())
+		}
+	}
+	logs.Logs.Println("[INFO][MIGRATION] migrated", len(users), "users from SQLite to Postgres")
+
+	// 7. Rename SQLite DB to avoid future migrations
+	err = os.Rename(sqlitePath, sqlitePath+".bak")
+	if err != nil {
+		logs.Logs.Println("[ERR][MIGRATION] error renaming SQLite DB: " + err.Error())
+	}
+}
+
+// Refactored user functions to use PostgreSQL
+func AddAccount(account models.Account) error {
+	pgpool, pgctx := ReportInstance()
+	_, err := pgpool.Exec(pgctx,
+		"INSERT INTO accounts (username, password, display_name, created) VALUES ($1, $2, $3, $4)",
 		account.Username,
 		utils.HashPassword(account.Password),
 		account.DisplayName,
-		account.Created.Format(time.RFC3339),
+		account.Created,
 	)
-
-	// check error
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][ADD_ACCOUNT] error in insert accounts query: " + err.Error())
 	}
-
 	return err
 }
 
 func UpdateAccount(accountID string, account models.AccountUpdate) error {
-	// get db
-	db := Instance()
-
-	// define error
+	pgpool, pgctx := ReportInstance()
 	var err error
-
-	// check props
 	if len(account.Password) > 0 {
-		// define and execute query
-		query := "UPDATE accounts set password = ? WHERE id = ?"
-		_, err = db.Exec(
-			query,
+		_, err = pgpool.Exec(pgctx,
+			"UPDATE accounts set password = $1 WHERE id = $2",
 			utils.HashPassword(account.Password),
 			accountID,
 		)
 	}
 	if len(account.DisplayName) > 0 {
-		// define and execute query
-		query := "UPDATE accounts set display_name = ? WHERE id = ?"
-		_, err = db.Exec(
-			query,
+		_, err = pgpool.Exec(pgctx,
+			"UPDATE accounts set display_name = $1 WHERE id = $2",
 			account.DisplayName,
 			accountID,
 		)
 	}
-
-	// check error
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][UPDATE_ACCOUNT] error in insert accounts query: " + err.Error())
+		logs.Logs.Println("[ERR][STORAGE][UPDATE_ACCOUNT] error in update accounts query: " + err.Error())
 	}
-
 	return err
 }
 
 func IsAdmin(accountUsername string) (bool, string) {
-	// get db
-	db := Instance()
-
-	// define query
-	var id string
-	query := "SELECT id FROM accounts where username = ? LIMIT 1"
-	err := db.QueryRow(query, accountUsername).Scan(&id)
-
-	// check error
+	pgpool, pgctx := ReportInstance()
+	var id int
+	err := pgpool.QueryRow(pgctx, "SELECT id FROM accounts where username = $1 LIMIT 1", accountUsername).Scan(&id)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
 	}
-
-	// check if user is admin or other user
-	return id == "1", id
+	return id == 1, string(rune(id))
 }
 
 func GetAccounts() ([]models.Account, error) {
-	// get db
-	db := Instance()
-
-	// define query
-	query := "SELECT id, username, display_name, created FROM accounts"
-	rows, err := db.Query(query)
+	pgpool, pgctx := ReportInstance()
+	rows, err := pgpool.Query(pgctx, "SELECT id, username, display_name, created FROM accounts")
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query execution:" + err.Error())
 	}
 	defer rows.Close()
-
-	// loop rows
 	var results []models.Account
 	for rows.Next() {
 		var accountRow models.Account
 		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
 		}
-
 		accountStatus, _ := utils.GetUserStatus(accountRow.Username)
 		accountRow.TwoFA = accountStatus == "1"
-
-		// append results
 		results = append(results, accountRow)
 	}
-
-	// return results
 	return results, err
 }
 
 func GetAccount(accountID string) ([]models.Account, error) {
-	// get db
-	db := Instance()
-
-	// define query
-	query := "SELECT id, username, display_name, created FROM accounts where id = ?"
-	rows, err := db.Query(query, accountID)
+	pgpool, pgctx := ReportInstance()
+	rows, err := pgpool.Query(pgctx, "SELECT id, username, display_name, created FROM accounts where id = $1", accountID)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNT] error in query execution:" + err.Error())
 	}
 	defer rows.Close()
-
-	// loop rows
 	var results []models.Account
 	for rows.Next() {
 		var accountRow models.Account
 		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNT] error in query row extraction" + err.Error())
 		}
-
-		// append results
 		results = append(results, accountRow)
 	}
-
-	// return results
 	return results, err
 }
 
 func GetPassword(accountUsername string) string {
-	// get db
-	db := Instance()
-
-	// define query
+	pgpool, pgctx := ReportInstance()
 	var password string
-	query := "SELECT password FROM accounts where username = ? LIMIT 1"
-	err := db.QueryRow(query, accountUsername).Scan(&password)
+	err := pgpool.QueryRow(pgctx, "SELECT password FROM accounts where username = $1 LIMIT 1", accountUsername).Scan(&password)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
 	}
-
-	// return password
 	return password
 }
 
 func DeleteAccount(accountID string) error {
-	// get db
-	db := Instance()
-
-	// define query
-	query := "DELETE FROM accounts where id = ?"
-	_, err = db.Exec(query, accountID)
+	pgpool, pgctx := ReportInstance()
+	_, err := pgpool.Exec(pgctx, "DELETE FROM accounts where id = $1", accountID)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][DELETE_ACCOUNT] error in query execution:" + err.Error())
 	}
-
 	return err
 }
 
 func UpdatePassword(accountUsername string, newPassword string) error {
-	// get db
-	db := Instance()
-
-	// define query
-	query := "UPDATE accounts set password = ? WHERE username = ?"
-	_, err = db.Exec(
-		query,
+	pgpool, pgctx := ReportInstance()
+	_, err := pgpool.Exec(pgctx,
+		"UPDATE accounts set password = $1 WHERE username = $2",
 		utils.HashPassword(newPassword),
 		accountUsername,
 	)
-
 	return err
 }
 

@@ -52,7 +52,6 @@ func setup() *gin.Engine {
 
 	// init storage
 	storage.Init()
-	storage.InitReportDb()
 
 	// init socket connection
 	socket.Init()
