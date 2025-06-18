@@ -9,6 +9,14 @@
 
 -- Create the schema for the report database
 
+CREATE TABLE IF NOT EXISTS accounts (
+		id SERIAL PRIMARY KEY,
+		username TEXT NOT NULL UNIQUE,
+		password TEXT NOT NULL,
+		display_name TEXT,
+		created TIMESTAMP NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS units (
     uuid UUID PRIMARY KEY,
     name TEXT,
