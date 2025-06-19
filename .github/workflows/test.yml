@@ -18,7 +18,7 @@ jobs:
       - name: Install Podman
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman
+          sudo apt-get install -y podman oathtool
       - name: Start TimescaleDB
         run: |
           podman run --rm -d --name timescaledb -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report timescale/timescaledb-ha:pg17
