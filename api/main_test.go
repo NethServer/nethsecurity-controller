@@ -8,9 +8,11 @@ import (
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/gin-gonic/gin"
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -21,6 +23,8 @@ func TestMainEndpoints(t *testing.T) {
 	var token string
 
 	t.Run("TestLoginEndpoint", func(t *testing.T) {
+		// Remove 2FA config from previous tests
+		os.RemoveAll(configuration.Config.SecretsDir + "/" + "admin")
 		w := httptest.NewRecorder()
 		var jsonResponse map[string]interface{}
 		body := `{"username": "admin", "password": "admin"}`
@@ -180,6 +184,72 @@ func TestMainEndpoints(t *testing.T) {
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
+
+	// 2FA test: enable, verify with OTP, verify with recovery code, remove
+	t.Run("Test2FAEnableVerifyRemove", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		// Execute login to get token
+		var jsonResponse map[string]interface{}
+		body := `{"username": "admin", "password": "admin"}`
+		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token = jsonResponse["token"].(string)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.NotEmpty(t, token)
+
+		// Enable 2FA (get QR code and secret)
+		qrReq, _ := http.NewRequest("GET", "/2fa/qr-code", nil)
+		qrReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, qrReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var qrResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&qrResp)
+		secret := qrResp["data"].(map[string]interface{})["key"].(string)
+		assert.NotEmpty(t, secret)
+
+		otp, err := totp.GenerateCode(secret, time.Now())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, otp)
+
+		// Verify 2FA login with OTP code
+		otpBody := map[string]string{"username": "admin", "token": token, "otp": otp}
+		otpBodyBytes, _ := json.Marshal(otpBody)
+		otpReq, _ := http.NewRequest("POST", "/2fa/otp-verify", bytes.NewBuffer(otpBodyBytes))
+		otpReq.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, otpReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Get recovery codes
+		w = httptest.NewRecorder()
+		statusReq, _ := http.NewRequest("GET", "/2fa", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp)
+		recoveryCodes := statusResp["data"].(map[string]interface{})["recovery_codes"].([]interface{})
+		assert.NotEmpty(t, recoveryCodes)
+		recoveryCode := recoveryCodes[0].(string)
+
+		// Verify 2FA login with recovery code
+		recBody := map[string]string{"username": "admin", "token": token, "otp": recoveryCode}
+		recBodyBytes, _ := json.Marshal(recBody)
+		recReq, _ := http.NewRequest("POST", "/2fa/otp-verify", bytes.NewBuffer(recBodyBytes))
+		recReq.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, recReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Remove 2FA
+		w = httptest.NewRecorder()
+		delReq, _ := http.NewRequest("DELETE", "/2fa", nil)
+		delReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, delReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+	})
 }
 
 func setupRouter() *gin.Engine {
@@ -201,7 +271,7 @@ func setupRouter() *gin.Engine {
 	os.Setenv("REPORT_DB_URI", "postgres://report:password@127.0.0.1:5432/report")
 	os.Setenv("GRAFANA_POSTGRES_PASSWORD", "password")
 	os.Setenv("ISSUER_2FA", "test")
-	os.Setenv("SECRETS_DIR", "./data")
+	os.Setenv("SECRETS_DIR", "./secrets")
 
 	// create directory configuration directory
 	if _, err := os.Stat(os.Getenv("DATA_DIR")); os.IsNotExist(err) {
