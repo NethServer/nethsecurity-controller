@@ -16,6 +16,7 @@ import (
 	_ "embed"
 	"html/template"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
@@ -136,6 +137,8 @@ func MigrateUsersFromSqliteToPostgres() {
 		username TEXT NOT NULL UNIQUE,
 		password TEXT NOT NULL,
 		display_name TEXT,
+		otp_secret TEXT,
+		otp_recovery_codes TEXT,
 		created TIMESTAMP NOT NULL
 	)`)
 	if err != nil {
@@ -145,8 +148,24 @@ func MigrateUsersFromSqliteToPostgres() {
 
 	// 6. Insert users into Postgres
 	for _, acc := range users {
-		_, err := pgpool.Exec(pgctx, `INSERT INTO accounts (username, password, display_name, created) VALUES ($1, $2, $3, $4) ON CONFLICT (username) DO NOTHING`,
-			acc.Username, acc.Password, acc.DisplayName, acc.Created)
+		// Read OTP secret
+		otp_secret := ""
+		secret, serr := os.ReadFile(configuration.Config.SecretsDir + "/" + acc.Username + "/secret")
+		if serr == nil {
+			otp_secret = string(secret[:])
+		}
+
+		// Read recovery codes
+		recoveryCodes := ""
+		codesB, rerr := os.ReadFile(configuration.Config.SecretsDir + "/" + acc.Username + "/codes")
+		if rerr == nil {
+			recoveryCodes = strings.ReplaceAll(strings.TrimSpace(string(codesB[:])), "\n", "|")
+		}
+		// remove acc.Username directory
+		os.RemoveAll(configuration.Config.SecretsDir + "/" + acc.Username)
+
+		_, err := pgpool.Exec(pgctx, `INSERT INTO accounts (username, password, display_name, otp_secret, otp_recovery_codes, created) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (username) DO NOTHING`,
+			acc.Username, acc.Password, acc.DisplayName, otp_secret, recoveryCodes, acc.Created)
 		if err != nil {
 			logs.Logs.Println("[ERR][MIGRATION] error inserting user into Postgres: " + err.Error())
 		}
@@ -222,8 +241,7 @@ func GetAccounts() ([]models.Account, error) {
 		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Created); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
 		}
-		accountStatus, _ := utils.GetUserStatus(accountRow.Username)
-		accountRow.TwoFA = accountStatus == "1"
+		accountRow.TwoFA = Is2FAEnabled(accountRow.Username)
 		results = append(results, accountRow)
 	}
 	return results, err
@@ -343,4 +361,65 @@ func ReportInstance() (*pgxpool.Pool, context.Context) {
 		}
 	}
 	return dbpool, dbctx
+}
+
+func GetUserOtpSecret(username string) string {
+	pgpool, pgctx := ReportInstance()
+	var otp_secret string
+	err := pgpool.QueryRow(pgctx, "SELECT otp_secret FROM accounts where username = $1 LIMIT 1", username).Scan(&otp_secret)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_USER_SECRET] error in query execution:" + err.Error())
+		return ""
+	}
+	decrypted, err := utils.DecryptAESGCMFromString(otp_secret, []byte(configuration.Config.EncryptionKey))
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][DECRYPT_USER_SECRET] error in decryption:" + err.Error())
+		return ""
+	}
+	return string(decrypted)
+}
+
+func GetRecoveryCodes(username string) []string {
+	pgpool, pgctx := ReportInstance()
+	var otp_recovery_codes string
+	err := pgpool.QueryRow(pgctx, "SELECT otp_recovery_codes FROM accounts where username = $1 LIMIT 1", username).Scan(&otp_recovery_codes)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_RECOVERY_CODES] error in query execution:" + err.Error())
+		return []string{}
+	}
+	return strings.Split(otp_recovery_codes, "|")
+}
+
+func Is2FAEnabled(username string) bool {
+	pgpool, pgctx := ReportInstance()
+	var status sql.NullString
+	err := pgpool.QueryRow(pgctx, "SELECT otp_secret FROM accounts where username = $1 LIMIT 1", username).Scan(&status)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_2FA_STATUS] error in query execution:" + err.Error())
+	}
+	return status.Valid && status.String != ""
+}
+
+func SetUserOtpSecret(username string, secret string) error {
+	pgpool, pgctx := ReportInstance()
+	var otp_secret string
+	if len(secret) > 0 {
+		otp_secret, _ = utils.EncryptAESGCMToString([]byte(secret), []byte(configuration.Config.EncryptionKey))
+	} else {
+		otp_secret = ""
+	}
+	_, err := pgpool.Exec(pgctx, "UPDATE accounts set otp_secret = $1 WHERE username = $2", otp_secret, username)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][SET_USER_OTP_SECRET] error in query execution:" + err.Error())
+	}
+	return err
+}
+
+func SetUserRecoveryCodes(username string, codes []string) error {
+	pgpool, pgctx := ReportInstance()
+	_, err := pgpool.Exec(pgctx, "UPDATE accounts set otp_recovery_codes = $1 WHERE username = $2", strings.Join(codes, "|"), username)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][SET_USER_RECOVERY_CODES] error in query execution:" + err.Error())
+	}
+	return err
 }

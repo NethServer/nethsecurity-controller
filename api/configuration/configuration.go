@@ -41,7 +41,7 @@ type Configuration struct {
 	CredentialsDir string `json:"credentials_dir"`
 	DataDir        string `json:"data_dir"`
 	Issuer2FA      string `json:"issuer_2fa"`
-	SecretsDir     string `json:"secrets_dir"`
+	SecretsDir     string `json:"secrets_dir"` // Deprecated: it can be removed in the future
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
@@ -70,6 +70,8 @@ type Configuration struct {
 	GrafanaPostgresPassword string `json:"grafana_postgres_password"`
 
 	RetentionDays string `json:"retention_days"`
+
+	EncryptionKey string `json:"encryption_key"`
 }
 
 var Config = Configuration{}
@@ -300,5 +302,16 @@ func Init() {
 		Config.RetentionDays = os.Getenv("RETENTION_DAYS")
 	} else {
 		Config.RetentionDays = "60"
+	}
+
+	if os.Getenv("ENCRYPTION_KEY") != "" {
+		Config.EncryptionKey = os.Getenv("ENCRYPTION_KEY")
+		if len(Config.EncryptionKey) != 32 {
+			logs.Logs.Println("[CRITICAL][ENV] ENCRYPTION_KEY variable is not 32 bytes")
+			os.Exit(1)
+		}
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] ENCRYPTION_KEY variable is empty")
+		os.Exit(1)
 	}
 }
