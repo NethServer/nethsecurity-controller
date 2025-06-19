@@ -62,6 +62,8 @@ CGO_ENABLED=0 go build
 - `SENSITIVE_LIST`: list of sensitive information to be redacted in logs
 - `VALID_SUBSCRIPTION`: valid subscription status - _default_: `false`
 
+- `ENCRYPTION_KEY`: key to encrypt/decrypt sensitive data, it must be 32 bytes long
+
 ## APIs
 
 ### Auth
