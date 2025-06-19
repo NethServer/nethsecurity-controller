@@ -104,14 +104,14 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				}
 
 				// check if user require 2fa
-				status, _ := utils.GetUserStatus(user.Username)
+				status := storage.Is2FAEnabled(user.Username)
 
 				// create claims map
 				return jwt.MapClaims{
 					identityKey: user.Username,
 					"role":      role,
 					"actions":   []string{},
-					"2fa":       status == "1",
+					"2fa":       status,
 				}
 			}
 

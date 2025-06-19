@@ -41,7 +41,7 @@ type Configuration struct {
 	CredentialsDir string `json:"credentials_dir"`
 	DataDir        string `json:"data_dir"`
 	Issuer2FA      string `json:"issuer_2fa"`
-	SecretsDir     string `json:"secrets_dir"`
+	SecretsDir     string `json:"secrets_dir"` // Deprecated: it can be removed in the future
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
