@@ -72,6 +72,9 @@ func setup() *gin.Engine {
 	// init routers
 	router := gin.Default()
 
+	// add trusted IP middleware globally
+	router.Use(middleware.TrustedIPMiddleware())
+
 	// add default compression
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
