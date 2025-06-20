@@ -19,39 +19,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMultipleListenAddresses(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router := setupRouter()
-
-	// Start two servers on different listeners
-	if len(configuration.Config.ListenAddress) < 2 {
-		t.Fatalf("expected at least 2 listen addresses, got %d", len(configuration.Config.ListenAddress))
-	}
-
-	servers := make([]*httptest.Server, 0, len(configuration.Config.ListenAddress))
-	for range configuration.Config.ListenAddress {
-		// Use httptest.Server to simulate listening on multiple addresses
-		ts := httptest.NewServer(router)
-		servers = append(servers, ts)
-	}
-	defer func() {
-		for _, ts := range servers {
-			ts.Close()
-		}
-	}()
-
-	// Test /health endpoint on all servers
-	for i, ts := range servers {
-		resp, err := http.Get(ts.URL + "/health")
-		if err != nil {
-			t.Fatalf("server %d: failed to GET /health: %v", i, err)
-		}
-		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
-			t.Errorf("server %d: expected status 200, got %d", i, resp.StatusCode)
-		}
-	}
-}
+var router *gin.Engine
 
 // TestAESGCMEncryption tests AES-GCM encryption and decryption.
 func TestAESGCMEncryption(t *testing.T) {
@@ -120,10 +88,44 @@ func TestAESGCMToString(t *testing.T) {
 	}
 }
 
+func TestMultipleListenAddresses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router = setupRouter()
+
+	// Start two servers on different listeners
+	if len(configuration.Config.ListenAddress) < 2 {
+		t.Fatalf("expected at least 2 listen addresses, got %d", len(configuration.Config.ListenAddress))
+	}
+
+	servers := make([]*httptest.Server, 0, len(configuration.Config.ListenAddress))
+	for range configuration.Config.ListenAddress {
+		// Use httptest.Server to simulate listening on multiple addresses
+		ts := httptest.NewServer(router)
+		servers = append(servers, ts)
+	}
+	defer func() {
+		for _, ts := range servers {
+			ts.Close()
+		}
+	}()
+
+	// Test /health endpoint on all servers
+	for i, ts := range servers {
+		resp, err := http.Get(ts.URL + "/health")
+		if err != nil {
+			t.Fatalf("server %d: failed to GET /health: %v", i, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("server %d: expected status 200, got %d", i, resp.StatusCode)
+		}
+	}
+}
+
 // TestHealthEndpoint tests the /health endpoint.
 func TestHealthEndpoint(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	router := setupRouter()
+	router = setupRouter()
 	w := httptest.NewRecorder()
 	req, _ := http.NewRequest("GET", "/health", nil)
 	router.ServeHTTP(w, req)
@@ -142,7 +144,7 @@ func TestHealthEndpoint(t *testing.T) {
 func TestMainEndpoints(t *testing.T) {
 	// Tests assume to run on a clean database, otherwise 2FA tests will fail
 	gin.SetMode(gin.TestMode)
-	router := setupRouter()
+	router = setupRouter()
 	var token string
 
 	t.Run("TestLoginEndpoint", func(t *testing.T) {
@@ -387,7 +389,49 @@ func TestMainEndpoints(t *testing.T) {
 	})
 }
 
+// TestTrustedIPMiddleware tests the TrustedIPMiddleware for allowed and denied
+func TestTrustedIPMiddleware(t *testing.T) {
+	os.Setenv("TRUSTED_IPS", "127.0.0.1,192.168.1.0/24")
+	os.Setenv("TRUSTED_IP_EXCLUDE_PATHS", "/units/register")
+	gin.SetMode(gin.TestMode)
+	restricted_router := setup()
+
+	// Allowed: 127.0.0.1
+	req := httptest.NewRequest("GET", "/health", nil)
+	req.RemoteAddr = "127.0.0.1:12345"
+	w := httptest.NewRecorder()
+	restricted_router.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Errorf("expected 200 for allowed IP, got %d", w.Code)
+	}
+
+	// Denied: 10.0.0.1
+	req = httptest.NewRequest("GET", "/health", nil)
+	req.RemoteAddr = "10.0.0.1:12345"
+	w = httptest.NewRecorder()
+	restricted_router.ServeHTTP(w, req)
+	if w.Code != 403 {
+		t.Errorf("expected 403 for denied IP, got %d", w.Code)
+	}
+
+	// Allowed: /units/register endpoint should be unrestricted
+	body := `{"unit_id": "11", "username": "aa", "unit_name": "bbb", "password": "ccc"}`
+	req = httptest.NewRequest("POST", "/units/register", bytes.NewBuffer([]byte(body)))
+	req.RemoteAddr = "10.0.0.1:12345"
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("RegistrationToken", "1234")
+	w = httptest.NewRecorder()
+	restricted_router.ServeHTTP(w, req)
+	if w.Code != 200 {
+		t.Errorf("expected 200 for /units/register endpoint, got %d", w.Code)
+	}
+}
+
 func setupRouter() *gin.Engine {
+	// Singleton
+	if router != nil {
+		return router
+	}
 	os.Setenv("LISTEN_ADDRESS", "0.0.0.0:8000,127.0.0.1:5000")
 	os.Setenv("ADMIN_USERNAME", "admin")
 	// default password is "password"
