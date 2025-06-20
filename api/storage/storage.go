@@ -363,7 +363,7 @@ func ReportInstance() (*pgxpool.Pool, context.Context) {
 	return dbpool, dbctx
 }
 
-func GetUserSecret(username string) string {
+func GetUserOtpSecret(username string) string {
 	pgpool, pgctx := ReportInstance()
 	var otp_secret string
 	err := pgpool.QueryRow(pgctx, "SELECT otp_secret FROM accounts where username = $1 LIMIT 1", username).Scan(&otp_secret)
@@ -371,7 +371,12 @@ func GetUserSecret(username string) string {
 		logs.Logs.Println("[ERR][STORAGE][GET_USER_SECRET] error in query execution:" + err.Error())
 		return ""
 	}
-	return otp_secret
+	decrypted, err := utils.DecryptAESGCMFromString(otp_secret, []byte(configuration.Config.EncryptionKey))
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][DECRYPT_USER_SECRET] error in decryption:" + err.Error())
+		return ""
+	}
+	return string(decrypted)
 }
 
 func GetRecoveryCodes(username string) []string {
@@ -397,7 +402,13 @@ func Is2FAEnabled(username string) bool {
 
 func SetUserOtpSecret(username string, secret string) error {
 	pgpool, pgctx := ReportInstance()
-	_, err := pgpool.Exec(pgctx, "UPDATE accounts set otp_secret = $1 WHERE username = $2", secret, username)
+	var otp_secret string
+	if len(secret) > 0 {
+		otp_secret, _ = utils.EncryptAESGCMToString([]byte(secret), []byte(configuration.Config.EncryptionKey))
+	} else {
+		otp_secret = ""
+	}
+	_, err := pgpool.Exec(pgctx, "UPDATE accounts set otp_secret = $1 WHERE username = $2", otp_secret, username)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][SET_USER_OTP_SECRET] error in query execution:" + err.Error())
 	}

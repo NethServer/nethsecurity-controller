@@ -106,7 +106,7 @@ func OTPVerify(c *gin.Context) {
 	}
 
 	// get secret for the user
-	secret := storage.GetUserSecret(jsonOTP.Username)
+	secret := storage.GetUserOtpSecret(jsonOTP.Username)
 
 	// check secret
 	if len(secret) == 0 {

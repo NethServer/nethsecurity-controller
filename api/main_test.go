@@ -10,14 +10,84 @@ import (
 	"testing"
 	"time"
 
+	"crypto/rand"
+
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
-func TestMainEndpoints(t *testing.T) {
+// TestAESGCMEncryption tests AES-GCM encryption and decryption.
+func TestAESGCMEncryption(t *testing.T) {
+	key := []byte("12345678901234567890123456789012") // AES-256, 32 byte
+	_, err := rand.Read(key)
+	if err != nil {
+		t.Fatalf("failed to generate random key: %v", err)
+	}
+	plaintext := []byte("Hello, AES-GCM encryption!")
 
+	ciphertext, err := utils.EncryptAESGCM(plaintext, key)
+	if err != nil {
+		t.Fatalf("encryption failed: %v", err)
+	}
+	if bytes.Equal(ciphertext, plaintext) {
+		t.Error("ciphertext should not match plaintext")
+	}
+
+	decrypted, err := utils.DecryptAESGCM(ciphertext, key)
+	if err != nil {
+		t.Fatalf("decryption failed: %v", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Errorf("decrypted text does not match original. got: %s, want: %s", decrypted, plaintext)
+	}
+
+	// Test with wrong key
+	wrongKey := make([]byte, 32)
+	_, err = rand.Read(wrongKey)
+	if err != nil {
+		t.Fatalf("failed to generate wrong key: %v", err)
+	}
+	_, err = utils.DecryptAESGCM(ciphertext, wrongKey)
+	if err == nil {
+		t.Error("decryption should fail with wrong key")
+	}
+}
+
+// TestAESGCMToString tests EncryptAESGCMToString and DecryptAESGCMFromString helpers.
+func TestAESGCMToString(t *testing.T) {
+	key := []byte("12345678901234567890123456789012") // 32 bytes
+
+	plaintext := []byte("Store this in DB as base64!")
+
+	ciphertextB64, err := utils.EncryptAESGCMToString(plaintext, key)
+	if err != nil {
+		t.Fatalf("EncryptAESGCMToString failed: %v", err)
+	}
+	if ciphertextB64 == "" {
+		t.Error("ciphertextB64 should not be empty")
+	}
+
+	decrypted, err := utils.DecryptAESGCMFromString(ciphertextB64, key)
+	if err != nil {
+		t.Fatalf("DecryptAESGCMFromString failed: %v", err)
+	}
+	if !bytes.Equal(decrypted, plaintext) {
+		t.Errorf("decrypted text does not match original. got: %s, want: %s", decrypted, plaintext)
+	}
+
+	// Test with wrong key
+	wrongKey := []byte("abcdefghabcdefghabcdefghabcdefgh") // 32 bytes
+	_, err = utils.DecryptAESGCMFromString(ciphertextB64, wrongKey)
+	if err == nil {
+		t.Error("decryption should fail with wrong key")
+	}
+}
+
+func TestMainEndpoints(t *testing.T) {
+	// Tests assume to run on a clean database, otherwise 2FA tests will fail
 	gin.SetMode(gin.TestMode)
 	router := setupRouter()
 	var token string
@@ -249,6 +319,18 @@ func TestMainEndpoints(t *testing.T) {
 		delReq.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, delReq)
 		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Check 2FA is disabled
+		w = httptest.NewRecorder()
+		statusReq, _ = http.NewRequest("GET", "/2fa", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp2fa map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp2fa)
+		assert.Equal(t, false, statusResp2fa["data"].(map[string]interface{})["status"])
+		// recovery codes should be empty
+		assert.Equal(t, []interface{}{}, statusResp2fa["data"].(map[string]interface{})["recovery_codes"])
 	})
 }
 
@@ -272,6 +354,7 @@ func setupRouter() *gin.Engine {
 	os.Setenv("GRAFANA_POSTGRES_PASSWORD", "password")
 	os.Setenv("ISSUER_2FA", "test")
 	os.Setenv("SECRETS_DIR", "./secrets")
+	os.Setenv("ENCRYPTION_KEY", "12345678901234567890123456789012")
 
 	// create directory configuration directory
 	if _, err := os.Stat(os.Getenv("DATA_DIR")); os.IsNotExist(err) {

@@ -12,8 +12,14 @@ package utils
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
+
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"io"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/gin-gonic/gin"
@@ -117,4 +123,67 @@ func Remove(a string, values []string) []string {
 		}
 	}
 	return values
+}
+
+// EncryptAESGCM encrypts plaintext using AES-GCM with the provided key.
+func EncryptAESGCM(plaintext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	return ciphertext, nil
+}
+
+// EncryptAESGCMToString encrypts plaintext and returns a base64 string for DB storage.
+func EncryptAESGCMToString(plaintext, key []byte) (string, error) {
+	ciphertext, err := EncryptAESGCM(plaintext, key)
+	if err != nil {
+		fmt.Println("error", err)
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+// DecryptAESGCMFromString decodes base64 string and decrypts using AES-GCM.
+func DecryptAESGCMFromString(ciphertextB64 string, key []byte) ([]byte, error) {
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextB64)
+	if err != nil {
+		return nil, err
+	}
+	plaintext, err := DecryptAESGCM(ciphertext, key)
+	if err == nil {
+		return plaintext, nil
+	}
+	return []byte(""), err
+}
+
+// DecryptAESGCM decrypts ciphertext using AES-GCM with the provided key.
+func DecryptAESGCM(ciphertext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if len(ciphertext) < gcm.NonceSize() {
+		return nil, io.ErrUnexpectedEOF
+	}
+	nonce := ciphertext[:gcm.NonceSize()]
+	ciphertext = ciphertext[gcm.NonceSize():]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
 }
