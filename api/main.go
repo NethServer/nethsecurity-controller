@@ -91,6 +91,11 @@ func setup() *gin.Engine {
 	api.POST("/login", middleware.InstanceJWT().LoginHandler)
 	api.POST("/logout", middleware.InstanceJWT().LogoutHandler)
 
+	// define healthcheck endpoint
+	api.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
+
 	// 2FA APIs
 	api.POST("/2fa/otp-verify", methods.OTPVerify)
 

@@ -68,6 +68,25 @@ CGO_ENABLED=0 go build
 
 ### Auth
 
+- `GET /health`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "status": "ok"
+   }
+  ```
+
 - `POST /login`
 
   REQ
