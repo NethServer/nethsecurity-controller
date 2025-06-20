@@ -86,6 +86,25 @@ func TestAESGCMToString(t *testing.T) {
 	}
 }
 
+// TestHealthEndpoint tests the /health endpoint.
+func TestHealthEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := setupRouter()
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/health", nil)
+	router.ServeHTTP(w, req)
+	if w.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d", w.Code)
+	}
+	var resp map[string]interface{}
+	if err := json.NewDecoder(w.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
+	if resp["status"] != "ok" {
+		t.Errorf("expected status 'ok', got %v", resp["status"])
+	}
+}
+
 func TestMainEndpoints(t *testing.T) {
 	// Tests assume to run on a clean database, otherwise 2FA tests will fail
 	gin.SetMode(gin.TestMode)
