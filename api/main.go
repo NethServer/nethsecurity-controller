@@ -169,6 +169,15 @@ func setup() *gin.Engine {
 
 func main() {
 	router := setup()
-	// run server
-	router.Run(configuration.Config.ListenAddress)
+	// Listen on multiple addresses
+	for _, addr := range configuration.Config.ListenAddress {
+		go func(a string) {
+			if err := router.Run(a); err != nil {
+				logs.Logs.Println("[CRITICAL][API] Server failed to start on address: " + a)
+			}
+		}(addr)
+	}
+
+	// Prevent main from exiting
+	select {}
 }

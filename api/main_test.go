@@ -19,6 +19,40 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestMultipleListenAddresses(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := setupRouter()
+
+	// Start two servers on different listeners
+	if len(configuration.Config.ListenAddress) < 2 {
+		t.Fatalf("expected at least 2 listen addresses, got %d", len(configuration.Config.ListenAddress))
+	}
+
+	servers := make([]*httptest.Server, 0, len(configuration.Config.ListenAddress))
+	for range configuration.Config.ListenAddress {
+		// Use httptest.Server to simulate listening on multiple addresses
+		ts := httptest.NewServer(router)
+		servers = append(servers, ts)
+	}
+	defer func() {
+		for _, ts := range servers {
+			ts.Close()
+		}
+	}()
+
+	// Test /health endpoint on all servers
+	for i, ts := range servers {
+		resp, err := http.Get(ts.URL + "/health")
+		if err != nil {
+			t.Fatalf("server %d: failed to GET /health: %v", i, err)
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("server %d: expected status 200, got %d", i, resp.StatusCode)
+		}
+	}
+}
+
 // TestAESGCMEncryption tests AES-GCM encryption and decryption.
 func TestAESGCMEncryption(t *testing.T) {
 	key := []byte("12345678901234567890123456789012") // AES-256, 32 byte
@@ -354,7 +388,7 @@ func TestMainEndpoints(t *testing.T) {
 }
 
 func setupRouter() *gin.Engine {
-	os.Setenv("LISTEN_ADDRESS", "0.0.0.0:8000")
+	os.Setenv("LISTEN_ADDRESS", "0.0.0.0:8000,127.0.0.1:5000")
 	os.Setenv("ADMIN_USERNAME", "admin")
 	// default password is "password"
 	os.Setenv("ADMIN_PASSWORD", "admin")
