@@ -29,7 +29,7 @@ type Configuration struct {
 	OpenVPNPKIDir    string `json:"openvpn_pki_dir"`
 	OpenVPNMGMTSock  string `json:"openvpn_mgmt_sock"`
 
-	ListenAddress string `json:"listen_address"`
+	ListenAddress []string `json:"listen_address"`
 
 	AdminUsername     string   `json:"admin_username"`
 	AdminPassword     string   `json:"admin_password"`
@@ -79,9 +79,9 @@ var Config = Configuration{}
 func Init() {
 	// read configuration from ENV
 	if os.Getenv("LISTEN_ADDRESS") != "" {
-		Config.ListenAddress = os.Getenv("LISTEN_ADDRESS")
+		Config.ListenAddress = strings.Split(os.Getenv("LISTEN_ADDRESS"), ",")
 	} else {
-		Config.ListenAddress = "127.0.0.1:5000"
+		Config.ListenAddress = []string{"127.0.0.1:5000"}
 	}
 
 	if os.Getenv("ADMIN_USERNAME") != "" {
