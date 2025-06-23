@@ -29,7 +29,8 @@ CGO_ENABLED=0 go build
 
 **Optional**
 
-- `LISTEN_ADDRESS`: listend address of server - _default_: `127.0.0.1:5000`
+- `LISTEN_ADDRESS`: a comma-separated list of listen addresses for the server. Each entry is in the form `<address>:<port>` - _default_: `127.0.0.1:5000`
+  Example: `127.0.0.1:5000,192.168.100.1:5000`
 
 - `OVPN_DIR`: openvpn configuration directory - _default_: `/etc/openvpn`
 - `OVPN_NETWORK`: openvpn network address - _default_: `172.21.0.0`
