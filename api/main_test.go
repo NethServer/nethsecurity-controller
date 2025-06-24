@@ -13,6 +13,7 @@ import (
 	"crypto/rand"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
@@ -425,6 +426,86 @@ func TestTrustedIPMiddleware(t *testing.T) {
 	if w.Code != 200 {
 		t.Errorf("expected 200 for /units/register endpoint, got %d", w.Code)
 	}
+}
+
+func TestAddInfoAndGetRemoteInfo(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router = setupRouter()
+
+	// Prepare: create a credentials file for the unit
+	unitID := "457c2b94-13be-48c9-b4aa-c7d677c85ee8"
+	if _, err := os.Stat(configuration.Config.CredentialsDir); os.IsNotExist(err) {
+		os.MkdirAll(configuration.Config.CredentialsDir, 0755)
+	}
+	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir); os.IsNotExist(err) {
+		os.MkdirAll(configuration.Config.OpenVPNCCDDir, 0755)
+	}
+	if _, err := os.Stat(configuration.Config.OpenVPNPKIDir); os.IsNotExist(err) {
+		os.MkdirAll(configuration.Config.OpenVPNPKIDir, 0755)
+	}
+	if _, err := os.Stat(configuration.Config.OpenVPNStatusDir); os.IsNotExist(err) {
+		os.MkdirAll(configuration.Config.OpenVPNStatusDir, 0755)
+	}
+
+	// Create fake credentials, ccd and cr files, otherwise GetUnit will fail
+	creds := map[string]string{"username": "testuser", "password": "testpass"}
+	credsBytes, _ := json.Marshal(creds)
+	werr := os.WriteFile(configuration.Config.CredentialsDir+"/"+unitID, credsBytes, 0644)
+	assert.NoError(t, werr, "failed to write credentials file")
+	conf := "ifconfig-push 10.10.10.2 255.255.255.0 \n"
+	werr = os.WriteFile(configuration.Config.OpenVPNCCDDir+"/"+unitID, []byte(conf), 0644)
+	assert.NoError(t, werr, "failed to write ccd file")
+	if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + unitID + ".crt"); os.IsNotExist(err) {
+		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/issued/" + unitID + ".crt"); err != nil {
+			t.Fatalf("failed to create certificate file: %v", err)
+		}
+	}
+
+	// AddInfo: POST /ingest/info (simulate BasicAuth middleware)
+	w := httptest.NewRecorder()
+	info := models.UnitInfo{
+		UnitName:         "my-test-unit",
+		Version:          "1.0.0",
+		VersionUpdate:    "1.0.1",
+		ScheduledUpdate:  0,
+		SubscriptionType: "test-subscription",
+		SystemID:         "test-system-id",
+		SSHPort:          22,
+		FQDN:             "test.example.com",
+		APIVersion:       "v1",
+	}
+	infoBytes, _ := json.Marshal(info)
+	req := httptest.NewRequest("POST", "/ingest/info", bytes.NewBuffer(infoBytes))
+	req.Header.Set("Content-Type", "application/json")
+	req.SetBasicAuth(unitID, "1234")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "AddInfo should return 200 OK")
+
+	w = httptest.NewRecorder()
+	var jsonResponse map[string]interface{}
+	body := `{"username": "admin", "password": "admin"}`
+	req, _ = http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	json.NewDecoder(w.Body).Decode(&jsonResponse)
+	token := jsonResponse["token"].(string)
+
+	// Call /units/:unit_id to retrieve unit info
+	req = httptest.NewRequest("GET", "/units/"+unitID, nil)
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	json.NewDecoder(w.Body).Decode(&jsonResponse)
+	infoResp := jsonResponse["data"].(map[string]interface{})["info"].(map[string]interface{})
+	assert.Equal(t, info.UnitName, infoResp["unit_name"])
+	assert.Equal(t, info.Version, infoResp["version"])
+	assert.Equal(t, info.VersionUpdate, infoResp["version_update"])
+	assert.Equal(t, float64(info.ScheduledUpdate), infoResp["scheduled_update"])
+	assert.Equal(t, info.SubscriptionType, infoResp["subscription_type"])
+	assert.Equal(t, info.SystemID, infoResp["system_id"])
+	assert.Equal(t, float64(info.SSHPort), infoResp["ssh_port"])
+	assert.Equal(t, info.FQDN, infoResp["fqdn"])
+	assert.Equal(t, info.APIVersion, infoResp["api_version"])
 }
 
 func setupRouter() *gin.Engine {
