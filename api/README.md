@@ -71,6 +71,9 @@ CGO_ENABLED=0 go build
    This is useful to allow access to the API from the units without authentication.
    Usually the only path that could be excluded is `/units/register`.
 
+- `PLATFORM_INFO`: a JSON string with platform information, used to store the controller version and other information. It can be left empty.
+  Example: `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`
+
 ## APIs
 
 ### Auth
@@ -683,6 +686,36 @@ CGO_ENABLED=0 go build
    {
       "code": 200,
       "data": "",
+      "message": "success"
+   }
+  ```
+
+- `GET /platform`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": {
+          "vpn_port": "1194",
+          "vpn_network": "172.21.0.0/16",
+          "controller_version": "1.2.3",
+          "nethserver_version": "8-23.05.3-ns.1.0.1",
+          "nethserver_system_id": "XXXXXXXX-XXXX",
+          "metrics_retention_days": 60,
+          "logs_retention_days": 30
+      },
       "message": "success"
    }
   ```

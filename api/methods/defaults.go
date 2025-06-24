@@ -32,3 +32,12 @@ func GetDefaults(c *gin.Context) {
 		},
 	}))
 }
+
+func GetPlatformInfo(c *gin.Context) {
+	// read and return platform info
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "success",
+		Data:    structs.Map(configuration.Config.PlatformInfo),
+	}))
+}
