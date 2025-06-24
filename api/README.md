@@ -304,7 +304,7 @@ CGO_ENABLED=0 go build
    }
   ```
 
-  The API saves unit information in `OVPN_S_DIR` with `.info` extension. This is useful for retrieving new information of the unit without waiting for cron to store it.
+  The backend stores data inside the database. This is useful for retrieving new information of the unit without waiting for cron to store it.
 
 - `GET /units/<unit_id>/token`
 
