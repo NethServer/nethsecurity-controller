@@ -534,6 +534,43 @@ func TestForwardedAuthMiddleware(t *testing.T) {
 	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
 }
 
+func TestGetPlatformInfo(t *testing.T) {
+	router = setupRouter()
+
+	// Step 1: Login and get token
+	loginBody := []byte(`{"username":"admin","password":"admin"}`)
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer(loginBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var loginResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&loginResp)
+	token, ok := loginResp["token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, token)
+
+	// Step 2: Call GET /platform with token
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/platform", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Step 3: Check response
+	var resp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&resp)
+	assert.Equal(t, float64(200), resp["code"])
+	assert.Equal(t, "success", resp["message"])
+	data, ok := resp["data"].(map[string]interface{})
+	assert.True(t, ok)
+	assert.Equal(t, "1194", data["vpn_port"])
+	assert.Equal(t, "192.168.100.0/24", data["vpn_network"])
+	assert.Equal(t, "1.0.0", data["controller_version"])
+	assert.Equal(t, float64(30), data["metrics_retention_days"])
+	assert.Equal(t, float64(90), data["logs_retention_days"])
+}
+
 func setupRouter() *gin.Engine {
 	// Singleton
 	if router != nil {
@@ -559,6 +596,7 @@ func setupRouter() *gin.Engine {
 	os.Setenv("ISSUER_2FA", "test")
 	os.Setenv("SECRETS_DIR", "./secrets")
 	os.Setenv("ENCRYPTION_KEY", "12345678901234567890123456789012")
+	os.Setenv("PLATFORM_INFO", `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`)
 
 	// create directory configuration directory
 	if _, err := os.Stat(os.Getenv("DATA_DIR")); os.IsNotExist(err) {
