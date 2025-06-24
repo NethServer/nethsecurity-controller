@@ -266,7 +266,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 	return authMiddleware
 }
 
-func BasicAuth() gin.HandlerFunc {
+func BasicUnitAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uuid, token, _ := c.Request.BasicAuth()
 		if uuid == "" || token == "" {
@@ -301,6 +301,45 @@ func BasicAuth() gin.HandlerFunc {
 		}
 
 		c.Set("UnitId", uuid)
+		c.Next()
+	}
+}
+
+func BasicUserAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username, password, _ := c.Request.BasicAuth()
+
+		if username == "" || password == "" {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusUnauthorized{
+				Code:    400,
+				Message: "missing username or password",
+				Data:    nil,
+			}))
+			c.Abort()
+			return
+		}
+
+		// read user password hash
+		passwordHash := storage.GetPassword(username)
+
+		// check password and username
+		valid := utils.CheckPasswordHash(password, passwordHash)
+		isAdmin, _ := storage.IsAdmin(username)
+
+		if !valid || !isAdmin {
+			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusUnauthorized{
+				Code:    401,
+				Message: "invalid username or password",
+				Data:    nil,
+			}))
+			logs.Logs.Println("[INFO][AUTH] user " + username + " authentication failed")
+			c.Abort()
+			return
+		}
+
+		// Just return success
+		logs.Logs.Println("[INFO][AUTH] user " + username + " authenticated successfully")
+		c.Header("X-Auth-User", username)
 		c.Next()
 	}
 }

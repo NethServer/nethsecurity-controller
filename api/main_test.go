@@ -512,6 +512,28 @@ func TestAddInfoAndGetRemoteInfo(t *testing.T) {
 	assert.Equal(t, info.APIVersion, infoResp["api_version"])
 }
 
+func TestForwardedAuthMiddleware(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router = setupRouter()
+
+	// Test with valid credentials
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/auth", nil)
+	req.SetBasicAuth("admin", "admin") // Use BasicAuth for testing
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+	// Check if X-Auth-User header is set
+	authUser := w.Header().Get("X-Auth-User")
+	assert.Equal(t, "admin", authUser, "X-Auth-User header should be set to 'admin'")
+
+	// Test with invalid credentials
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/auth", nil)
+	req.SetBasicAuth("admin", "wrongpassword") // Use BasicAuth for testing
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code, w.Body.String())
+}
+
 func setupRouter() *gin.Engine {
 	// Singleton
 	if router != nil {

@@ -154,9 +154,15 @@ func setup() *gin.Engine {
 	}
 
 	// Ingest APIs: receive data from firewalls
-	authorized := router.Group("/ingest", middleware.BasicAuth())
+	authorized := router.Group("/ingest", middleware.BasicUnitAuth())
 	authorized.POST("/info", methods.AddInfo)
 	authorized.POST("/:firewall_api", methods.HandelMonitoring)
+
+	// Forwarded authentication middleware
+	forwarded := router.Group("/auth", middleware.BasicUserAuth())
+	forwarded.GET("", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"auth": "ok"})
+	})
 
 	// handle missing endpoint
 	router.NoRoute(func(c *gin.Context) {
