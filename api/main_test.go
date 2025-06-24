@@ -14,6 +14,7 @@ import (
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/pquerna/otp/totp"
@@ -460,6 +461,9 @@ func TestAddInfoAndGetRemoteInfo(t *testing.T) {
 			t.Fatalf("failed to create certificate file: %v", err)
 		}
 	}
+	// Manually add to the database: we can't call /units POST endpoint because
+	// it requires the presence of easyrsa binary and configuration files
+	storage.AddUnit(unitID)
 
 	// AddInfo: POST /ingest/info (simulate BasicAuth middleware)
 	w := httptest.NewRecorder()

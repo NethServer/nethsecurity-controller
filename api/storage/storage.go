@@ -14,6 +14,7 @@ import (
 	"context"
 	"database/sql"
 	_ "embed"
+	"encoding/json"
 	"html/template"
 	"os"
 	"strings"
@@ -35,6 +36,9 @@ var err error
 //go:embed report_schema.sql.tmpl
 var reportSchemaSQL string
 
+//go:embed upgrade_schema.sql
+var upgradeSchemaSQL string
+
 //go:embed grafana_user.sql.tmpl
 var grafanaUserSQL string
 
@@ -46,6 +50,9 @@ func Init() *pgxpool.Pool {
 
 	// Migrate users from SQLite to Postgres if needed
 	MigrateUsersFromSqliteToPostgres()
+
+	// Migrate unit info from file to Postgres if needed
+	MigrateUnitInfoFromFileToPostgres()
 
 	// Initialize PostgreSQL connection
 	dbctx = context.Background()
@@ -323,6 +330,14 @@ func loadReportSchema(*pgxpool.Pool, context.Context) bool {
 		logs.Logs.Println("[ERR][STORAGE] error in storage file schema init:" + errExecute.Error())
 		return false
 	}
+
+	// execute upgrade schema
+	logs.Logs.Println("[INFO][STORAGE] upgrading report schema")
+	_, errExecute = dbpool.Exec(dbctx, upgradeSchemaSQL)
+	if errExecute != nil {
+		logs.Logs.Println("[ERR][STORAGE] error in storage file schema upgrade:" + errExecute.Error())
+		return false
+	}
 	return true
 }
 
@@ -422,4 +437,94 @@ func SetUserRecoveryCodes(username string, codes []string) error {
 		logs.Logs.Println("[ERR][STORAGE][SET_USER_RECOVERY_CODES] error in query execution:" + err.Error())
 	}
 	return err
+}
+
+func AddUnit(uuid string) error {
+	pgpool, pgctx := ReportInstance()
+	// Try to insert the unit; if it already exists, return an error
+	_, err := pgpool.Exec(pgctx, `
+		INSERT INTO units (uuid, created_at, updated_at)
+		VALUES ($1, NOW(), NOW())
+		ON CONFLICT (uuid) DO NOTHING
+	`, uuid)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][ADD_UNIT] error in query execution:" + err.Error())
+	}
+	return err
+}
+
+func SetUnitInfo(uuid string, info models.UnitInfo) error {
+	pgpool, pgctx := ReportInstance()
+	// Try to update the unit; if no rows are affected, return an error
+	res, err := pgpool.Exec(pgctx, `
+		UPDATE units SET name = $2, info = $3::jsonb, updated_at = NOW()
+		WHERE uuid = $1
+	`, uuid, info.UnitName, info)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][SET_UNIT_INFO] error in query execution:" + err.Error())
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		logs.Logs.Println("[WARN][STORAGE][SET_UNIT_INFO] unit with uuid " + uuid + " does not exist")
+	}
+	return err
+}
+
+func GetUnitInfo(uuid string) map[string]interface{} {
+	pgpool, pgctx := ReportInstance()
+	var infoStr string
+	err := pgpool.QueryRow(pgctx, `
+		SELECT info::text FROM units WHERE uuid = $1
+	`, uuid).Scan(&infoStr)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_UNIT_INFO] error in query execution:" + err.Error())
+		return nil
+	}
+	var info map[string]interface{}
+	if err := json.Unmarshal([]byte(infoStr), &info); err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_UNIT_INFO] error unmarshalling info:" + err.Error())
+		return nil
+	}
+	return info
+}
+
+func MigrateUnitInfoFromFileToPostgres() {
+	// Search for all *.info file inside Config.OpenVPNStatusDir
+	// If the dir does not exists, just return
+	if _, err := os.Stat(configuration.Config.OpenVPNStatusDir); os.IsNotExist(err) {
+		return
+	}
+	files, err := os.ReadDir(configuration.Config.OpenVPNStatusDir)
+	if err != nil {
+		logs.Logs.Println("[WARNING][MIGRATION] error reading OpenVPN status directory: " + err.Error())
+		return
+	}
+	for _, file := range files {
+		if !file.IsDir() && strings.HasSuffix(file.Name(), ".info") {
+			filePath := configuration.Config.OpenVPNStatusDir + "/" + file.Name()
+			// read file, parse as JSON and then call AddUnit
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error reading file:", filePath, err.Error())
+				continue
+			}
+			var info models.UnitInfo
+			if err := json.Unmarshal(data, &info); err != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error parsing JSON in file:", filePath, err.Error())
+				continue
+			}
+			uuid := strings.TrimSuffix(file.Name(), ".info")
+			// ignore the error
+			_ = AddUnit(uuid)
+			if err := SetUnitInfo(uuid, info); err != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error setting unit info for", uuid, ":", err.Error())
+			}
+			// remove the file
+			if err := os.Remove(filePath); err != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error removing file:", filePath, err.Error())
+			} else {
+				logs.Logs.Println("[INFO][MIGRATION] removed file:", filePath)
+			}
+		}
+	}
 }

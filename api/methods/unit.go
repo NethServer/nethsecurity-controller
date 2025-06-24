@@ -25,6 +25,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/socket"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 
 	"github.com/fatih/structs"
@@ -155,16 +156,16 @@ func AddInfo(c *gin.Context) {
 		return
 	}
 
-	jsonInfo, _ := json.Marshal(jsonRequest)
-	err := os.WriteFile(configuration.Config.OpenVPNStatusDir+"/"+unitId+".info", jsonInfo, 0644)
+	_, err := json.Marshal(jsonRequest)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "can't write unit info for: " + unitId,
+			Message: "can't marshal unit info for: " + unitId,
 			Data:    err.Error(),
 		}))
 		return
 	}
+	storage.SetUnitInfo(unitId, jsonRequest)
 
 	// return 200 OK
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
@@ -301,6 +302,17 @@ func AddUnit(c *gin.Context) {
 			Code:    400,
 			Message: "cannot write conf file for: " + jsonRequest.UnitId,
 			Data:    errWrite.Error(),
+		}))
+		return
+	}
+
+	// create record inside units table
+	errCreate := storage.AddUnit(jsonRequest.UnitId)
+	if errCreate != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot store unit record inside database for: " + jsonRequest.UnitId,
+			Data:    errCreate.Error(),
 		}))
 		return
 	}
@@ -713,12 +725,8 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	unitInfo.Data.ScheduledUpdate = systemUpdateInfo.Data.ScheduledAt
 	unitInfo.Data.VersionUpdate = systemUpdateInfo.Data.LastVersion
 
-	// write json to file
-	jsonInfo, _ := json.Marshal(unitInfo.Data)
-	errWrite := os.WriteFile(configuration.Config.OpenVPNStatusDir+"/"+unitId+".info", jsonInfo, 0644)
-	if errWrite != nil {
-		return models.UnitInfo{}, errors.New("error writing info file")
-	}
+	// write json to database
+	storage.SetUnitInfo(unitId, unitInfo.Data)
 
 	return unitInfo.Data, nil
 }
@@ -734,7 +742,8 @@ func getUnitInfo(unitId string) (gin.H, error) {
 	result := parseUnitFile(unitId, unitFile)
 
 	// add info from unit
-	remote_info := getRemoteInfo(unitId)
+	remote_info := storage.GetUnitInfo(unitId)
+
 	if remote_info != nil {
 		result["info"] = remote_info
 	} else {
@@ -769,21 +778,6 @@ func getVPNInfo(unitId string) gin.H {
 	return gin.H{
 		"connected_since": time,
 	}
-}
-
-func getRemoteInfo(unitId string) gin.H {
-	// read unit file
-	statusFile, err := os.ReadFile(configuration.Config.OpenVPNStatusDir + "/" + unitId + ".info")
-	if err != nil {
-		return nil
-	}
-
-	// convert timestamp to int
-	var result map[string]interface{}
-	_ = json.Unmarshal(statusFile, &result)
-
-	// return vpn details
-	return result
 }
 
 func readUnitFile(unitId string) ([]byte, error) {
