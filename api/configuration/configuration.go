@@ -25,7 +25,7 @@ type Configuration struct {
 	OpenVPNNetmask string `json:"openvpn_netmask"`
 	OpenVPNUDPPort string `json:"openvpn_udp_port"`
 
-	OpenVPNStatusDir string `json:"openvpn_status_dir"`
+	OpenVPNStatusDir string `json:"openvpn_status_dir"` // Deprecated: it can be removed in the future
 	OpenVPNCCDDir    string `json:"openvpn_ccd_dir"`
 	OpenVPNProxyDir  string `json:"openvpn_proxy_dir"`
 	OpenVPNPKIDir    string `json:"openvpn_pki_dir"`
@@ -173,11 +173,7 @@ func Init() {
 		Config.OpenVPNUDPPort = "1194"
 	}
 
-	if os.Getenv("OVPN_S_DIR") != "" {
-		Config.OpenVPNStatusDir = os.Getenv("OVPN_S_DIR")
-	} else {
-		Config.OpenVPNStatusDir = Config.OpenVPNDir + "/status"
-	}
+	Config.OpenVPNStatusDir = Config.OpenVPNDir + "/status"
 	if os.Getenv("OVPN_C_DIR") != "" {
 		Config.OpenVPNCCDDir = os.Getenv("OVPN_C_DIR")
 	} else {
