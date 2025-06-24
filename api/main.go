@@ -151,6 +151,9 @@ func setup() *gin.Engine {
 			units.POST("", methods.AddUnit)
 			units.DELETE("/:unit_id", methods.DeleteUnit)
 		}
+
+		// platforms APIs
+		api.GET("/platform", methods.GetPlatformInfo)
 	}
 
 	// Ingest APIs: receive data from firewalls

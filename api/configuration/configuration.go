@@ -10,12 +10,14 @@
 package configuration
 
 import (
+	"encoding/json"
 	"net"
 	"os"
 	"slices"
 	"strings"
 
 	"github.com/NethServer/nethsecurity-controller/api/logs"
+	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/Showmax/go-fqdn"
 )
 
@@ -77,6 +79,8 @@ type Configuration struct {
 
 	TrustedIPs            []net.IPNet `json:"trusted_ips"`
 	TrustedIPExcludePaths []string    `json:"trusted_ip_exclude_paths"`
+
+	PlatformInfo models.PlatformInfo `json:"platform_info"`
 }
 
 var Config = Configuration{}
@@ -351,5 +355,16 @@ func Init() {
 		Config.TrustedIPExcludePaths = slices.Compact(Config.TrustedIPExcludePaths)
 	} else {
 		Config.TrustedIPExcludePaths = []string{}
+	}
+
+	if os.Getenv("PLATFORM_INFO") != "" {
+		var platformInfo models.PlatformInfo
+		err := json.Unmarshal([]byte(os.Getenv("PLATFORM_INFO")), &platformInfo)
+		if err != nil {
+			logs.Logs.Println("[WARNING][ENV] PLATFORM_INFO variable is not valid JSON:", err)
+		}
+		Config.PlatformInfo = platformInfo
+	} else {
+		Config.PlatformInfo = models.PlatformInfo{}
 	}
 }
