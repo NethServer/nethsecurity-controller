@@ -687,6 +687,32 @@ CGO_ENABLED=0 go build
    }
   ```
 
+## Basic authentication API
+
+- GET `/auth`
+
+  This endpoint is used to check if the user is authenticated. It returns a 200 status code if the user is authenticated, otherwise it returns a 401 status code.
+  It can be used by external applications to check if the user is authenticated without needing to handle JWT tokens.
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+   X-Auth-User: <username>
+
+   {
+      "authentication": "ok"
+   }
+  ```
+
 ### Defaults
 
 - `GET /defaults`
