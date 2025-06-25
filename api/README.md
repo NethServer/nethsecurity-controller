@@ -377,7 +377,7 @@ CGO_ENABLED=0 go build
       "password": "Nethesis,1234",
       "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
       "subscription_type": "enterprise",
-      "system_id": "XXXXXXXX-XXXX",
+      "system_id": "XXXXXXXX-XXXX"
    }
   ```
 
@@ -396,7 +396,9 @@ CGO_ENABLED=0 go build
           "key": "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----",
           "port": "1194",
           "promtail_address": "172.21.0.1",
-          "promtail_port": "5151"
+          "promtail_port": "5151",
+          "api_port": "20001",
+          "vpn_address": "192.168.0.1"
       },
       "message": "unit registered successfully"
    }

@@ -423,6 +423,13 @@ func RegisterUnit(c *gin.Context) {
 			return
 		}
 
+		// extract API port from listen address
+		addressParts := strings.Split(configuration.Config.ListenAddress[0], ":")
+		apiPort := addressParts[len(addressParts)-1]
+		// calculate server address from OpenVPNNetwork
+		openvpnNetwork := strings.TrimSuffix(configuration.Config.OpenVPNNetwork, ".0")
+		vpnAddress := openvpnNetwork + ".1"
+
 		// compose config
 		config := gin.H{
 			"host":             configuration.Config.FQDN,
@@ -432,6 +439,8 @@ func RegisterUnit(c *gin.Context) {
 			"key":              keyS,
 			"promtail_address": configuration.Config.PromtailAddress,
 			"promtail_port":    configuration.Config.PromtailPort,
+			"api_port":         apiPort,
+			"vpn_address":      vpnAddress,
 		}
 
 		// read credentials from request
