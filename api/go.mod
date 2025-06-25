@@ -9,7 +9,6 @@ require (
 	github.com/NethServer/nethsecurity-api v0.0.0-20241002122635-8157091120e5
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/appleboy/gin-jwt/v2 v2.10.3
-	github.com/dgryski/dgoogauth v0.0.0-20190221195224-5a805980a5f3
 	github.com/fatih/structs v1.1.0
 	github.com/gin-contrib/cors v1.7.6
 	github.com/gin-contrib/gzip v1.2.3
@@ -19,13 +18,14 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/nqd/flat v0.2.0
 	github.com/oschwald/geoip2-golang v1.11.0
+	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.10.0
 	golang.org/x/crypto v0.39.0
 )
 
 require (
-	github.com/bytedance/sonic v1.13.3 // indirect
 	github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc // indirect
+	github.com/bytedance/sonic v1.13.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cloudwego/base64x v0.1.5 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -49,7 +49,6 @@ require (
 	github.com/oschwald/maxminddb-golang v1.13.0 // indirect
 	github.com/pelletier/go-toml/v2 v2.2.4 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
-	github.com/pquerna/otp v1.5.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.3.0 // indirect
 	github.com/youmark/pkcs8 v0.0.0-20240726163527-a2c0da244d78 // indirect
