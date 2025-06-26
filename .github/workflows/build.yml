@@ -81,6 +81,7 @@ jobs:
           image-ref: ${{ env.built_image_sha }}
           format: 'github'
           github-pat: ${{ secrets.GITHUB_TOKEN }}
+          output: ${{ matrix.directory }}.github.json
       - name: Generate SBOM
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
         uses: aquasecurity/trivy-action@0.31.0
