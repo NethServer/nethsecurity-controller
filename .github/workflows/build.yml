@@ -80,7 +80,7 @@ jobs:
         with:
           image-ref: ${{ env.built_image_sha }}
           format: 'github'
-          output: 'dependency-results.sbom.json'
+          output: ${{ matrix.directory }}.github.json
           github-pat: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate SBOM
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
