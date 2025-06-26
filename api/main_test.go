@@ -396,44 +396,6 @@ func TestMainEndpoints(t *testing.T) {
 	})
 }
 
-// TestTrustedIPMiddleware tests the TrustedIPMiddleware for allowed and denied
-func TestTrustedIPMiddleware(t *testing.T) {
-	os.Setenv("TRUSTED_IPS", "127.0.0.1,192.168.1.0/24")
-	os.Setenv("TRUSTED_IP_EXCLUDE_PATHS", "/units/register")
-	gin.SetMode(gin.TestMode)
-	restricted_router := setup()
-
-	// Allowed: 127.0.0.1
-	req := httptest.NewRequest("GET", "/health", nil)
-	req.RemoteAddr = "127.0.0.1:12345"
-	w := httptest.NewRecorder()
-	restricted_router.ServeHTTP(w, req)
-	if w.Code != 200 {
-		t.Errorf("expected 200 for allowed IP, got %d", w.Code)
-	}
-
-	// Denied: 10.0.0.1
-	req = httptest.NewRequest("GET", "/health", nil)
-	req.RemoteAddr = "10.0.0.1:12345"
-	w = httptest.NewRecorder()
-	restricted_router.ServeHTTP(w, req)
-	if w.Code != 403 {
-		t.Errorf("expected 403 for denied IP, got %d", w.Code)
-	}
-
-	// Allowed: /units/register endpoint should be unrestricted
-	body := `{"unit_id": "11", "username": "aa", "unit_name": "bbb", "password": "ccc"}`
-	req = httptest.NewRequest("POST", "/units/register", bytes.NewBuffer([]byte(body)))
-	req.RemoteAddr = "10.0.0.1:12345"
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("RegistrationToken", "1234")
-	w = httptest.NewRecorder()
-	restricted_router.ServeHTTP(w, req)
-	if w.Code != 200 {
-		t.Errorf("expected 200 for /units/register endpoint, got %d", w.Code)
-	}
-}
-
 func addUnit(t *testing.T) string {
 	// Generate a UUID v4 and convert it to string using the uuid package
 	unitID := uuid.New().String()

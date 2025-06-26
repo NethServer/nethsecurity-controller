@@ -65,12 +65,6 @@ CGO_ENABLED=0 go build
 
 - `ENCRYPTION_KEY`: key to encrypt/decrypt sensitive data, it must be 32 bytes long
 
-- `TRUSTED_IPS`: list of trusted IPs/CIDRs to access the API - _default_: ``.
-   If the list is empty, all IPs are allowed.
-- `TRUSTED_IP_EXCLUDE_PATHS`: list of paths to exclude from trusted IPs check - _default_: ``
-   This is useful to allow access to the API from the units without authentication.
-   Usually the only path that could be excluded is `/units/register`.
-
 - `PLATFORM_INFO`: a JSON string with platform information, used to store the controller version and other information. It can be left empty.
   Example: `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`
 

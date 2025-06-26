@@ -74,6 +74,9 @@ The following environment variables can be used to configure the containers:
 - `PROXY_PORT`: proxy listening port, default is `8080`
 - `PROXY_BIND_IP`: proxy binding IP, default is `0.0.0.0`
 - `REPORT_DB_URI`: Timescale DB URI, like `postgresql://user:password@host:port/dbname`
+- `ALLOWED_IPS`: comma-separated list of allowed IPs, if empty, all IPs are allowed, default is empty
+- `PUBLIC_ENDPOINTS`: comma-separated list of public endpoints, that can be accessed even if `ALLOWED_IPS` is set, default is empty
+   If ALLOWED_IPS is set, the public endpoints should allow registration and ingestions from units, a good value should be: `/api/ingest,/api/units/register`
 
 ## REST API
 
