@@ -16,7 +16,18 @@ CREATE TABLE IF NOT EXISTS accounts (
 		display_name TEXT,
 		otp_secret TEXT,
 		otp_recovery_codes TEXT,
-		created TIMESTAMP NOT NULL
+    unit_groups int[],
+		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS unit_groups (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL UNIQUE,
+    description TEXT,
+    units uuid[],
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE IF NOT EXISTS units (
