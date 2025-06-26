@@ -53,3 +53,12 @@ type CheckSystemUpdate struct {
 	ScheduledAt    int    `json:"scheduledAt"`
 	CurrentVersion string `json:"currentVersion"`
 }
+
+type UnitGroup struct {
+	ID          int       `json:"id" structs:"id"`
+	Name        string    `json:"name" structs:"name"`
+	Description string    `json:"description" structs:"description"`
+	Units       []string  `json:"units" structs:"units"`
+	CreatedAt   time.Time `json:"created_at" structs:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at" structs:"updated_at"`
+}

@@ -152,6 +152,16 @@ func setup() *gin.Engine {
 			units.DELETE("/:unit_id", methods.DeleteUnit)
 		}
 
+		// unit_groups APIs
+		unitGroups := api.Group("/unit_groups")
+		{
+			unitGroups.GET("", methods.ListUnitGroups)
+			unitGroups.GET("/:group_id", methods.GetUnitGroup)
+			unitGroups.POST("", methods.AddUnitGroup)
+			unitGroups.PUT("/:group_id", methods.UpdateUnitGroup)
+			unitGroups.DELETE("/:group_id", methods.DeleteUnitGroup)
+		}
+
 		// platforms APIs
 		api.GET("/platform", methods.GetPlatformInfo)
 	}
