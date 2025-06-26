@@ -373,3 +373,20 @@ func generateRecoveryCodes() []string {
 	}
 	return recoveryCodes
 }
+
+func UserCanAccessUnit(user string, unitID string) bool {
+	if storage.IsAdmin(user) {
+		return true
+	}
+	userUnits := storage.GetUserUnits()
+	units, ok := userUnits[user]
+	if !ok {
+		return false
+	}
+	for _, u := range units {
+		if u == unitID {
+			return true
+		}
+	}
+	return false
+}

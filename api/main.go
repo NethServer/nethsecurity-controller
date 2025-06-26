@@ -171,7 +171,10 @@ func setup() *gin.Engine {
 	// Forwarded authentication middleware
 	forwarded := router.Group("/auth", middleware.BasicUserAuth())
 	forwarded.GET("", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"auth": "ok"})
+		c.Status(http.StatusOK)
+	})
+	forwarded.GET("/:unit_id", func(c *gin.Context) {
+		c.Status(http.StatusOK)
 	})
 
 	// handle missing endpoint

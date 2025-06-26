@@ -208,7 +208,7 @@ func TestMainEndpoints(t *testing.T) {
 	t.Run("TestAddUpdateDeleteAccount", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		// Add account
-		addBody := `{"username": "testuser", "password": "testpass", "display_name": "Test User"}`
+		addBody := `{"username": "testuser", "password": "testpass", "admin": false, "display_name": "Test User"}`
 		addReq, _ := http.NewRequest("POST", "/accounts", bytes.NewBuffer([]byte(addBody)))
 		addReq.Header.Set("Content-Type", "application/json")
 		addReq.Header.Set("Authorization", "Bearer "+token)
@@ -235,7 +235,7 @@ func TestMainEndpoints(t *testing.T) {
 		}
 		assert.NotEmpty(t, testAccountID)
 		// Update account display name
-		updateBody := `{"display_name": "Updated User", "unit_groups": []}`
+		updateBody := `{"display_name": "Updated User", "unit_groups": [], "admin": false}`
 		updateReq, _ := http.NewRequest("PUT", "/accounts/"+testAccountID, bytes.NewBuffer([]byte(updateBody)))
 		updateReq.Header.Set("Content-Type", "application/json")
 		updateReq.Header.Set("Authorization", "Bearer "+token)
@@ -743,6 +743,128 @@ func TestUnitGroupsAPI(t *testing.T) {
 	assert.Equal(t, unitId_1, fmt.Sprintf("%v", units2[0]), "unitId_1 should be present in group2")
 
 	// DELETE "/units/"+unitId_1 can't be tested because it requires easy-rsa binary and configuration file
+}
+
+func TestUnitAuthorization(t *testing.T) {
+	router = setupRouter()
+	unitId_1 := addUnit(t)
+	unitId_2 := addUnit(t)
+
+	randCounter := fmt.Sprintf("%d", mathrand.New(mathrand.NewSource(time.Now().UnixNano())).Intn(10000))
+
+	// Login to get token
+	w := httptest.NewRecorder()
+	loginBody := []byte(`{"username":"admin","password":"admin"}`)
+	req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer(loginBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var loginResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&loginResp)
+	token, ok := loginResp["token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, token)
+
+	// Create unit group with unitId_1
+	w = httptest.NewRecorder()
+	groupName := fmt.Sprintf("authgroup%s", randCounter)
+	groupBody := []byte(`{"name":"` + groupName + `","description":"auth test group", "units":["` + unitId_1 + `"]}`)
+	req, _ = http.NewRequest("POST", "/unit_groups", bytes.NewBuffer(groupBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var groupResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&groupResp)
+	groupData := groupResp["data"].(map[string]interface{})
+	groupID := fmt.Sprintf("%v", groupData["id"])
+	assert.NotEmpty(t, groupID)
+
+	// Create limited account associated to the unit group
+	w = httptest.NewRecorder()
+	limitedUserName := fmt.Sprintf("limited%s", randCounter)
+	addBody := `{"username": "` + limitedUserName + `", "password": "limited", "display_name": "Limited user", "unit_groups": [` + groupID + `]}`
+	addReq, _ := http.NewRequest("POST", "/accounts", bytes.NewBuffer([]byte(addBody)))
+	addReq.Header.Set("Content-Type", "application/json")
+	addReq.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, addReq)
+	assert.Equal(t, http.StatusCreated, w.Code)
+	var addUserResp map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&addUserResp)
+	limitedAccountID := fmt.Sprintf("%v", addUserResp["data"].(map[string]interface{})["id"])
+	assert.NotEmpty(t, limitedAccountID)
+
+	// Test /auth/<unit_id_1> with limited user - should return 200 OK
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/auth/"+unitId_1, nil)
+	req.SetBasicAuth(limitedUserName, "limited")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "limited user should have access to unitId_1")
+	authUser := w.Header().Get("X-Auth-User")
+	assert.Equal(t, limitedUserName, authUser, "X-Auth-User header should be set to limited user")
+
+	// Test /auth/<unit_id_2> with limited user - should return 403 Forbidden
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/auth/"+unitId_2, nil)
+	req.SetBasicAuth(limitedUserName, "limited")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code, "limited user should not have access to unitId_2")
+
+	// Login with limited user to get their token
+	w = httptest.NewRecorder()
+	limitedLoginBody := []byte(`{"username":"` + limitedUserName + `","password":"limited"}`)
+	req, _ = http.NewRequest("POST", "/login", bytes.NewBuffer(limitedLoginBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var limitedLoginResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&limitedLoginResp)
+	limitedToken, ok := limitedLoginResp["token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, limitedToken)
+
+	// // Test GET /units/<unit_id_1> with limited user - should return 200 OK
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/units/"+unitId_1, nil)
+	req.Header.Set("Authorization", "Bearer "+limitedToken)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "limited user should be able to get unitId_1")
+
+	// Test GET /units/<unit_id_2> with limited user - should return 403 Forbidden
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/units/"+unitId_2, nil)
+	req.Header.Set("Authorization", "Bearer "+limitedToken)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code, "limited user should not be able to get unitId_2")
+
+	// Test GET /units with limited user - should only return unitId_1
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/units", nil)
+	req.Header.Set("Authorization", "Bearer "+limitedToken)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var unitsResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&unitsResp)
+	unitsData := unitsResp["data"].([]interface{})
+	assert.Len(t, unitsData, 1, "limited user should only see one unit")
+	unit := unitsData[0].(map[string]interface{})
+	assert.Equal(t, unitId_1, unit["id"], "limited user should only see unitId_1")
+
+	// Limited user tries to delete unitId_1 (should fail with 403)
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/units/"+unitId_1, nil)
+	req.Header.Set("Authorization", "Bearer "+limitedToken)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code, "limited user should not be able to delete unitId_1")
+
+	// Limited user tries to add a new unit (should fail with 403)
+	w = httptest.NewRecorder()
+	addUnitBody := []byte(`{"unit_id":"shouldfail","username":"failuser","unit_name":"Should Fail Unit","password":"failpass"}`)
+	req, _ = http.NewRequest("POST", "/units", bytes.NewBuffer(addUnitBody))
+	req.Header.Set("Authorization", "Bearer "+limitedToken)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code, "limited user should not be able to add a unit")
 }
 
 func setupRouter() *gin.Engine {

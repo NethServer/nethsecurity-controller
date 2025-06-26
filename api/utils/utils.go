@@ -12,7 +12,6 @@ package utils
 import (
 	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"net"
 	"strconv"
 
@@ -147,7 +146,6 @@ func EncryptAESGCM(plaintext, key []byte) ([]byte, error) {
 func EncryptAESGCMToString(plaintext, key []byte) (string, error) {
 	ciphertext, err := EncryptAESGCM(plaintext, key)
 	if err != nil {
-		fmt.Println("error", err)
 		return "", err
 	}
 	return base64.StdEncoding.EncodeToString(ciphertext), nil

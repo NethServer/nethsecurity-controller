@@ -46,15 +46,23 @@ var grafanaUserSQL string
 
 var reportDbIsInitialized = false
 
+// userUnits is a map that holds the units for each user.
+var userUnits = make(map[string][]string)
+
+// adminUsers is a list of user names that has the admin flag
+var adminUsers = make([]string, 0)
+
 func Init() *pgxpool.Pool {
 	// Initialize PostgreSQL connection and schema
 	dbpool, dbctx = InitReportDb()
 
-	// Migrate users from SQLite to Postgres if needed
-	MigrateUsersFromSqliteToPostgres()
-
 	// Migrate unit info from file to Postgres if needed
-	MigrateUnitInfoFromFileToPostgres()
+	migrated_units := MigrateUnitInfoFromFileToPostgres()
+
+	// Migrate users from SQLite to Postgres if needed
+	MigrateUsersFromSqliteToPostgres(migrated_units)
+
+	ReloadACLs()
 
 	// Initialize PostgreSQL connection
 	dbctx = context.Background()
@@ -81,6 +89,7 @@ func Init() *pgxpool.Pool {
 		admin := models.Account{
 			Username:    configuration.Config.AdminUsername,
 			Password:    configuration.Config.AdminPassword,
+			Admin:       true,
 			DisplayName: "Administrator",
 			Created:     time.Now(),
 		}
@@ -91,7 +100,7 @@ func Init() *pgxpool.Pool {
 }
 
 // MigrateUsersFromSqliteToPostgres migrates users from SQLite to PostgreSQL if needed
-func MigrateUsersFromSqliteToPostgres() {
+func MigrateUsersFromSqliteToPostgres(units []string) {
 	// 1. Check if SQLite DB exists
 	sqlitePath := configuration.Config.DataDir + "/db.sqlite"
 	if _, err := os.Stat(sqlitePath); os.IsNotExist(err) {
@@ -122,6 +131,7 @@ func MigrateUsersFromSqliteToPostgres() {
 			continue
 		}
 		acc.Created, _ = time.Parse(time.RFC3339, createdStr)
+		acc.Admin = true
 		users = append(users, acc)
 	}
 	if len(users) == 0 {
@@ -131,7 +141,7 @@ func MigrateUsersFromSqliteToPostgres() {
 	// 4. Check if admin user exists in Postgres
 	pgpool, pgctx := ReportInstance()
 	var adminExists bool
-	err = pgpool.QueryRow(pgctx, `SELECT EXISTS (SELECT 1 FROM accounts WHERE username = $1)`, configuration.Config.AdminUsername).Scan(&adminExists)
+	err = pgpool.QueryRow(pgctx, `SELECT EXISTS (SELECT 1 FROM accounts WHERE admin = true)`).Scan(&adminExists)
 	if err != nil {
 		logs.Logs.Println("[ERR][MIGRATION] error checking admin user in Postgres: " + err.Error())
 		return
@@ -140,11 +150,27 @@ func MigrateUsersFromSqliteToPostgres() {
 		return // Admin user exists, nothing to do
 	}
 
-	// 5. Create accounts table in Postgres
+	// 5. Create a unit_group with all units
+	groupID := -1
+	var groupErr error
+	if len(units) > 0 {
+		group := models.UnitGroup{
+			Name:  "Migrated",
+			Units: units,
+		}
+		groupID, groupErr = AddUnitGroup(group)
+		// Create a unit group for the migrated units
+		if groupErr != nil {
+			logs.Logs.Println("[ERR][MIGRATION] error creating unit group in Postgres: " + err.Error())
+		}
+	}
+
+	// 6. Create accounts table in Postgres
 	_, err = pgpool.Exec(pgctx, `CREATE TABLE IF NOT EXISTS accounts (
 		id SERIAL PRIMARY KEY,
 		username TEXT NOT NULL UNIQUE,
 		password TEXT NOT NULL,
+		admin BOOLEAN NOT NULL DEFAULT FALSE,
 		display_name TEXT,
 		otp_secret TEXT,
 		otp_recovery_codes TEXT,
@@ -174,11 +200,18 @@ func MigrateUsersFromSqliteToPostgres() {
 		}
 		// remove acc.Username directory
 		os.RemoveAll(configuration.Config.SecretsDir + "/" + acc.Username)
-
-		_, err := pgpool.Exec(pgctx, `INSERT INTO accounts (username, password, display_name, otp_secret, otp_recovery_codes, created_at) VALUES ($1, $2, $3, $4, $5, $6) ON CONFLICT (username) DO NOTHING`,
-			acc.Username, acc.Password, acc.DisplayName, otp_secret, recoveryCodes, acc.Created)
-		if err != nil {
-			logs.Logs.Println("[ERR][MIGRATION] error inserting user into Postgres: " + err.Error())
+		acc.UnitGroups = []int{groupID} // Reset unit groups for migration
+		// Insert user into Postgres
+		_, accountError := AddAccount(acc) // Use AddAccount to handle password hashing and other logic
+		if accountError != nil {
+			logs.Logs.Println("[ERR][MIGRATION] error migrating user to Postgres: " + accountError.Error())
+		}
+		// Set OTP secret
+		if err := SetUserOtpSecret(acc.Username, otp_secret); err != nil {
+			logs.Logs.Println("[ERR][MIGRATION] error mirating OTP secret for user", acc.Username, ":", err.Error())
+		}
+		if err := SetUserRecoveryCodes(acc.Username, strings.Split(recoveryCodes, "|")); err != nil {
+			logs.Logs.Println("[ERR][MIGRATION] error mirating recovery codes for user", acc.Username, ":", err.Error())
 		}
 	}
 	logs.Logs.Println("[INFO][MIGRATION] migrated", len(users), "users from SQLite to Postgres")
@@ -195,9 +228,10 @@ func AddAccount(account models.Account) (int, error) {
 	pgpool, pgctx := ReportInstance()
 	var id int
 	err := pgpool.QueryRow(pgctx,
-		"INSERT INTO accounts (username, password, display_name, unit_groups, created_at) VALUES ($1, $2, $3, $4, $5) RETURNING id",
+		"INSERT INTO accounts (username, password, admin, display_name, unit_groups, created_at) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id",
 		account.Username,
 		utils.HashPassword(account.Password),
+		account.Admin,
 		account.DisplayName,
 		account.UnitGroups,
 		account.Created,
@@ -205,6 +239,9 @@ func AddAccount(account models.Account) (int, error) {
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][ADD_ACCOUNT] error in insert accounts query: " + err.Error())
 	}
+
+	ReloadACLs()
+
 	return id, err
 }
 
@@ -218,53 +255,39 @@ func UpdateAccount(accountID string, account models.AccountUpdate) error {
 	}
 	unitGroupsArray := "{" + strings.Join(unitGroupsStrs, ",") + "}"
 	_, err = pgpool.Exec(pgctx,
-		"UPDATE accounts set unit_groups = $1::int[], updated_at = NOW() WHERE id = $2",
+		`UPDATE accounts 
+		 SET unit_groups = $1::int[], 
+			 display_name = $2, 
+			 admin = $3, 
+			 updated_at = NOW() 
+		 WHERE id = $4`,
 		unitGroupsArray,
+		account.DisplayName,
+		account.Admin,
 		accountID,
 	)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][UPDATE_ACCOUNT] error in update accounts query: " + err.Error())
+		return err
 	}
-	if len(account.Password) > 0 {
-		_, err = pgpool.Exec(pgctx,
-			"UPDATE accounts set password = $1 WHERE id = $2",
-			utils.HashPassword(account.Password),
-			accountID,
-		)
-		if err != nil {
-			logs.Logs.Println("[ERR][STORAGE][UPDATE_ACCOUNT] error in update account password query: " + err.Error())
-			return err
-		}
-	}
-	if len(account.DisplayName) > 0 {
-		_, err = pgpool.Exec(pgctx,
-			"UPDATE accounts set display_name = $1 WHERE id = $2",
-			account.DisplayName,
-			accountID,
-		)
-		if err != nil {
-			logs.Logs.Println("[ERR][STORAGE][UPDATE_ACCOUNT] error in update account display name query: " + err.Error())
-			return err
-		}
-	}
+
+	ReloadACLs()
 
 	return err
 }
 
-func IsAdmin(accountUsername string) (bool, string) {
-	pgpool, pgctx := ReportInstance()
-	var id int
-	err := pgpool.QueryRow(pgctx, "SELECT id FROM accounts where username = $1 LIMIT 1", accountUsername).Scan(&id)
-	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][GET_PASSWORD] error in query execution:" + err.Error())
+func IsAdmin(accountUsername string) bool {
+	for _, admin := range adminUsers {
+		if admin == accountUsername {
+			return true
+		}
 	}
-	// Admin user has ID 1
-	return id == 1, string(rune(id))
+	return false
 }
 
 func GetAccounts() ([]models.Account, error) {
 	pgpool, pgctx := ReportInstance()
-	rows, err := pgpool.Query(pgctx, "SELECT id, username, display_name, unit_groups, created_at, updated_at FROM accounts ORDER BY id ASC")
+	rows, err := pgpool.Query(pgctx, "SELECT id, username, display_name, admin, unit_groups, created_at, updated_at FROM accounts ORDER BY id ASC")
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query execution:" + err.Error())
 	}
@@ -272,7 +295,7 @@ func GetAccounts() ([]models.Account, error) {
 	var results []models.Account
 	for rows.Next() {
 		var accountRow models.Account
-		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.UnitGroups, &accountRow.Created, &accountRow.Updated); err != nil {
+		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Admin, &accountRow.UnitGroups, &accountRow.Created, &accountRow.Updated); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNTS] error in query row extraction" + err.Error())
 		}
 		accountRow.TwoFA = Is2FAEnabled(accountRow.Username)
@@ -283,7 +306,7 @@ func GetAccounts() ([]models.Account, error) {
 
 func GetAccount(accountID string) ([]models.Account, error) {
 	pgpool, pgctx := ReportInstance()
-	rows, err := pgpool.Query(pgctx, "SELECT id, username, display_name, unit_groups, created_at, updated_at FROM accounts where id = $1", accountID)
+	rows, err := pgpool.Query(pgctx, "SELECT id, username, display_name, admin, unit_groups, created_at, updated_at FROM accounts where id = $1", accountID)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNT] error in query execution:" + err.Error())
 	}
@@ -291,7 +314,7 @@ func GetAccount(accountID string) ([]models.Account, error) {
 	var results []models.Account
 	for rows.Next() {
 		var accountRow models.Account
-		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.UnitGroups, &accountRow.Created, &accountRow.Updated); err != nil {
+		if err := rows.Scan(&accountRow.ID, &accountRow.Username, &accountRow.DisplayName, &accountRow.Admin, &accountRow.UnitGroups, &accountRow.Created, &accountRow.Updated); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_ACCOUNT] error in query row extraction" + err.Error())
 		}
 		results = append(results, accountRow)
@@ -315,6 +338,9 @@ func DeleteAccount(accountID string) error {
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][DELETE_ACCOUNT] error in query execution:" + err.Error())
 	}
+
+	ReloadACLs()
+
 	return err
 }
 
@@ -513,7 +539,7 @@ func GetUnitInfo(uuid string) map[string]interface{} {
 		SELECT info::text FROM units WHERE uuid = $1
 	`, uuid).Scan(&infoStr)
 	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][GET_UNIT_INFO] error in query execution:" + err.Error())
+		// No info found for this unit, return nil
 		return nil
 	}
 	var info map[string]interface{}
@@ -524,16 +550,17 @@ func GetUnitInfo(uuid string) map[string]interface{} {
 	return info
 }
 
-func MigrateUnitInfoFromFileToPostgres() {
+func MigrateUnitInfoFromFileToPostgres() []string {
+	ret := make([]string, 0)
 	// Search for all *.info file inside Config.OpenVPNStatusDir
 	// If the dir does not exists, just return
 	if _, err := os.Stat(configuration.Config.OpenVPNStatusDir); os.IsNotExist(err) {
-		return
+		return ret
 	}
 	files, err := os.ReadDir(configuration.Config.OpenVPNStatusDir)
 	if err != nil {
 		logs.Logs.Println("[WARNING][MIGRATION] error reading OpenVPN status directory: " + err.Error())
-		return
+		return ret
 	}
 	for _, file := range files {
 		if !file.IsDir() && strings.HasSuffix(file.Name(), ".info") {
@@ -561,8 +588,10 @@ func MigrateUnitInfoFromFileToPostgres() {
 			} else {
 				logs.Logs.Println("[INFO][MIGRATION] removed file:", filePath)
 			}
+			ret = append(ret, uuid)
 		}
 	}
+	return ret
 }
 
 func UnitExists(uuid string) (bool, error) {
@@ -587,6 +616,9 @@ func AddUnitGroup(group models.UnitGroup) (int, error) {
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][ADD_UNIT_GROUP] error in insert unit_groups query: " + err.Error())
 	}
+
+	ReloadACLs()
+
 	return id, err
 }
 
@@ -604,6 +636,9 @@ func UpdateUnitGroup(groupId int, group models.UnitGroup) error {
 		logs.Logs.Println("[WARN][STORAGE][EDIT_UNIT_GROUP] no unit group updated with id " + strconv.Itoa(groupId))
 		return fmt.Errorf("no unit group updated with id %d", groupId)
 	}
+
+	ReloadACLs()
+
 	return nil
 }
 
@@ -618,6 +653,9 @@ func DeleteUnitGroup(groupID int) error {
 		logs.Logs.Println("[WARN][STORAGE][DELETE_UNIT_GROUP] no unit group deleted with id " + strconv.Itoa(groupID))
 		return fmt.Errorf("no unit group deleted with id %d", groupID)
 	}
+
+	ReloadACLs()
+
 	return nil
 }
 
@@ -684,4 +722,103 @@ func UnitGroupExists(groupID int) (bool, error) {
 		return false, err
 	}
 	return exists, nil
+}
+
+func GetUserUnits() map[string][]string {
+	// If userUnits is already loaded, return it
+	if len(userUnits) > 0 {
+		return userUnits
+	}
+
+	// Load user units from the database
+	userUnitsMap, err := LoadUserUnitsMap()
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_USER_UNITS] error loading user units: " + err.Error())
+		return nil
+	}
+
+	userUnits = userUnitsMap
+	return userUnits
+}
+
+func LoadUserUnitsMap() (map[string][]string, error) {
+	pgpool, pgctx := ReportInstance()
+	UserUnits := make(map[string][]string)
+
+	// Use a join to get username and units in a single query
+	rows, err := pgpool.Query(pgctx, `
+		SELECT a.username, COALESCE(u.units, '{}') AS units
+		FROM accounts a
+		LEFT JOIN LATERAL (
+			SELECT array_agg(DISTINCT group_id) AS group_ids
+			FROM accounts acc, unnest(acc.unit_groups) AS group_id
+			WHERE acc.username = a.username AND acc.unit_groups IS NOT NULL AND array_length(acc.unit_groups, 1) > 0
+		) ag ON true
+		LEFT JOIN LATERAL (
+			SELECT array_agg(DISTINCT unit_id) AS units
+			FROM unit_groups ug, unnest(ug.units) AS unit_id
+			WHERE ag.group_ids IS NOT NULL AND ug.id = ANY(ag.group_ids)
+		) u ON true
+	`)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_USER_UNITS_MAP] error in query execution:" + err.Error())
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var username string
+		var unitsArr []string
+		if err := rows.Scan(&username, &unitsArr); err != nil {
+			logs.Logs.Println("[ERR][STORAGE][GET_USER_UNITS_MAP] error in row scan: " + err.Error())
+			continue
+		}
+		// If unitsArr is nil, assign empty slice
+		if unitsArr == nil {
+			unitsArr = []string{}
+		}
+		UserUnits[username] = unitsArr
+	}
+	return UserUnits, nil
+}
+
+func LoadAdminUsersList() ([]string, error) {
+	pgpool, pgctx := ReportInstance()
+	rows, err := pgpool.Query(pgctx, "SELECT username FROM accounts WHERE admin = true")
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][LOAD_ADMIN_USERS] error in query execution:" + err.Error())
+		return nil, err
+	}
+	defer rows.Close()
+
+	admins := make([]string, 0)
+	for rows.Next() {
+		var username string
+		if err := rows.Scan(&username); err != nil {
+			logs.Logs.Println("[ERR][STORAGE][LOAD_ADMIN_USERS] error in row scan: " + err.Error())
+			continue
+		}
+		admins = append(admins, username)
+	}
+	return admins, nil
+}
+
+func ReloadACLs() {
+	// Reload user units from the database
+	userUnitsMap, err := LoadUserUnitsMap()
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][RELOAD_USER_UNITS] error loading user units: " + err.Error())
+		return
+	}
+	userUnits = userUnitsMap
+	logs.Logs.Println("[INFO][STORAGE][RELOAD_USER_UNITS] user units reloaded successfully")
+
+	// Reload admin users
+	admins, err := LoadAdminUsersList()
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][RELOAD_ADMIN_USERS] error loading admin users: " + err.Error())
+		return
+	}
+	adminUsers = admins
+	logs.Logs.Println("[INFO][STORAGE][RELOAD_ADMIN_USERS] admin users reloaded successfully")
 }
