@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS accounts (
 		id SERIAL PRIMARY KEY,
 		username TEXT NOT NULL UNIQUE,
 		password TEXT NOT NULL,
+    admin BOOLEAN NOT NULL DEFAULT FALSE,
 		display_name TEXT,
 		otp_secret TEXT,
 		otp_recovery_codes TEXT,

@@ -24,6 +24,7 @@ import (
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
+
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
@@ -34,6 +35,9 @@ import (
 )
 
 func GetUnits(c *gin.Context) {
+	// extract user from JWT claims
+	user := jwt.ExtractClaims(c)["id"].(string)
+
 	// list file in OpenVPNCCDDir
 	units, err := ListUnits()
 	if err != nil {
@@ -48,6 +52,9 @@ func GetUnits(c *gin.Context) {
 	// loop through units
 	var results []gin.H
 	for _, unit := range units {
+		if !UserCanAccessUnit(user, unit) {
+			continue
+		}
 		// read unit file
 		result, err := getUnitInfo(unit)
 		if err != nil {
@@ -73,6 +80,15 @@ func GetUnits(c *gin.Context) {
 func GetUnit(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
+	user := jwt.ExtractClaims(c)["id"].(string)
+	if !UserCanAccessUnit(user, unitId) {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "user does not have access to this unit",
+			Data:    nil,
+		}))
+		return
+	}
 
 	// parse unit file
 	result, err := getUnitInfo(unitId)
@@ -176,6 +192,16 @@ func AddInfo(c *gin.Context) {
 }
 
 func AddUnit(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// parse request fields
 	var jsonRequest models.AddRequest
 	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
@@ -496,6 +522,16 @@ func RegisterUnit(c *gin.Context) {
 }
 
 func DeleteUnit(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// get unit id
 	unitId := c.Param("unit_id")
 
@@ -814,7 +850,7 @@ func parseUnitFile(unitId string, unitFile []byte) gin.H {
 }
 
 func AddUnitGroup(c *gin.Context) {
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -851,7 +887,7 @@ func AddUnitGroup(c *gin.Context) {
 }
 
 func UpdateUnitGroup(c *gin.Context) {
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -924,7 +960,7 @@ func UpdateUnitGroup(c *gin.Context) {
 }
 
 func DeleteUnitGroup(c *gin.Context) {
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -985,7 +1021,7 @@ func DeleteUnitGroup(c *gin.Context) {
 }
 
 func ListUnitGroups(c *gin.Context) {
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -1012,7 +1048,7 @@ func ListUnitGroups(c *gin.Context) {
 }
 
 func GetUnitGroup(c *gin.Context) {
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
