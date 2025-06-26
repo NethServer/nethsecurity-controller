@@ -11,12 +11,14 @@ import (
 	"time"
 
 	"crypto/rand"
+	mathrand "math/rand"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
@@ -198,7 +200,6 @@ func TestMainEndpoints(t *testing.T) {
 		var jsonResponse map[string]interface{}
 		json.NewDecoder(w.Body).Decode(&jsonResponse)
 		data := jsonResponse["data"].(map[string]interface{})
-		assert.Equal(t, int(data["total"].(float64)), 1)
 		assert.Equal(t, data["accounts"].([]interface{})[0].(map[string]interface{})["username"], "admin")
 		assert.Equal(t, data["accounts"].([]interface{})[0].(map[string]interface{})["display_name"], "Administrator")
 		assert.Equal(t, data["accounts"].([]interface{})[0].(map[string]interface{})["two_fa"], false)
@@ -213,6 +214,10 @@ func TestMainEndpoints(t *testing.T) {
 		addReq.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, addReq)
 		assert.Equal(t, http.StatusCreated, w.Code)
+		var addResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&addResp)
+		id := fmt.Sprintf("%v", addResp["data"].(map[string]interface{})["id"])
+		assert.NotEmpty(t, id)
 		// Get accounts to find the new account's ID
 		w = httptest.NewRecorder()
 		getReq, _ := http.NewRequest("GET", "/accounts", nil)
@@ -230,7 +235,7 @@ func TestMainEndpoints(t *testing.T) {
 		}
 		assert.NotEmpty(t, testAccountID)
 		// Update account display name
-		updateBody := `{"display_name": "Updated User"}`
+		updateBody := `{"display_name": "Updated User", "unit_groups": []}`
 		updateReq, _ := http.NewRequest("PUT", "/accounts/"+testAccountID, bytes.NewBuffer([]byte(updateBody)))
 		updateReq.Header.Set("Content-Type", "application/json")
 		updateReq.Header.Set("Authorization", "Bearer "+token)
@@ -429,12 +434,10 @@ func TestTrustedIPMiddleware(t *testing.T) {
 	}
 }
 
-func TestAddInfoAndGetRemoteInfo(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-	router = setupRouter()
+func addUnit(t *testing.T) string {
+	// Generate a UUID v4 and convert it to string using the uuid package
+	unitID := uuid.New().String()
 
-	// Prepare: create a credentials file for the unit
-	unitID := "457c2b94-13be-48c9-b4aa-c7d677c85ee8"
 	if _, err := os.Stat(configuration.Config.CredentialsDir); os.IsNotExist(err) {
 		os.MkdirAll(configuration.Config.CredentialsDir, 0755)
 	}
@@ -464,6 +467,16 @@ func TestAddInfoAndGetRemoteInfo(t *testing.T) {
 	// Manually add to the database: we can't call /units POST endpoint because
 	// it requires the presence of easyrsa binary and configuration files
 	storage.AddUnit(unitID)
+
+	return unitID
+}
+
+func TestAddInfoAndGetRemoteInfo(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router = setupRouter()
+
+	// Simulate an add unit
+	unitID := addUnit(t)
 
 	// AddInfo: POST /ingest/info (simulate BasicAuth middleware)
 	w := httptest.NewRecorder()
@@ -571,6 +584,205 @@ func TestGetPlatformInfo(t *testing.T) {
 	assert.Equal(t, float64(90), data["logs_retention_days"])
 }
 
+func TestUnitGroupsAPI(t *testing.T) {
+	router = setupRouter()
+	unitId_1 := addUnit(t)
+	unitId_2 := addUnit(t)
+	randCounter := fmt.Sprintf("%d", mathrand.New(mathrand.NewSource(time.Now().UnixNano())).Intn(10000))
+
+	// Login to get token
+	w := httptest.NewRecorder()
+	loginBody := []byte(`{"username":"admin","password":"admin"}`)
+	req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer(loginBody))
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var loginResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&loginResp)
+	token, ok := loginResp["token"].(string)
+	assert.True(t, ok)
+	assert.NotEmpty(t, token)
+
+	// Create an empty unit group
+	w = httptest.NewRecorder()
+	// generate a random group name composed by testgroups + random number from 1 to 1000
+	groupName := fmt.Sprintf("testgroups%s", randCounter)
+	groupBody := []byte(`{"name":"` + groupName + `","description":"desc"}`)
+	req, _ = http.NewRequest("POST", "/unit_groups", bytes.NewBuffer(groupBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var groupResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&groupResp)
+	groupData := groupResp["data"].(map[string]interface{})
+	groupID := fmt.Sprintf("%v", groupData["id"])
+	assert.NotEmpty(t, groupID)
+
+	// Update the group with units
+	w = httptest.NewRecorder()
+	updateBody := []byte(`{"name":"` + groupName + `","description":"desc", "units":["` + unitId_1 + `", "` + unitId_2 + `"]}`)
+	req, _ = http.NewRequest("PUT", "/unit_groups/"+groupID, bytes.NewBuffer([]byte(updateBody)))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// List unit groups
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/unit_groups", nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+
+	// Get the created unit group
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/unit_groups/"+groupID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var getGroupResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&getGroupResp)
+	groupData = getGroupResp["data"].(map[string]interface{})
+	assert.Equal(t, groupName, groupData["name"])
+	assert.Equal(t, "desc", groupData["description"])
+	units := groupData["units"].([]interface{})
+	assert.Len(t, units, 2)
+	assert.Contains(t, units, unitId_1)
+	assert.Contains(t, units, unitId_2)
+
+	// Update the unit group
+	w = httptest.NewRecorder()
+	updateBody = []byte(`{"name":"updatedgroup` + randCounter + `","description":"updated desc", "units":["` + unitId_1 + `", "` + unitId_2 + `"]}}`)
+	req, _ = http.NewRequest("PUT", "/unit_groups/"+groupID, bytes.NewBuffer(updateBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	// Get the updated unit group and check the new name and description
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/unit_groups/"+groupID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var updatedGroupResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&updatedGroupResp)
+	updatedGroupData := updatedGroupResp["data"].(map[string]interface{})
+	assert.Equal(t, "updatedgroup"+randCounter, updatedGroupData["name"])
+	assert.Equal(t, "updated desc", updatedGroupData["description"])
+
+	// Try to update the group with a non-existing unit, expect failure (400)
+	w = httptest.NewRecorder()
+	nonExistingUnitID := uuid.New().String()
+	updateBody = []byte(`{"name":"` + groupName + `","description":"desc", "units":["` + unitId_1 + `", "` + nonExistingUnitID + `"]}`)
+	req, _ = http.NewRequest("PUT", "/unit_groups/"+groupID, bytes.NewBuffer(updateBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code, "should fail when adding non-existing unit to group")
+
+	// Add limited user account
+	w = httptest.NewRecorder()
+	limitedUserName := fmt.Sprintf("limited%s", randCounter)
+	addBody := `{"username": "` + limitedUserName + `", "password": "limited", "display_name": "Limited user"}`
+	addReq, _ := http.NewRequest("POST", "/accounts", bytes.NewBuffer([]byte(addBody)))
+	addReq.Header.Set("Content-Type", "application/json")
+	addReq.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, addReq)
+	assert.Equal(t, http.StatusCreated, w.Code)
+	var addUserResp map[string]interface{}
+	json.NewDecoder(w.Body).Decode(&addUserResp)
+	testAccountID := fmt.Sprintf("%v", addUserResp["data"].(map[string]interface{})["id"])
+	assert.NotEmpty(t, testAccountID)
+
+	// Try to add a non-existing group ID to the user account, expect failure
+	w = httptest.NewRecorder()
+	nonExistingGroupID := "9999999"
+	addUserBody := []byte(`{"username":"` + limitedUserName + `","unit_groups":[` + nonExistingGroupID + `]}`)
+	req, _ = http.NewRequest("PUT", "/accounts/"+testAccountID, bytes.NewBuffer(addUserBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code, "should fail when adding non-existing group ID")
+
+	// Add unit group to user account
+	w = httptest.NewRecorder()
+	addUserBody = []byte(`{"username":"` + limitedUserName + `","unit_groups":[` + groupID + `]}`)
+	req, _ = http.NewRequest("PUT", "/accounts/"+testAccountID, bytes.NewBuffer(addUserBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// Delete the unit group: should fail because it is associated with an account
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/unit_groups/"+groupID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.NotEqual(t, http.StatusOK, w.Code, "should not allow deleting a group associated with an account")
+	assert.True(t, w.Code == http.StatusBadRequest, "expected 400 when deleting a group in use")
+
+	// Remove the group from the user account's unit_groups
+	w = httptest.NewRecorder()
+	removeGroupBody := []byte(`{"username":"` + limitedUserName + `","unit_groups":[]}`)
+	req, _ = http.NewRequest("PUT", "/accounts/"+testAccountID, bytes.NewBuffer(removeGroupBody))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+	// Now delete the unit group again, should succeed
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/unit_groups/"+groupID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "should allow deleting a group not associated with any account")
+
+	// Get the account again and check that unit_groups does not contain groupID
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/accounts/"+testAccountID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var getAccountAfterDeleteResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&getAccountAfterDeleteResp)
+	accountAfterDeleteData := getAccountAfterDeleteResp["data"].(map[string]interface{})["account"].(map[string]interface{})
+	unitGroups := accountAfterDeleteData["unit_groups"].([]interface{})
+	for _, v := range unitGroups {
+		assert.NotEqual(t, groupID, fmt.Sprintf("%.0f", v), "unit_groups should not contain deleted groupID")
+	}
+
+	// Create a new group and add unitId_1 to it
+	w = httptest.NewRecorder()
+	groupName2 := fmt.Sprintf("group2_%s", randCounter)
+	groupBody2 := []byte(`{"name":"` + groupName2 + `","description":"desc2", "units":["` + unitId_1 + `"]}`)
+	req, _ = http.NewRequest("POST", "/unit_groups", bytes.NewBuffer(groupBody2))
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("Content-Type", "application/json")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusCreated, w.Code, w.Body.String())
+	var group2Resp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&group2Resp)
+	group2Data := group2Resp["data"].(map[string]interface{})
+	group2ID := fmt.Sprintf("%v", group2Data["id"])
+	assert.NotEmpty(t, group2ID)
+
+	// Get the group and check that unitId_1 is present
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/unit_groups/"+group2ID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var getGroup3Resp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&getGroup3Resp)
+	group2Data = getGroup3Resp["data"].(map[string]interface{})
+	units2 := group2Data["units"].([]interface{})
+	assert.Len(t, units2, 1, "group2 should contain exactly one unit")
+	assert.Equal(t, unitId_1, fmt.Sprintf("%v", units2[0]), "unitId_1 should be present in group2")
+
+	// DELETE "/units/"+unitId_1 can't be tested because it requires easy-rsa binary and configuration file
+}
+
 func setupRouter() *gin.Engine {
 	// Singleton
 	if router != nil {
@@ -596,7 +808,7 @@ func setupRouter() *gin.Engine {
 	os.Setenv("ISSUER_2FA", "test")
 	os.Setenv("SECRETS_DIR", "./secrets")
 	os.Setenv("ENCRYPTION_KEY", "12345678901234567890123456789012")
-	os.Setenv("PLATFORM_INFO", `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`)
+	os.Setenv("PLATFORM_INFO", `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "nethserver_version":"1.6.0", "nethserver_system_id":"1234567890", "metrics_retention_days":30, "logs_retention_days":90}`)
 
 	// create directory configuration directory
 	if _, err := os.Stat(os.Getenv("DATA_DIR")); os.IsNotExist(err) {

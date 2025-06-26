@@ -74,6 +74,32 @@ CGO_ENABLED=0 go build
 - `PLATFORM_INFO`: a JSON string with platform information, used to store the controller version and other information. It can be left empty.
   Example: `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`
 
+## User and units authorizations
+
+A unit is a NethSecurity firewall that is connected to the controller.
+Units are identified by a unique ID and are stored in the database. VPN info of the unit are stored in a file in the `OVPN_DIR` directory.
+
+A group of units is a collection of units that can be managed together.
+Units can be added to a group via the API. The group is identified by a unique ID and is stored in the database.
+
+A user is an account that can access the API and the UI.
+User accounts are stored in the database and can be managed via the API.
+By default, a user can access all units but this can be restricted by assigning the user to a group of units.
+
+There is also a special `admin` user with id `1` that can:
+- create, modify and delete user accounts
+- create, modify and delete units
+- create, modify and delete units groups
+- assign a user to one or more groups of units
+
+The following rules apply:
+
+- a user can be assigned to one or more groups of units, if the user is not assigned to any group, the user can access all units
+- a non existing-unit cannot be added to a group
+- a unit group that is associated to a user account can't be deleted
+- a non-existing unit group cannot be assigned to a user account
+- when a unit is deleted from the database, it is removed from all groups
+
 ## APIs
 
 ### Auth
@@ -439,6 +465,151 @@ CGO_ENABLED=0 go build
    }
   ```
 
+### Unit Groups
+
+- `GET /unit_groups`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": {
+          "unit_groups": [
+              {
+                  "id": 1,
+                  "name": "Group 1",
+                  "description": "This is a test group",
+                  "units": ["unit_id_1", "unit_id_2"],
+                  "created": "2024-03-14T09:37:28+01:00",
+                  "updated": "2024-03-14T10:00:00+01:00"
+              }
+              ...
+          ]
+      },
+      "message": "unit groups listed successfully"
+   }
+  ```
+
+- `GET /unit_groups/<group_id>`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": {
+          "unit_group": {
+              "id": 1,
+              "name": "Group 1",
+              "description": "This is a test group",
+              "units": ["unit_id_1", "unit_id_2"],
+              "created": "2024-03-14T09:37:28+01:00",
+              "updated": "2024-03-14T10:00:00+01:00"
+          }
+      },
+      "message": "success"
+   }
+  ```
+
+- `POST /unit_groups`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+
+   {
+      "name": "Group 1",
+      "descrption": "This is a test group",
+      "units": ["unit_id_1", "unit_id_2"]
+   }
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 201 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 201,
+      "data": {"id": 1},
+      "message": "success"
+   }
+  ```
+
+- `PUT /unit_groups/<group_id>`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+
+   {
+      "name": "Group 1 updated",
+      "description": "This is an updated test group",
+      "units": ["unit_id_1", "unit_id_3"]
+   }
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": null,
+      "message": "success"
+   }
+  ```
+
+- `DELETE /unit_groups/<group_id>`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": "",
+      "message": "success"
+   }
+  ```
+
 ### Accounts
 
 - `GET /accounts`
@@ -536,7 +707,7 @@ CGO_ENABLED=0 go build
 
    {
       "code": 201,
-      "data": null,
+      "data": {"id": 5},
       "message": "success"
    }
   ```
@@ -551,7 +722,8 @@ CGO_ENABLED=0 go build
 
    {
       "password": "Nethesis,4321",
-      "display_name": "Test 5"
+      "display_name": "Test 5",
+      "unit_groups": [1, 2]
    }
   ```
 

@@ -18,13 +18,16 @@ type Account struct {
 	Username    string    `json:"username" structs:"username" binding:"required,excludesall= "`
 	Password    string    `json:"password" structs:"password" db:"-" binding:"required"`
 	DisplayName string    `json:"display_name" structs:"display_name"`
-	Created     time.Time `json:"created" structs:"created"`
+	UnitGroups  []int     `json:"unit_groups" structs:"unit_groups"`
+	Created     time.Time `json:"created" structs:"created_at"`
+	Updated     time.Time `json:"updated" structs:"updated_at"`
 	TwoFA       bool      `json:"two_fa" structs:"two_fa"`
 }
 
 type AccountUpdate struct {
 	Password    string `json:"password" structs:"password"`
 	DisplayName string `json:"display_name" structs:"display_name"`
+	UnitGroups  []int  `json:"unit_groups" structs:"unit_groups" binding:"required"`
 }
 
 type PasswordChange struct {

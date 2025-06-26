@@ -14,6 +14,7 @@ require (
 	github.com/gin-contrib/gzip v1.2.3
 	github.com/gin-gonic/gin v1.10.1
 	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/google/uuid v1.2.0
 	github.com/jackc/pgx/v5 v5.7.5
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/nqd/flat v0.2.0

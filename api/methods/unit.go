@@ -27,6 +27,7 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
+	jwt "github.com/appleboy/gin-jwt/v2"
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
@@ -508,8 +509,8 @@ func DeleteUnit(c *gin.Context) {
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
 	)
 	if err := cmdRevoke.Run(); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
 			Message: "cannot revoke certificate for: " + unitId,
 			Data:    err.Error(),
 		}))
@@ -524,8 +525,8 @@ func DeleteUnit(c *gin.Context) {
 		"EASYRSA_CRL_DAYS=3650",
 	)
 	if err := cmdGen.Run(); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
 			Message: "cannot renew certificate revocation list (CLR)",
 			Data:    err.Error(),
 		}))
@@ -536,8 +537,8 @@ func DeleteUnit(c *gin.Context) {
 	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + unitId); err == nil {
 		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + unitId)
 		if errDeleteAuth != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    403,
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
 				Message: "error in deletion auth file for: " + unitId,
 				Data:    errDeleteAuth.Error(),
 			}))
@@ -549,8 +550,8 @@ func DeleteUnit(c *gin.Context) {
 	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml"); err == nil {
 		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml")
 		if errDeleteProxy != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    403,
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
 				Message: "error in deletion proxy file for: " + unitId,
 				Data:    errDeleteProxy.Error(),
 			}))
@@ -810,4 +811,246 @@ func parseUnitFile(unitId string, unitFile []byte) gin.H {
 	}
 
 	return result
+}
+
+func AddUnitGroup(c *gin.Context) {
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	var req models.UnitGroup
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "request fields malformed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	id, err := storage.AddUnitGroup(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot add unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusCreated, structs.Map(response.StatusCreated{
+		Code:    201,
+		Message: "unit group added successfully",
+		Data:    gin.H{"id": id},
+	}))
+}
+
+func UpdateUnitGroup(c *gin.Context) {
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groupId := c.Param("group_id")
+	if groupId == "" {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id is required",
+		}))
+		return
+	}
+	groupIntId, err := strconv.Atoi(groupId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id must be an integer",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	var req models.UnitGroup
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "request fields malformed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	for _, unit := range req.Units {
+		exists, err := storage.UnitExists(unit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
+				Message: "error checking unit existence",
+				Data:    err.Error(),
+			}))
+			return
+		}
+		if !exists {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "unit does not exist",
+				Data:    unit,
+			}))
+			return
+		}
+	}
+
+	if err := storage.UpdateUnitGroup(groupIntId, req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot edit unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit group edited successfully",
+	}))
+}
+
+func DeleteUnitGroup(c *gin.Context) {
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groupId := c.Param("group_id")
+	if groupId == "" {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id is required",
+		}))
+		return
+	}
+	groupIdInt, err := strconv.Atoi(groupId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id must be an integer",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// check if the unit group is used
+	used, err := storage.IsUnitGroupUsed(groupIdInt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "error checking if unit group is used",
+			Data:    err.Error(),
+		}))
+		return
+	}
+	if used {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "unit group is used and cannot be deleted",
+		}))
+		return
+	}
+
+	if err := storage.DeleteUnitGroup(groupIdInt); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot delete unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit group deleted successfully",
+	}))
+}
+
+func ListUnitGroups(c *gin.Context) {
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groups, err := storage.ListUnitGroups()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot list unit groups",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit groups listed successfully",
+		Data:    groups,
+	}))
+}
+
+func GetUnitGroup(c *gin.Context) {
+	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groupId := c.Param("group_id")
+	if groupId == "" {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id is required",
+		}))
+		return
+	}
+	groupIdInt, err := strconv.Atoi(groupId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id must be an integer",
+			Data:    err.Error(),
+		}))
+		return
+	}
+	group, err := storage.GetUnitGroup(groupIdInt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot get unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit group retrieved successfully",
+		Data:    group,
+	}))
 }

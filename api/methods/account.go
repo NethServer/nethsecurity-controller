@@ -135,7 +135,7 @@ func AddAccount(c *gin.Context) {
 
 	// create account
 	json.Created = time.Now()
-	err := storage.AddAccount(json)
+	id, err := storage.AddAccount(json)
 
 	// check results
 	if err != nil {
@@ -151,7 +151,7 @@ func AddAccount(c *gin.Context) {
 	c.JSON(http.StatusCreated, structs.Map(response.StatusCreated{
 		Code:    201,
 		Message: "success",
-		Data:    nil,
+		Data:    gin.H{"id": id},
 	}))
 }
 
@@ -180,7 +180,28 @@ func UpdateAccount(c *gin.Context) {
 	// update account
 	err := storage.UpdateAccount(accountID, json)
 
-	// check results
+	// check if all unit_groups exist
+	for _, groupID := range json.UnitGroups {
+		exists, err := storage.UnitGroupExists(groupID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
+				Message: "error checking group existence",
+				Data:    err.Error(),
+			}))
+			return
+		}
+		if !exists {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "unit group does not exist",
+				Data:    gin.H{"unit_group": groupID},
+			}))
+			return
+		}
+	}
+
+	// check for groupid_not_found error
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
 			Code:    500,
