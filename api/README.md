@@ -78,17 +78,19 @@ Units can be added to a group via the API. The group is identified by a unique I
 
 A user is an account that can access the API and the UI.
 User accounts are stored in the database and can be managed via the API.
-By default, a user can access all units but this can be restricted by assigning the user to a group of units.
+By default, a user can't access any unit.
+A user can be promoted to an admin user, which allows the user to manage other users and units.
 
-There is also a special `admin` user with id `1` that can:
+Admin users have the `admin` flag set to `true` and can:
 - create, modify and delete user accounts
 - create, modify and delete units
 - create, modify and delete units groups
 - assign a user to one or more groups of units
+- see all units, despite the groups assigned to the user
 
 The following rules apply:
 
-- a user can be assigned to one or more groups of units, if the user is not assigned to any group, the user can access all units
+- a user can be assigned to one or more groups of units, if the user is not assigned to any group, the user can't see any unit
 - a non existing-unit cannot be added to a group
 - a unit group that is associated to a user account can't be deleted
 - a non-existing unit group cannot be assigned to a user account
@@ -629,6 +631,7 @@ The following rules apply:
               "id": 2,
               "username": "test1",
               "password": "",
+              "admin": true,
               "display_name": "Test 1",
               "created": "2024-03-14T09:37:28+01:00"
           },
@@ -637,6 +640,7 @@ The following rules apply:
               "id": 6,
               "username": "test2",
               "password": "",
+              "admin": false,
               "display_name": "Test 2",
               "created": "2024-03-14T11:43:33+01:00"
           }
@@ -670,6 +674,7 @@ The following rules apply:
           "id": 2,
           "username": "test3",
           "password": "",
+          "admin": false,
           "display_name": "Test 3",
           "created": "2024-03-14T09:37:28+01:00"
           }
@@ -689,7 +694,9 @@ The following rules apply:
    {
       "username": "test1",
       "password": "Nethesis,1234",
-      "display_name": "Test 1"
+      "display_name": "Test 1",
+      "unit_groups": [1, 2],
+      "admin": false
    }
   ```
 
@@ -717,7 +724,8 @@ The following rules apply:
    {
       "password": "Nethesis,4321",
       "display_name": "Test 5",
-      "unit_groups": [1, 2]
+      "unit_groups": [1, 2],
+      "admin": false
    }
   ```
 

@@ -98,7 +98,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				role := "user"
 
 				// check if username is admin
-				isAdmin, _ := storage.IsAdmin(user.Username)
+				isAdmin := storage.IsAdmin(user.Username)
 				if isAdmin {
 					role = "admin"
 				}
@@ -323,9 +323,8 @@ func BasicUserAuth() gin.HandlerFunc {
 
 		// check password and username
 		valid := utils.CheckPasswordHash(password, passwordHash)
-		isAdmin, _ := storage.IsAdmin(username)
 
-		if !valid || !isAdmin {
+		if !valid {
 			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusUnauthorized{
 				Code:    401,
 				Message: "invalid username or password",
@@ -336,8 +335,24 @@ func BasicUserAuth() gin.HandlerFunc {
 			return
 		}
 
+		// Optionally load unit_id from query or header
+		unitID := c.Param("unit_id")
+		extra_log := ""
+		if unitID != "" {
+			if !methods.UserCanAccessUnit(username, unitID) {
+				c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+					Code:    403,
+					Message: "user does not have access to this unit",
+					Data:    nil,
+				}))
+				logs.Logs.Println("[INFO][AUTH] user " + username + " does not have access to unit " + unitID)
+				c.Abort()
+				return
+			}
+			extra_log = " to unit " + unitID
+		}
 		// Just return success
-		logs.Logs.Println("[INFO][AUTH] user " + username + " authenticated successfully")
+		logs.Logs.Println("[INFO][AUTH] user "+username+" authenticated successfully", extra_log)
 		c.Header("X-Auth-User", username)
 		c.Next()
 	}

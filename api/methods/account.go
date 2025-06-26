@@ -29,7 +29,7 @@ import (
 
 func GetAccounts(c *gin.Context) {
 	// check auth for not admin users
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -71,7 +71,7 @@ func GetAccounts(c *gin.Context) {
 
 func GetAccount(c *gin.Context) {
 	// check auth for not admin users
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -116,7 +116,7 @@ func GetAccount(c *gin.Context) {
 
 func AddAccount(c *gin.Context) {
 	// check auth for not admin users
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -160,7 +160,7 @@ func UpdateAccount(c *gin.Context) {
 	accountID := c.Param("account_id")
 
 	// check auth for not admin users
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
@@ -221,7 +221,7 @@ func UpdateAccount(c *gin.Context) {
 
 func DeleteAccount(c *gin.Context) {
 	// check auth
-	isAdmin, _ := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
 	if !isAdmin {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
