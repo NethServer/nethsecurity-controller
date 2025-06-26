@@ -13,7 +13,6 @@ import (
 	"bytes"
 	"encoding/json"
 	"io"
-	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -341,40 +340,5 @@ func BasicUserAuth() gin.HandlerFunc {
 		logs.Logs.Println("[INFO][AUTH] user " + username + " authenticated successfully")
 		c.Header("X-Auth-User", username)
 		c.Next()
-	}
-}
-
-// TrustedIPMiddleware restricts access to requests from trusted IPs/CIDRs defined in TRUSTED_IPS env var.
-func TrustedIPMiddleware() gin.HandlerFunc {
-	if len(configuration.Config.TrustedIPs) == 0 {
-		// No restriction
-		return func(c *gin.Context) {
-			c.Next()
-		}
-	}
-	// Return the middleware handler
-	return func(c *gin.Context) {
-		// If path is inside TrustedIPExcludePaths, just skip the middleware
-		if len(configuration.Config.TrustedIPExcludePaths) > 0 {
-			for _, path := range configuration.Config.TrustedIPExcludePaths {
-				if strings.HasPrefix(c.Request.URL.Path, path) {
-					c.Next()
-					return
-				}
-			}
-		}
-		clientIP := c.ClientIP()
-		ip := net.ParseIP(clientIP)
-		if ip == nil {
-			c.AbortWithStatusJSON(403, gin.H{"error": "forbidden: invalid client IP"})
-			return
-		}
-		for _, network := range configuration.Config.TrustedIPs {
-			if network.Contains(ip) {
-				c.Next()
-				return
-			}
-		}
-		c.AbortWithStatusJSON(403, gin.H{"error": "forbidden: IP not allowed"})
 	}
 }

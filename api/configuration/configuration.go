@@ -11,9 +11,7 @@ package configuration
 
 import (
 	"encoding/json"
-	"net"
 	"os"
-	"slices"
 	"strings"
 
 	"github.com/NethServer/nethsecurity-controller/api/logs"
@@ -76,9 +74,6 @@ type Configuration struct {
 	RetentionDays string `json:"retention_days"`
 
 	EncryptionKey string `json:"encryption_key"`
-
-	TrustedIPs            []net.IPNet `json:"trusted_ips"`
-	TrustedIPExcludePaths []string    `json:"trusted_ip_exclude_paths"`
 
 	PlatformInfo models.PlatformInfo `json:"platform_info"`
 }
@@ -318,43 +313,6 @@ func Init() {
 	} else {
 		logs.Logs.Println("[CRITICAL][ENV] ENCRYPTION_KEY variable is empty")
 		os.Exit(1)
-	}
-
-	if os.Getenv("TRUSTED_IPS") != "" {
-		var cidrs []string
-		for _, entry := range strings.Split(os.Getenv("TRUSTED_IPS"), ",") {
-			entry = strings.TrimSpace(entry)
-			if entry != "" {
-				cidrs = append(cidrs, entry)
-			}
-		}
-		// Remove duplicates and sort
-		slices.Sort(cidrs)
-		cidrs = slices.Compact(cidrs)
-		for _, cidr := range cidrs {
-			if !strings.Contains(cidr, "/") {
-				cidr += "/32"
-			}
-			_, network, err := net.ParseCIDR(cidr)
-			if err == nil {
-				Config.TrustedIPs = append(Config.TrustedIPs, *network)
-			}
-		}
-	} else {
-		Config.TrustedIPs = []net.IPNet{}
-	}
-
-	if os.Getenv("TRUSTED_IP_EXCLUDE_PATHS") != "" {
-		for _, entry := range strings.Split(os.Getenv("TRUSTED_IP_EXCLUDE_PATHS"), ",") {
-			entry = strings.TrimSpace(entry)
-			if entry != "" {
-				Config.TrustedIPExcludePaths = append(Config.TrustedIPExcludePaths, entry)
-			}
-		}
-		slices.Sort(Config.TrustedIPExcludePaths)
-		Config.TrustedIPExcludePaths = slices.Compact(Config.TrustedIPExcludePaths)
-	} else {
-		Config.TrustedIPExcludePaths = []string{}
 	}
 
 	if os.Getenv("PLATFORM_INFO") != "" {
