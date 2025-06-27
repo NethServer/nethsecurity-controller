@@ -24,14 +24,20 @@ import (
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/models"
+
 	"github.com/NethServer/nethsecurity-controller/api/socket"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
+	jwt "github.com/appleboy/gin-jwt/v2"
 
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 )
 
 func GetUnits(c *gin.Context) {
+	// extract user from JWT claims
+	user := jwt.ExtractClaims(c)["id"].(string)
+
 	// list file in OpenVPNCCDDir
 	units, err := ListUnits()
 	if err != nil {
@@ -46,6 +52,9 @@ func GetUnits(c *gin.Context) {
 	// loop through units
 	var results []gin.H
 	for _, unit := range units {
+		if !UserCanAccessUnit(user, unit) {
+			continue
+		}
 		// read unit file
 		result, err := getUnitInfo(unit)
 		if err != nil {
@@ -71,6 +80,15 @@ func GetUnits(c *gin.Context) {
 func GetUnit(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
+	user := jwt.ExtractClaims(c)["id"].(string)
+	if !UserCanAccessUnit(user, unitId) {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "user does not have access to this unit",
+			Data:    nil,
+		}))
+		return
+	}
 
 	// parse unit file
 	result, err := getUnitInfo(unitId)
@@ -155,16 +173,16 @@ func AddInfo(c *gin.Context) {
 		return
 	}
 
-	jsonInfo, _ := json.Marshal(jsonRequest)
-	err := os.WriteFile(configuration.Config.OpenVPNStatusDir+"/"+unitId+".info", jsonInfo, 0644)
+	_, err := json.Marshal(jsonRequest)
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "can't write unit info for: " + unitId,
+			Message: "can't marshal unit info for: " + unitId,
 			Data:    err.Error(),
 		}))
 		return
 	}
+	storage.SetUnitInfo(unitId, jsonRequest)
 
 	// return 200 OK
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
@@ -174,6 +192,16 @@ func AddInfo(c *gin.Context) {
 }
 
 func AddUnit(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// parse request fields
 	var jsonRequest models.AddRequest
 	if err := c.ShouldBindJSON(&jsonRequest); err != nil {
@@ -305,6 +333,17 @@ func AddUnit(c *gin.Context) {
 		return
 	}
 
+	// create record inside units table
+	errCreate := storage.AddUnit(jsonRequest.UnitId)
+	if errCreate != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot store unit record inside database for: " + jsonRequest.UnitId,
+			Data:    errCreate.Error(),
+		}))
+		return
+	}
+
 	// return 200 OK with data
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
@@ -411,6 +450,13 @@ func RegisterUnit(c *gin.Context) {
 			return
 		}
 
+		// extract API port from listen address
+		addressParts := strings.Split(configuration.Config.ListenAddress[0], ":")
+		apiPort := addressParts[len(addressParts)-1]
+		// calculate server address from OpenVPNNetwork
+		openvpnNetwork := strings.TrimSuffix(configuration.Config.OpenVPNNetwork, ".0")
+		vpnAddress := openvpnNetwork + ".1"
+
 		// compose config
 		config := gin.H{
 			"host":             configuration.Config.FQDN,
@@ -420,6 +466,8 @@ func RegisterUnit(c *gin.Context) {
 			"key":              keyS,
 			"promtail_address": configuration.Config.PromtailAddress,
 			"promtail_port":    configuration.Config.PromtailPort,
+			"api_port":         apiPort,
+			"vpn_address":      vpnAddress,
 		}
 
 		// read credentials from request
@@ -474,6 +522,16 @@ func RegisterUnit(c *gin.Context) {
 }
 
 func DeleteUnit(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "can't access this resource",
+			Data:    nil,
+		}))
+		return
+	}
+
 	// get unit id
 	unitId := c.Param("unit_id")
 
@@ -487,8 +545,8 @@ func DeleteUnit(c *gin.Context) {
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
 	)
 	if err := cmdRevoke.Run(); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
 			Message: "cannot revoke certificate for: " + unitId,
 			Data:    err.Error(),
 		}))
@@ -503,8 +561,8 @@ func DeleteUnit(c *gin.Context) {
 		"EASYRSA_CRL_DAYS=3650",
 	)
 	if err := cmdGen.Run(); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
 			Message: "cannot renew certificate revocation list (CLR)",
 			Data:    err.Error(),
 		}))
@@ -515,8 +573,8 @@ func DeleteUnit(c *gin.Context) {
 	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + unitId); err == nil {
 		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + unitId)
 		if errDeleteAuth != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    403,
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
 				Message: "error in deletion auth file for: " + unitId,
 				Data:    errDeleteAuth.Error(),
 			}))
@@ -528,8 +586,8 @@ func DeleteUnit(c *gin.Context) {
 	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml"); err == nil {
 		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml")
 		if errDeleteProxy != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    403,
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
 				Message: "error in deletion proxy file for: " + unitId,
 				Data:    errDeleteProxy.Error(),
 			}))
@@ -713,12 +771,8 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	unitInfo.Data.ScheduledUpdate = systemUpdateInfo.Data.ScheduledAt
 	unitInfo.Data.VersionUpdate = systemUpdateInfo.Data.LastVersion
 
-	// write json to file
-	jsonInfo, _ := json.Marshal(unitInfo.Data)
-	errWrite := os.WriteFile(configuration.Config.OpenVPNStatusDir+"/"+unitId+".info", jsonInfo, 0644)
-	if errWrite != nil {
-		return models.UnitInfo{}, errors.New("error writing info file")
-	}
+	// write json to database
+	storage.SetUnitInfo(unitId, unitInfo.Data)
 
 	return unitInfo.Data, nil
 }
@@ -734,7 +788,8 @@ func getUnitInfo(unitId string) (gin.H, error) {
 	result := parseUnitFile(unitId, unitFile)
 
 	// add info from unit
-	remote_info := getRemoteInfo(unitId)
+	remote_info := storage.GetUnitInfo(unitId)
+
 	if remote_info != nil {
 		result["info"] = remote_info
 	} else {
@@ -771,21 +826,6 @@ func getVPNInfo(unitId string) gin.H {
 	}
 }
 
-func getRemoteInfo(unitId string) gin.H {
-	// read unit file
-	statusFile, err := os.ReadFile(configuration.Config.OpenVPNStatusDir + "/" + unitId + ".info")
-	if err != nil {
-		return nil
-	}
-
-	// convert timestamp to int
-	var result map[string]interface{}
-	_ = json.Unmarshal(statusFile, &result)
-
-	// return vpn details
-	return result
-}
-
 func readUnitFile(unitId string) ([]byte, error) {
 	// read unit file
 	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
@@ -807,4 +847,246 @@ func parseUnitFile(unitId string, unitFile []byte) gin.H {
 	}
 
 	return result
+}
+
+func AddUnitGroup(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	var req models.UnitGroup
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "request fields malformed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	id, err := storage.AddUnitGroup(req)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot add unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusCreated, structs.Map(response.StatusCreated{
+		Code:    201,
+		Message: "unit group added successfully",
+		Data:    gin.H{"id": id},
+	}))
+}
+
+func UpdateUnitGroup(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groupId := c.Param("group_id")
+	if groupId == "" {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id is required",
+		}))
+		return
+	}
+	groupIntId, err := strconv.Atoi(groupId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id must be an integer",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	var req models.UnitGroup
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "request fields malformed",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	for _, unit := range req.Units {
+		exists, err := storage.UnitExists(unit)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+				Code:    500,
+				Message: "error checking unit existence",
+				Data:    err.Error(),
+			}))
+			return
+		}
+		if !exists {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "unit does not exist",
+				Data:    unit,
+			}))
+			return
+		}
+	}
+
+	if err := storage.UpdateUnitGroup(groupIntId, req); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot edit unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit group edited successfully",
+	}))
+}
+
+func DeleteUnitGroup(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groupId := c.Param("group_id")
+	if groupId == "" {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id is required",
+		}))
+		return
+	}
+	groupIdInt, err := strconv.Atoi(groupId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id must be an integer",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// check if the unit group is used
+	used, err := storage.IsUnitGroupUsed(groupIdInt)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "error checking if unit group is used",
+			Data:    err.Error(),
+		}))
+		return
+	}
+	if used {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "unit group is used and cannot be deleted",
+		}))
+		return
+	}
+
+	if err := storage.DeleteUnitGroup(groupIdInt); err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot delete unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit group deleted successfully",
+	}))
+}
+
+func ListUnitGroups(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groups, err := storage.ListUnitGroups()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot list unit groups",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit groups listed successfully",
+		Data:    groups,
+	}))
+}
+
+func GetUnitGroup(c *gin.Context) {
+	isAdmin := storage.IsAdmin(jwt.ExtractClaims(c)["id"].(string))
+	if !isAdmin {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "admin privileges required",
+		}))
+		return
+	}
+
+	groupId := c.Param("group_id")
+	if groupId == "" {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id is required",
+		}))
+		return
+	}
+	groupIdInt, err := strconv.Atoi(groupId)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "group_id must be an integer",
+			Data:    err.Error(),
+		}))
+		return
+	}
+	group, err := storage.GetUnitGroup(groupIdInt)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "cannot get unit group",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+		Code:    200,
+		Message: "unit group retrieved successfully",
+		Data:    group,
+	}))
 }

@@ -29,7 +29,8 @@ CGO_ENABLED=0 go build
 
 **Optional**
 
-- `LISTEN_ADDRESS`: listend address of server - _default_: `127.0.0.1:5000`
+- `LISTEN_ADDRESS`: a comma-separated list of listen addresses for the server. Each entry is in the form `<address>:<port>` - _default_: `127.0.0.1:5000`
+  Example: `127.0.0.1:5000,192.168.100.1:5000`
 
 - `OVPN_DIR`: openvpn configuration directory - _default_: `/etc/openvpn`
 - `OVPN_NETWORK`: openvpn network address - _default_: `172.21.0.0`
@@ -62,9 +63,61 @@ CGO_ENABLED=0 go build
 - `SENSITIVE_LIST`: list of sensitive information to be redacted in logs
 - `VALID_SUBSCRIPTION`: valid subscription status - _default_: `false`
 
+- `ENCRYPTION_KEY`: key to encrypt/decrypt sensitive data, it must be 32 bytes long
+
+- `PLATFORM_INFO`: a JSON string with platform information, used to store the controller version and other information. It can be left empty.
+  Example: `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`
+
+## User and units authorizations
+
+A unit is a NethSecurity firewall that is connected to the controller.
+Units are identified by a unique ID and are stored in the database. VPN info of the unit are stored in a file in the `OVPN_DIR` directory.
+
+A group of units is a collection of units that can be managed together.
+Units can be added to a group via the API. The group is identified by a unique ID and is stored in the database.
+
+A user is an account that can access the API and the UI.
+User accounts are stored in the database and can be managed via the API.
+By default, a user can't access any unit.
+A user can be promoted to an admin user, which allows the user to manage other users and units.
+
+Admin users have the `admin` flag set to `true` and can:
+- create, modify and delete user accounts
+- create, modify and delete units
+- create, modify and delete units groups
+- assign a user to one or more groups of units
+- see all units, despite the groups assigned to the user
+
+The following rules apply:
+
+- a user can be assigned to one or more groups of units, if the user is not assigned to any group, the user can't see any unit
+- a non existing-unit cannot be added to a group
+- a unit group that is associated to a user account can't be deleted
+- a non-existing unit group cannot be assigned to a user account
+- when a unit is deleted from the database, it is removed from all groups
+
 ## APIs
 
 ### Auth
+
+- `GET /health`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "status": "ok"
+   }
+  ```
 
 - `POST /login`
 
@@ -276,7 +329,7 @@ CGO_ENABLED=0 go build
    }
   ```
 
-  The API saves unit information in `OVPN_S_DIR` with `.info` extension. This is useful for retrieving new information of the unit without waiting for cron to store it.
+  The backend stores data inside the database. This is useful for retrieving new information of the unit without waiting for cron to store it.
 
 - `GET /units/<unit_id>/token`
 
@@ -346,7 +399,7 @@ CGO_ENABLED=0 go build
       "password": "Nethesis,1234",
       "version": "8-23.05.2-ns.0.0.2-beta2-37-g6e74afc",
       "subscription_type": "enterprise",
-      "system_id": "XXXXXXXX-XXXX",
+      "system_id": "XXXXXXXX-XXXX"
    }
   ```
 
@@ -365,7 +418,9 @@ CGO_ENABLED=0 go build
           "key": "-----BEGIN PRIVATE KEY-----\n\n-----END PRIVATE KEY-----",
           "port": "1194",
           "promtail_address": "172.21.0.1",
-          "promtail_port": "5151"
+          "promtail_port": "5151",
+          "api_port": "20001",
+          "vpn_address": "192.168.0.1"
       },
       "message": "unit registered successfully"
    }
@@ -406,6 +461,151 @@ CGO_ENABLED=0 go build
    }
   ```
 
+### Unit Groups
+
+- `GET /unit_groups`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": {
+          "unit_groups": [
+              {
+                  "id": 1,
+                  "name": "Group 1",
+                  "description": "This is a test group",
+                  "units": ["unit_id_1", "unit_id_2"],
+                  "created": "2024-03-14T09:37:28+01:00",
+                  "updated": "2024-03-14T10:00:00+01:00"
+              }
+              ...
+          ]
+      },
+      "message": "unit groups listed successfully"
+   }
+  ```
+
+- `GET /unit_groups/<group_id>`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": {
+          "unit_group": {
+              "id": 1,
+              "name": "Group 1",
+              "description": "This is a test group",
+              "units": ["unit_id_1", "unit_id_2"],
+              "created": "2024-03-14T09:37:28+01:00",
+              "updated": "2024-03-14T10:00:00+01:00"
+          }
+      },
+      "message": "success"
+   }
+  ```
+
+- `POST /unit_groups`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+
+   {
+      "name": "Group 1",
+      "descrption": "This is a test group",
+      "units": ["unit_id_1", "unit_id_2"]
+   }
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 201 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 201,
+      "data": {"id": 1},
+      "message": "success"
+   }
+  ```
+
+- `PUT /unit_groups/<group_id>`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+
+   {
+      "name": "Group 1 updated",
+      "description": "This is an updated test group",
+      "units": ["unit_id_1", "unit_id_3"]
+   }
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": null,
+      "message": "success"
+   }
+  ```
+
+- `DELETE /unit_groups/<group_id>`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": "",
+      "message": "success"
+   }
+  ```
+
 ### Accounts
 
 - `GET /accounts`
@@ -431,6 +631,7 @@ CGO_ENABLED=0 go build
               "id": 2,
               "username": "test1",
               "password": "",
+              "admin": true,
               "display_name": "Test 1",
               "created": "2024-03-14T09:37:28+01:00"
           },
@@ -439,6 +640,7 @@ CGO_ENABLED=0 go build
               "id": 6,
               "username": "test2",
               "password": "",
+              "admin": false,
               "display_name": "Test 2",
               "created": "2024-03-14T11:43:33+01:00"
           }
@@ -472,6 +674,7 @@ CGO_ENABLED=0 go build
           "id": 2,
           "username": "test3",
           "password": "",
+          "admin": false,
           "display_name": "Test 3",
           "created": "2024-03-14T09:37:28+01:00"
           }
@@ -491,7 +694,9 @@ CGO_ENABLED=0 go build
    {
       "username": "test1",
       "password": "Nethesis,1234",
-      "display_name": "Test 1"
+      "display_name": "Test 1",
+      "unit_groups": [1, 2],
+      "admin": false
    }
   ```
 
@@ -503,7 +708,7 @@ CGO_ENABLED=0 go build
 
    {
       "code": 201,
-      "data": null,
+      "data": {"id": 5},
       "message": "success"
    }
   ```
@@ -518,7 +723,9 @@ CGO_ENABLED=0 go build
 
    {
       "password": "Nethesis,4321",
-      "display_name": "Test 5"
+      "display_name": "Test 5",
+      "unit_groups": [1, 2],
+      "admin": false
    }
   ```
 
@@ -656,6 +863,62 @@ CGO_ENABLED=0 go build
       "code": 200,
       "data": "",
       "message": "success"
+   }
+  ```
+
+- `GET /platform`
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+
+   {
+      "code": 200,
+      "data": {
+          "vpn_port": "1194",
+          "vpn_network": "172.21.0.0/16",
+          "controller_version": "1.2.3",
+          "nethserver_version": "8-23.05.3-ns.1.0.1",
+          "nethserver_system_id": "XXXXXXXX-XXXX",
+          "metrics_retention_days": 60,
+          "logs_retention_days": 30
+      },
+      "message": "success"
+   }
+  ```
+
+## Basic authentication API
+
+- GET `/auth`
+
+  This endpoint is used to check if the user is authenticated. It returns a 200 status code if the user is authenticated, otherwise it returns a 401 status code.
+  It can be used by external applications to check if the user is authenticated without needing to handle JWT tokens.
+
+  REQ
+
+  ```json
+   Content-Type: application/json
+   Authorization: Bearer <JWT_TOKEN>
+  ```
+
+  RES
+
+  ```json
+   HTTP/1.1 200 OK
+   Content-Type: application/json; charset=utf-8
+   X-Auth-User: <username>
+
+   {
+      "authentication": "ok"
    }
   ```
 
