@@ -44,8 +44,6 @@ var upgradeSchemaSQL string
 //go:embed grafana_user.sql.tmpl
 var grafanaUserSQL string
 
-var reportDbIsInitialized = false
-
 // userUnits is a map that holds the units for each user.
 var userUnits = make(map[string][]string)
 
@@ -116,7 +114,7 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 	defer sqliteDB.Close()
 
 	// 3. Check if SQLite has users
-	rows, err := sqliteDB.Query("SELECT id, username, password, display_name, created_at FROM accounts")
+	rows, err := sqliteDB.Query("SELECT id, username, password, display_name, created FROM accounts")
 	if err != nil {
 		logs.Logs.Println("[ERR][MIGRATION] cannot query SQLite accounts: " + err.Error())
 		return
@@ -155,32 +153,15 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 	var groupErr error
 	if len(units) > 0 {
 		group := models.UnitGroup{
-			Name:  "Migrated",
-			Units: units,
+			Name:        "Migrated",
+			Description: "All units migrated from old release",
+			Units:       units,
 		}
 		groupID, groupErr = AddUnitGroup(group)
 		// Create a unit group for the migrated units
 		if groupErr != nil {
 			logs.Logs.Println("[ERR][MIGRATION] error creating unit group in Postgres: " + err.Error())
 		}
-	}
-
-	// 6. Create accounts table in Postgres
-	_, err = pgpool.Exec(pgctx, `CREATE TABLE IF NOT EXISTS accounts (
-		id SERIAL PRIMARY KEY,
-		username TEXT NOT NULL UNIQUE,
-		password TEXT NOT NULL,
-		admin BOOLEAN NOT NULL DEFAULT FALSE,
-		display_name TEXT,
-		otp_secret TEXT,
-		otp_recovery_codes TEXT,
-	    unit_groups []int,
-		created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-		updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP),
-	)`)
-	if err != nil {
-		logs.Logs.Println("[ERR][MIGRATION] error creating accounts table in Postgres: " + err.Error())
-		return
 	}
 
 	// 6. Insert users into Postgres
@@ -200,12 +181,20 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 		}
 		// remove acc.Username directory
 		os.RemoveAll(configuration.Config.SecretsDir + "/" + acc.Username)
-		acc.UnitGroups = []int{groupID} // Reset unit groups for migration
+		if groupID > 0 {
+			acc.UnitGroups = []int{groupID} // Set unit group for the user
+		}
 		// Insert user into Postgres
 		_, accountError := AddAccount(acc) // Use AddAccount to handle password hashing and other logic
 		if accountError != nil {
 			logs.Logs.Println("[ERR][MIGRATION] error migrating user to Postgres: " + accountError.Error())
 		}
+		// Set the password directly using a raw query
+		_, rawPasswordError := pgpool.Exec(pgctx, "UPDATE accounts SET password = $1 WHERE username = $2", acc.Password, acc.Username)
+		if rawPasswordError != nil {
+			logs.Logs.Println("[ERR][MIGRATION] error setting raw password for user", acc.Username, ":", rawPasswordError.Error())
+		}
+
 		// Set OTP secret
 		if err := SetUserOtpSecret(acc.Username, otp_secret); err != nil {
 			logs.Logs.Println("[ERR][MIGRATION] error mirating OTP secret for user", acc.Username, ":", err.Error())
@@ -415,7 +404,7 @@ func InitReportDb() (*pgxpool.Pool, context.Context) {
 		logs.Logs.Println("[WARN][DB] error in db connection:" + err.Error())
 	}
 
-	reportDbIsInitialized = loadReportSchema(dbpool, dbctx)
+	loadReportSchema(dbpool, dbctx)
 
 	return dbpool, dbctx
 }
@@ -425,18 +414,7 @@ func ReportInstance() (*pgxpool.Pool, context.Context) {
 		dbpool, dbctx = InitReportDb()
 
 	}
-	if !reportDbIsInitialized {
-		// check if 'units' table exists, if not call initialization
-		query := `SELECT EXISTS (
-				SELECT FROM information_schema.tables
-				WHERE  table_schema = 'schema_name'
-				AND    table_name   = 'units'
-			)`
-		dbpool.QueryRow(dbctx, query).Scan(&reportDbIsInitialized)
-		if !reportDbIsInitialized {
-			reportDbIsInitialized = loadReportSchema(dbpool, dbctx)
-		}
-	}
+
 	return dbpool, dbctx
 }
 
@@ -557,40 +535,49 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 	if _, err := os.Stat(configuration.Config.OpenVPNStatusDir); os.IsNotExist(err) {
 		return ret
 	}
-	files, err := os.ReadDir(configuration.Config.OpenVPNStatusDir)
+	files, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
 	if err != nil {
 		logs.Logs.Println("[WARNING][MIGRATION] error reading OpenVPN status directory: " + err.Error())
 		return ret
 	}
 	for _, file := range files {
-		if !file.IsDir() && strings.HasSuffix(file.Name(), ".info") {
-			filePath := configuration.Config.OpenVPNStatusDir + "/" + file.Name()
-			// read file, parse as JSON and then call AddUnit
-			data, err := os.ReadFile(filePath)
-			if err != nil {
-				logs.Logs.Println("[WARNING][MIGRATION] error reading file:", filePath, err.Error())
-				continue
-			}
-			var info models.UnitInfo
-			if err := json.Unmarshal(data, &info); err != nil {
-				logs.Logs.Println("[WARNING][MIGRATION] error parsing JSON in file:", filePath, err.Error())
-				continue
-			}
-			uuid := strings.TrimSuffix(file.Name(), ".info")
+		if !file.IsDir() {
+			vpnFile := configuration.Config.OpenVPNCCDDir + "/" + file.Name()
+			infoFile := configuration.Config.OpenVPNStatusDir + "/" + file.Name() + ".info"
+			uuid := file.Name()
 			// ignore the error
 			_ = AddUnit(uuid)
-			if err := SetUnitInfo(uuid, info); err != nil {
-				logs.Logs.Println("[WARNING][MIGRATION] error setting unit info for", uuid, ":", err.Error())
+			if _, err := os.Stat(infoFile); err == nil {
+				// read file, parse as JSON and then call AddUnit
+				data, err := os.ReadFile(infoFile)
+				if err != nil {
+					logs.Logs.Println("[WARNING][MIGRATION] error reading file:", infoFile, err.Error())
+					continue
+				}
+				var info models.UnitInfo
+				if err := json.Unmarshal(data, &info); err != nil {
+					logs.Logs.Println("[WARNING][MIGRATION] error parsing JSON in file:", infoFile, err.Error())
+					continue
+				}
+				if err := SetUnitInfo(uuid, info); err != nil {
+					logs.Logs.Println("[WARNING][MIGRATION] error setting unit info for", uuid, ":", err.Error())
+				}
+				// remove the file
+				if err := os.Remove(infoFile); err != nil {
+					logs.Logs.Println("[WARNING][MIGRATION] error removing file:", infoFile, err.Error())
+				} else {
+					logs.Logs.Println("[INFO][MIGRATION] removed file:", infoFile)
+				}
 			}
-			// remove the file
-			if err := os.Remove(filePath); err != nil {
-				logs.Logs.Println("[WARNING][MIGRATION] error removing file:", filePath, err.Error())
+			if err := os.Remove(vpnFile); err != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error removing file:", vpnFile, err.Error())
 			} else {
-				logs.Logs.Println("[INFO][MIGRATION] removed file:", filePath)
+				logs.Logs.Println("[INFO][MIGRATION] removed file:", vpnFile)
 			}
 			ret = append(ret, uuid)
 		}
 	}
+	logs.Logs.Println("[INFO][MIGRATION] migrated", len(ret), "units from file to Postgres")
 	return ret
 }
 
