@@ -113,7 +113,7 @@ func GetToken(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
 
-	token, expire, err := getUnitToken(unitId)
+	token, expire, err := GetUnitToken(unitId)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
@@ -641,7 +641,7 @@ func ListConnectedUnits() ([]string, error) {
 	return units, nil
 }
 
-func getUnitToken(unitId string) (string, string, error) {
+func GetUnitToken(unitId string) (string, string, error) {
 
 	// read credentials
 	var credentials models.LoginRequest
@@ -692,7 +692,7 @@ func getUnitToken(unitId string) (string, string, error) {
 
 func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	// get the unit token and execute the request
-	token, _, _ := getUnitToken(unitId)
+	token, _, _ := GetUnitToken(unitId)
 	if token == "" {
 		return models.UnitInfo{}, errors.New("error getting token")
 	}
@@ -808,6 +808,18 @@ func getUnitInfo(unitId string) (gin.H, error) {
 	}
 
 	return result, nil
+}
+
+func GetUnitIPAddress(unitId string) string {
+	// read unit file
+	unitFile, err := readUnitFile(unitId)
+	if err != nil {
+		return ""
+	}
+
+	// parse ccd dir file content
+	result := parseUnitFile(unitId, unitFile)
+	return result["ipaddress"].(string)
 }
 
 func getVPNInfo(unitId string) gin.H {

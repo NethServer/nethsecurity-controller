@@ -10,12 +10,13 @@
 package main
 
 import (
+	"crypto/tls"
 	"io"
 	"net/http"
+	"net/http/httputil"
 
 	"github.com/fatih/structs"
 	"github.com/gin-contrib/cors"
-	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 
 	"github.com/NethServer/nethsecurity-api/response"
@@ -72,9 +73,6 @@ func setup() *gin.Engine {
 	// init routers
 	router := gin.Default()
 
-	// add default compression
-	router.Use(gzip.Gzip(gzip.DefaultCompression))
-
 	// cors configuration only in debug mode GIN_MODE=debug (default)
 	if gin.Mode() == gin.DebugMode {
 		// gin gonic cors conf
@@ -101,6 +99,70 @@ func setup() *gin.Engine {
 
 	// define server registration
 	api.POST("/units/register", methods.RegisterUnit)
+
+	//	unitTokens := map[string]string{}
+
+	// proxypass APIs
+	proxypass := api.Group("/proxypass/:unit_id")
+	{
+		proxypass.Any("/*proxyPath", func(c *gin.Context) {
+			unitID := c.Param("unit_id")
+			proxyPath := c.Param("proxyPath")
+
+			unitToken, _, _ := methods.GetUnitToken(unitID)
+			if unitToken == "" {
+				c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized: missing unit token"})
+				logs.Logs.Printf("[ERROR] Missing unit token for unit ID: %s", unitID)
+				return
+			}
+			logs.Logs.Printf("[DEBUG] Retrieved unit token for unit ID %s: %s", unitID, unitToken)
+
+			// if unitTokens[unitID] == "" {
+			// 	// Retrieve the unit's token from storage or configuration
+			// 	token, _, _ := methods.GetUnitToken(unitID)
+			// 	if token == "" {
+			// 		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+			// 		return
+			// 	}
+			// 	unitTokens[unitID] = token
+			// }
+			// unitToken := unitTokens[unitID]
+
+			// Retrieve the unit's base URL from storage or configuration
+			unitIPAddress := methods.GetUnitIPAddress(unitID)
+			if unitIPAddress == "" {
+				c.JSON(http.StatusNotFound, gin.H{"error": "Unit not found"})
+				return
+			}
+
+			//unitBaseURL := "https://" + unitIPAddress + ":9090"
+
+			// Create a reverse proxy
+			proxy := &httputil.ReverseProxy{
+				Director: func(req *http.Request) {
+					req.URL.Scheme = "https"
+					req.URL.Host = unitIPAddress + ":9090"
+					req.URL.Path = proxyPath
+					req.Header = c.Request.Header.Clone()
+					// Remove existing Authorization headers
+					req.Header.Del("Authorization")
+					// Add Authorization header
+					req.Header.Set("Authorization", "Bearer "+unitToken)
+					// Debugging request
+					logs.Logs.Printf("[DEBUG] Proxying request to: %s%s", req.URL.Host, req.URL.Path)
+					logs.Logs.Printf("[DEBUG] Request Headers: %v", req.Header)
+					logs.Logs.Printf("[DEBUG] Request Method: %s", req.Method)
+					logs.Logs.Printf("[DEBUG] Request Body: %v", c.Request.Body)
+				},
+				Transport: &http.Transport{
+					TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+				},
+			}
+
+			// Serve the proxied request
+			proxy.ServeHTTP(c.Writer, c.Request)
+		})
+	}
 
 	// define JWT middleware
 	api.Use(middleware.InstanceJWT().MiddlewareFunc())
@@ -161,6 +223,7 @@ func setup() *gin.Engine {
 
 		// platforms APIs
 		api.GET("/platform", methods.GetPlatformInfo)
+
 	}
 
 	// Ingest APIs: receive data from firewalls
