@@ -542,9 +542,18 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 	}
 	for _, file := range files {
 		if !file.IsDir() {
-			vpnFile := configuration.Config.OpenVPNCCDDir + "/" + file.Name()
 			infoFile := configuration.Config.OpenVPNStatusDir + "/" + file.Name() + ".info"
 			uuid := file.Name()
+			// Check if the unit already exists in Postgres
+			exists, err := UnitExists(uuid)
+			if err != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error checking if unit exists in Postgres:", err.Error())
+				continue
+			}
+			if exists {
+				logs.Logs.Println("[INFO][MIGRATION] unit", uuid, "already exists in Postgres, skipping migration")
+				continue
+			}
 			// ignore the error
 			_ = AddUnit(uuid)
 			if _, err := os.Stat(infoFile); err == nil {
@@ -568,11 +577,6 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 				} else {
 					logs.Logs.Println("[INFO][MIGRATION] removed file:", infoFile)
 				}
-			}
-			if err := os.Remove(vpnFile); err != nil {
-				logs.Logs.Println("[WARNING][MIGRATION] error removing file:", vpnFile, err.Error())
-			} else {
-				logs.Logs.Println("[INFO][MIGRATION] removed file:", vpnFile)
 			}
 			ret = append(ret, uuid)
 		}
