@@ -49,7 +49,6 @@ http:
       middlewares:
         - strip-prefix-client-$username-middleware
         - compress-response
-        - forward-auth
 
   middlewares:
     compress-response:
@@ -59,11 +58,6 @@ http:
       stripPrefix:
         prefixes:
           - /tunnel/$username
-
-    forward-auth:
-      forwardAuth:
-        address: http://127.0.0.1:$API_PORT/auth/$username
-        trustForwardHeader: true
 EOF
 
 echo -n "$ifconfig_pool_remote_ip" > /etc/openvpn/clients/$username
