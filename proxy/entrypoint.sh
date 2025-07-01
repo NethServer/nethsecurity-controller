@@ -85,6 +85,9 @@ providers:
 serversTransport:
   insecureSkipVerify: true
 
+core:
+  defaultRuleSyntax: v2
+
 EOF
 
 cat << EOF > "${CONFIG_DIR}api.yaml"
