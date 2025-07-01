@@ -1,5 +1,7 @@
 #!/bin/sh
 
+source /etc/openvpn/config.env
+
 # Add route to traefik
 username=$common_name
 cat <<EOF > /etc/openvpn/proxy/$username.yaml
@@ -28,6 +30,40 @@ http:
       stripPrefix:
         prefixes:
           - "/$username"
+EOF
+
+cat <<EOF > /etc/openvpn/proxy/${username}_direct_access.yaml
+http:
+  services:
+    client-$username:
+      loadBalancer:
+        servers:
+          - url: https://$ifconfig_pool_remote_ip:9090
+
+  routers:
+    to-client-$username:
+      rule: PathPrefix(\`/tunnel/$username\`)
+      service: client-$username
+      entryPoints:
+        - web
+      middlewares:
+        - strip-prefix-client-$username-middleware
+        - compress-response
+        - forward-auth
+
+  middlewares:
+    compress-response:
+      compress: true
+
+    strip-prefix-client-$username-middleware:
+      stripPrefix:
+        prefixes:
+          - /tunnel/$username
+
+    forward-auth:
+      forwardAuth:
+        address: http://127.0.0.1:$API_PORT/auth/$username
+        trustForwardHeader: true
 EOF
 
 echo -n "$ifconfig_pool_remote_ip" > /etc/openvpn/clients/$username

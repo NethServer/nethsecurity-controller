@@ -26,4 +26,8 @@ while [ ! -e "$socket" ]; do
     fi
 done
 
+cat <<EOF > /etc/openvpn/config.env
+API_PORT=${API_PORT:-8080}
+EOF
+
 exec "$@"
