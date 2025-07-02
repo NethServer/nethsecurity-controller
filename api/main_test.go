@@ -867,6 +867,29 @@ func TestUnitAuthorization(t *testing.T) {
 	assert.Equal(t, http.StatusForbidden, w.Code, "limited user should not be able to add a unit")
 }
 
+func TestToCIDR(t *testing.T) {
+	tests := []struct {
+		ip      string
+		mask    string
+		want    string
+		wantErr bool
+	}{
+		{"192.168.1.10", "255.255.255.0", "192.168.1.10/24", false},
+		{"172.16.5.4", "255.255.0.0", "172.16.5.4/16", false},
+		{"192.168.1.10", "255.255.255.255", "192.168.1.10/32", false},
+		{"192.168.1.10", "255.255.0", "", true}, // invalid mask
+		{"notanip", "255.255.255.0", "", true},  // invalid ip
+	}
+	for _, tt := range tests {
+		got := utils.ToCIDR(tt.ip, tt.mask)
+		if got == "" {
+			assert.Error(t, fmt.Errorf("invalid input"), "expected error for input: %v/%v", tt.ip, tt.mask)
+		} else {
+			assert.Equal(t, tt.want, got, "unexpected CIDR for input: %v/%v", tt.ip, tt.mask)
+		}
+	}
+}
+
 func setupRouter() *gin.Engine {
 	// Singleton
 	if router != nil {

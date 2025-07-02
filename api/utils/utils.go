@@ -12,6 +12,7 @@ package utils
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net"
 	"strconv"
 
@@ -184,4 +185,36 @@ func DecryptAESGCM(ciphertext, key []byte) ([]byte, error) {
 		return nil, err
 	}
 	return plaintext, nil
+}
+
+// ToCIDR converts an IPv4 address and a netmask string into CIDR notation.
+// It returns an empty string if the input IP or mask is invalid.
+// For example, given "192.168.0.1" and "255.255.255.0", it returns "192.168.0.1/24".
+func ToCIDR(ipStr, maskStr string) string {
+	// Parse the IP address string.
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return ""
+	}
+	// The function works with IPv4 addresses, so we ensure it's a 4-byte representation.
+	ipv4 := ip.To4()
+	if ipv4 == nil {
+		return ""
+	}
+	// Parse the netmask string as an IP address.
+	maskIP := net.ParseIP(maskStr)
+	if maskIP == nil {
+		return ""
+	}
+	// Convert the parsed netmask IP to a 4-byte representation.
+	maskIPv4 := maskIP.To4()
+	if maskIPv4 == nil {
+		return ""
+	}
+	// Create an IPMask type from the 4-byte mask.
+	mask := net.IPMask(maskIPv4)
+	// Get the prefix size (the number of leading '1's in the mask).
+	// The second return value is the total number of bits, which is always 32 for IPv4.
+	prefixSize, _ := mask.Size()
+	return fmt.Sprintf("%s/%d", ipStr, prefixSize)
 }
