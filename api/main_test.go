@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -428,7 +429,8 @@ func addUnit(t *testing.T) string {
 	}
 	// Manually add to the database: we can't call /units POST endpoint because
 	// it requires the presence of easyrsa binary and configuration files
-	storage.AddUnit(unitID)
+	newIp := storage.GetFreeIP()
+	storage.AddUnit(unitID, newIp)
 
 	return unitID
 }
@@ -485,6 +487,10 @@ func TestAddInfoAndGetRemoteInfo(t *testing.T) {
 	assert.Equal(t, float64(info.SSHPort), infoResp["ssh_port"])
 	assert.Equal(t, info.FQDN, infoResp["fqdn"])
 	assert.Equal(t, info.APIVersion, infoResp["api_version"])
+	ipaddress := jsonResponse["data"].(map[string]interface{})["ipaddress"].(string)
+	assert.True(t, strings.HasPrefix(ipaddress, "172.21.0"), "ipaddress should start with 172.21.0, got: %v", ipaddress)
+	netmask := jsonResponse["data"].(map[string]interface{})["netmask"].(string)
+	assert.Equal(t, configuration.Config.OpenVPNNetmask, netmask, "OpenVPNNetmask should match the one in configuration, got: %v", netmask)
 }
 
 func TestForwardedAuthMiddleware(t *testing.T) {
@@ -886,6 +892,32 @@ func TestToCIDR(t *testing.T) {
 			assert.Error(t, fmt.Errorf("invalid input"), "expected error for input: %v/%v", tt.ip, tt.mask)
 		} else {
 			assert.Equal(t, tt.want, got, "unexpected CIDR for input: %v/%v", tt.ip, tt.mask)
+		}
+	}
+}
+
+func TestToIpMask(t *testing.T) {
+	tests := []struct {
+		cidr    string
+		wantIP  string
+		wantNet string
+		wantErr bool
+	}{
+		{"192.168.1.10/24", "192.168.1.10", "255.255.255.0", false},
+		{"172.16.5.4/16", "172.16.5.4", "255.255.0.0", false},
+		{"10.0.0.1/32", "10.0.0.1", "255.255.255.255", false},
+		{"192.168.1.10/33", "", "", true}, // invalid mask
+		{"notanip/24", "", "", true},      // invalid ip
+		{"", "", "", true},                // empty input
+	}
+	for _, tt := range tests {
+		ip, mask := utils.ToIpMask(tt.cidr)
+		if tt.wantErr {
+			assert.Equal(t, "", ip, "expected empty ip for input: %v", tt.cidr)
+			assert.Equal(t, "", mask, "expected empty mask for input: %v", tt.cidr)
+		} else {
+			assert.Equal(t, tt.wantIP, ip, "unexpected ip for input: %v", tt.cidr)
+			assert.Equal(t, tt.wantNet, mask, "unexpected mask for input: %v", tt.cidr)
 		}
 	}
 }
