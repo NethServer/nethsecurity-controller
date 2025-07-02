@@ -35,6 +35,8 @@ CREATE TABLE IF NOT EXISTS units (
     uuid UUID PRIMARY KEY,
     name TEXT,
     info JSONB,
+    vpn_address TEXT,
+    vpn_connected_since TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

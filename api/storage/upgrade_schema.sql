@@ -7,28 +7,8 @@
  * author: Giacomo Sanchietti <giacomo.sanchietti@nethesis.it>
  */
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name='units'
-          AND column_name='info'
-    ) THEN
-        ALTER TABLE units ADD COLUMN info JSONB;
-    END IF;
-END;
-$$;
 
-DO $$
-BEGIN
-    IF NOT EXISTS (
-        SELECT 1
-        FROM information_schema.columns
-        WHERE table_name='units'
-          AND column_name='updated_at'
-    ) THEN
-        ALTER TABLE units ADD COLUMN updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
-    END IF;
-END;
-$$;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS info JSONB;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS vpn_address TEXT;
+ALTER TABLE units ADD COLUMN IF NOT EXISTS vpn_connected_since TIMESTAMP NULL;

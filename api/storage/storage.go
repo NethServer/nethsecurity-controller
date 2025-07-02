@@ -479,14 +479,14 @@ func SetUserRecoveryCodes(username string, codes []string) error {
 	return err
 }
 
-func AddUnit(uuid string) error {
+func AddUnit(uuid string, ipaddr string) error {
 	pgpool, pgctx := ReportInstance()
 	// Try to insert the unit; if it already exists, return an error
 	_, err := pgpool.Exec(pgctx, `
-		INSERT INTO units (uuid, created_at, updated_at)
-		VALUES ($1, NOW(), NOW())
+		INSERT INTO units (uuid, vpn_address, created_at, updated_at)
+		VALUES ($1, $2, NOW(), NOW())
 		ON CONFLICT (uuid) DO NOTHING
-	`, uuid)
+	`, uuid, ipaddr)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][ADD_UNIT] error in query execution:" + err.Error())
 	}
@@ -528,6 +528,19 @@ func GetUnitInfo(uuid string) map[string]interface{} {
 	return info
 }
 
+func loadUnitIP(unitId string) string {
+	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
+	if err != nil {
+		return ""
+	}
+
+	// parse ccd dir file content
+	parts := strings.Split(string(unitFile), "\n")
+	parts = strings.Split(parts[0], " ")
+
+	return parts[1]
+}
+
 func MigrateUnitInfoFromFileToPostgres() []string {
 	ret := make([]string, 0)
 	// Search for all *.info file inside Config.OpenVPNStatusDir
@@ -542,8 +555,11 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 	}
 	for _, file := range files {
 		if !file.IsDir() {
-			infoFile := configuration.Config.OpenVPNStatusDir + "/" + file.Name() + ".info"
 			uuid := file.Name()
+			infoFile := configuration.Config.OpenVPNStatusDir + "/" + uuid + ".info"
+			vpnFile := configuration.Config.OpenVPNCCDDir + "/" + uuid + ".vpn"
+			ipaddr := loadUnitIP(uuid)
+
 			// Check if the unit already exists in Postgres
 			exists, err := UnitExists(uuid)
 			if err != nil {
@@ -555,7 +571,20 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 				continue
 			}
 			// ignore the error
-			_ = AddUnit(uuid)
+			addUnitErr := AddUnit(uuid, ipaddr)
+			if addUnitErr != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error adding unit to Postgres:", uuid, addUnitErr.Error())
+				continue
+			}
+			connected_since := 0
+			statusFile, err := os.ReadFile(vpnFile)
+			if err == nil {
+				connected_since, _ = strconv.Atoi(string(statusFile))
+			}
+			if connected_since > 0 {
+				// Update the unit with the connected_since timestamp
+				UpdateUnitVpnStatus(uuid, connected_since)
+			}
 			if _, err := os.Stat(infoFile); err == nil {
 				// read file, parse as JSON and then call AddUnit
 				data, err := os.ReadFile(infoFile)
@@ -812,4 +841,138 @@ func ReloadACLs() {
 	}
 	adminUsers = admins
 	logs.Logs.Println("[INFO][STORAGE][RELOAD_ADMIN_USERS] admin users reloaded successfully")
+}
+
+func GetFreeIP() string {
+	// get all ips
+	IPs, _ := utils.ListIPs(configuration.Config.OpenVPNNetwork, configuration.Config.OpenVPNNetmask)
+	// remove first ip used for tun
+	IPs = IPs[1:]
+
+	pgpool, pgctx := ReportInstance()
+	rows, err := pgpool.Query(pgctx, "SELECT vpn_address FROM units WHERE vpn_address IS NOT NULL")
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_FREE_IP] error in query execution:" + err.Error())
+		return ""
+	}
+	defer rows.Close()
+
+	usedIPs := make([]string, 0)
+	for rows.Next() {
+		var ip string
+		if err := rows.Scan(&ip); err != nil {
+			logs.Logs.Println("[ERR][STORAGE][GET_FREE_IP] error in row scan: " + err.Error())
+			continue
+		}
+		usedIPs = append(usedIPs, ip)
+	}
+	// usedIPs now contains all used IP addresses from the units table
+	// loop all IPs
+	for _, ip := range IPs {
+		if !utils.Contains(ip, usedIPs) {
+			return ip
+		}
+	}
+	return ""
+}
+
+func ListUnits() ([]string, error) {
+	pgpool, pgctx := ReportInstance()
+	rows, err := pgpool.Query(pgctx, "SELECT uuid FROM units")
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][LIST_UNITS] error in query execution:" + err.Error())
+		return nil, err
+	}
+	defer rows.Close()
+
+	var uuids []string
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			logs.Logs.Println("[ERR][STORAGE][LIST_UNITS] error in row scan: " + err.Error())
+			continue
+		}
+		uuids = append(uuids, uuid)
+	}
+	return uuids, nil
+}
+
+func ListConnectedUnits() ([]string, error) {
+	pgpool, pgctx := ReportInstance()
+	rows, err := pgpool.Query(pgctx, "SELECT uuid FROM units WHERE vpn_connected_since IS NOT NULL")
+	if err != nil {
+		logs.Logs.Println("[INFO][STORAGE][LIST_CONNECTED_UNITS] error in query execution:" + err.Error())
+		return nil, err
+	}
+	defer rows.Close()
+
+	var uuids []string
+	for rows.Next() {
+		var uuid string
+		if err := rows.Scan(&uuid); err != nil {
+			logs.Logs.Println("[ERR][STORAGE][LIST_CONNECTED_UNITS] error in row scan: " + err.Error())
+			continue
+		}
+		uuids = append(uuids, uuid)
+	}
+	return uuids, nil
+}
+
+func UpdateUnitVpnStatus(uuid string, connectedSince int) error {
+	pgpool, pgctx := ReportInstance()
+	// Convert connectedSince (seconds since epoch) to time.Time
+	connectedTime := time.Unix(int64(connectedSince), 0)
+	_, err := pgpool.Exec(pgctx, `
+		UPDATE units 
+		SET vpn_connected_since = $1, updated_at = NOW() 
+		WHERE uuid = $2
+	`, connectedTime, uuid)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][UPDATE_UNIT_VPN_STATUS] error in query execution:" + err.Error())
+		return err
+	}
+	return nil
+}
+
+func GetUnit(uuid string) map[string]interface{} {
+	pgpool, pgctx := ReportInstance()
+	var (
+		ipaddress      sql.NullString
+		infoStr        sql.NullString
+		connectedSince sql.NullTime
+	)
+	err := pgpool.QueryRow(pgctx, `
+		SELECT vpn_address, info::text, vpn_connected_since
+		FROM units
+		WHERE uuid = $1
+	`, uuid).Scan(&ipaddress, &infoStr, &connectedSince)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_UNIT] error in query execution:" + err.Error())
+		return nil
+	}
+
+	result := make(map[string]interface{})
+	result["id"] = uuid
+	result["ipaddress"] = ipaddress.String
+	result["netmask"] = configuration.Config.OpenVPNNetmask
+
+	var info map[string]interface{}
+	if infoStr.Valid && infoStr.String != "" {
+		if err := json.Unmarshal([]byte(infoStr.String), &info); err == nil {
+			result["info"] = info
+		} else {
+			result["info"] = map[string]interface{}{}
+		}
+	} else {
+		result["info"] = map[string]interface{}{}
+	}
+
+	result["join_code"] = utils.GetJoinCode(uuid)
+	if connectedSince.Valid {
+		result["connected_since"] = connectedSince.Time.Unix()
+	} else {
+		result["connected_since"] = nil
+	}
+
+	return result
 }

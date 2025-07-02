@@ -16,7 +16,6 @@ import (
 	"net/http"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -56,12 +55,12 @@ func GetUnits(c *gin.Context) {
 			continue
 		}
 		// read unit file
-		result, err := getUnitInfo(unit)
-		if err != nil {
+		result := storage.GetUnit(unit)
+		if result == nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
 				Message: "Can't get unit info for: " + unit,
-				Data:    err.Error(),
+				Data:    nil,
 			}))
 		}
 
@@ -91,13 +90,13 @@ func GetUnit(c *gin.Context) {
 	}
 
 	// parse unit file
-	result, err := getUnitInfo(unitId)
+	result := storage.GetUnit(unitId)
 
-	if err != nil {
+	if result == nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
 			Message: "can't get unit info for: " + unitId,
-			Data:    err.Error(),
+			Data:    nil,
 		}))
 	} else {
 		// return 200 OK with data
@@ -244,41 +243,8 @@ func AddUnit(c *gin.Context) {
 		return
 	}
 
-	// get used ips
-	var usedIPs []string
-
-	units, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "access CCD directory failed",
-			Data:    err.Error(),
-		}))
-		return
-	}
-
-	for _, e := range units {
-		// read unit file
-		unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + e.Name())
-		if err != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    400,
-				Message: "access CCD directory unit file failed",
-				Data:    err.Error(),
-			}))
-			return
-		}
-
-		// parse unit file
-		parts := strings.Split(string(unitFile), "\n")
-		parts = strings.Split(parts[0], " ")
-
-		// append to array
-		usedIPs = append(usedIPs, parts[1])
-	}
-
 	// get free ip of a network
-	freeIP := utils.GetFreeIP(configuration.Config.OpenVPNNetwork, configuration.Config.OpenVPNNetmask, usedIPs)
+	freeIP := storage.GetFreeIP()
 
 	if freeIP == "" {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
@@ -334,7 +300,7 @@ func AddUnit(c *gin.Context) {
 	}
 
 	// create record inside units table
-	errCreate := storage.AddUnit(jsonRequest.UnitId)
+	errCreate := storage.AddUnit(jsonRequest.UnitId, freeIP)
 	if errCreate != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -604,41 +570,11 @@ func DeleteUnit(c *gin.Context) {
 }
 
 func ListUnits() ([]string, error) {
-	// list unit name from files in OpenVPNCCDDir
-	units := []string{}
-	// list file in OpenVPNCCDDir
-	files, err := os.ReadDir(configuration.Config.OpenVPNCCDDir)
-	if err != nil {
-		return nil, err
-	}
-
-	// loop through files
-	for _, file := range files {
-		units = append(units, file.Name())
-	}
-
-	return units, nil
+	return storage.ListUnits()
 }
 
 func ListConnectedUnits() ([]string, error) {
-	// list unit name from files in OpenVPNStatusDir
-	units := []string{}
-
-	// list file in OpenVPNStatusDir
-	files, err := os.ReadDir(configuration.Config.OpenVPNStatusDir)
-	if err != nil {
-		return nil, err
-	}
-
-	// loop through files
-	for _, file := range files {
-
-		if filepath.Ext(file.Name()) == ".vpn" {
-			units = append(units, strings.TrimSuffix(file.Name(), filepath.Ext(file.Name())))
-		}
-	}
-
-	return units, nil
+	return storage.ListConnectedUnits()
 }
 
 func getUnitToken(unitId string) (string, string, error) {
@@ -775,78 +711,6 @@ func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
 	storage.SetUnitInfo(unitId, unitInfo.Data)
 
 	return unitInfo.Data, nil
-}
-
-func getUnitInfo(unitId string) (gin.H, error) {
-	// read ccd dir for unit
-	unitFile, err := readUnitFile(unitId)
-	if err != nil {
-		return gin.H{}, err
-	}
-
-	// parse ccd dir file content
-	result := parseUnitFile(unitId, unitFile)
-
-	// add info from unit
-	remote_info := storage.GetUnitInfo(unitId)
-
-	if remote_info != nil {
-		result["info"] = remote_info
-	} else {
-		result["info"] = gin.H{}
-	}
-
-	// add join code
-	result["join_code"] = utils.GetJoinCode(unitId)
-
-	// add vpn info
-	vpn_info := getVPNInfo(unitId)
-	if vpn_info != nil {
-		result["vpn"] = vpn_info
-	} else {
-		result["vpn"] = gin.H{}
-	}
-
-	return result, nil
-}
-
-func getVPNInfo(unitId string) gin.H {
-	// read unit file
-	statusFile, err := os.ReadFile(configuration.Config.OpenVPNStatusDir + "/" + unitId + ".vpn")
-	if err != nil {
-		return nil
-	}
-
-	// convert timestamp to int
-	time, _ := strconv.Atoi(string(statusFile))
-
-	// return vpn details
-	return gin.H{
-		"connected_since": time,
-	}
-}
-
-func readUnitFile(unitId string) ([]byte, error) {
-	// read unit file
-	unitFile, err := os.ReadFile(configuration.Config.OpenVPNCCDDir + "/" + unitId)
-
-	// return results
-	return unitFile, err
-}
-
-func parseUnitFile(unitId string, unitFile []byte) gin.H {
-	// parse unit file
-	parts := strings.Split(string(unitFile), "\n")
-	parts = strings.Split(parts[0], " ")
-
-	// compose result
-	result := gin.H{
-		"id":        unitId,
-		"ipaddress": parts[1],
-		"netmask":   parts[2],
-	}
-
-	return result
 }
 
 func AddUnitGroup(c *gin.Context) {

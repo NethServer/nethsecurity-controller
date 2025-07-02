@@ -44,23 +44,6 @@ func Contains(a string, values []string) bool {
 	return false
 }
 
-func GetFreeIP(ip string, netmask string, usedIPs []string) string {
-	// get all ips
-	IPs, _ := ListIPs(ip, netmask)
-
-	// remove first ip used for tun
-	IPs = IPs[1:]
-
-	// loop all IPs
-	for _, ip := range IPs {
-		if !Contains(ip, usedIPs) {
-			return ip
-		}
-	}
-
-	return ""
-}
-
 func ListIPs(ipArg string, netmaskArg string) ([]string, error) {
 	// convert netmask to prefix
 	prefixMask, _ := net.IPMask(net.ParseIP(netmaskArg).To4()).Size()
@@ -217,4 +200,16 @@ func ToCIDR(ipStr, maskStr string) string {
 	// The second return value is the total number of bits, which is always 32 for IPv4.
 	prefixSize, _ := mask.Size()
 	return fmt.Sprintf("%s/%d", ipStr, prefixSize)
+}
+
+// ToIpMask takes an IP address in CIDR notation (e.g., "192.168.100.2/24")
+// and returns the IP address and its corresponding netmask string (e.g., "255.255.255.0").
+func ToIpMask(cidr string) (string, string) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return "", ""
+	}
+	mask := ipnet.Mask
+	netmask := fmt.Sprintf("%d.%d.%d.%d", mask[0], mask[1], mask[2], mask[3])
+	return ip.String(), netmask
 }
