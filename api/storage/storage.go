@@ -60,6 +60,9 @@ func Init() *pgxpool.Pool {
 	// Migrate users from SQLite to Postgres if needed
 	MigrateUsersFromSqliteToPostgres(migrated_units)
 
+	// Migrate unit credentials from file to Postgres
+	MigrateUnitCredentialsFromFileToPostgres()
+
 	ReloadACLs()
 
 	// Initialize PostgreSQL connection
@@ -1018,5 +1021,87 @@ func DeleteUnit(uuid string) error {
 		return fmt.Errorf("no unit deleted with uuid %s", uuid)
 	}
 
+	// Also delete credentials for this unit
+	_, err = pgpool.Exec(pgctx, "DELETE FROM unit_credentials WHERE uuid = $1", uuid)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][DELETE_UNIT] error deleting unit credentials:" + err.Error())
+		return err
+	}
+
 	return nil
+}
+
+func GetUnitCredentials(uuid string) (string, string, error) {
+	pgpool, pgctx := ReportInstance()
+	var username, password string
+	err := pgpool.QueryRow(pgctx, "SELECT username, password FROM unit_credentials WHERE uuid = $1::uuid", uuid).Scan(&username, &password)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][GET_UNIT_CREDENTIALS] error in query execution:" + err.Error())
+		return "", "", err
+	}
+
+	decrypted, err := utils.DecryptAESGCMFromString(password, []byte(configuration.Config.EncryptionKey))
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][DECRYPT_UNIT_CREDENTIALS] error in decryption:" + err.Error())
+		return "", "", err
+	}
+
+	return username, string(decrypted), nil
+}
+
+func SetUnitCredentials(uuid string, username string, password string) error {
+	encrypted, err := utils.EncryptAESGCMToString([]byte(password), []byte(configuration.Config.EncryptionKey))
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][ENCRYPT_UNIT_CREDENTIALS] error in encryption:" + err.Error())
+		return err
+	}
+
+	pgpool, pgctx := ReportInstance()
+	// Update the account with the new credentials
+	_, err = pgpool.Exec(pgctx, `
+		INSERT INTO unit_credentials (uuid, username, password)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (uuid) DO UPDATE
+		SET username = EXCLUDED.username, password = EXCLUDED.password
+	`, uuid, username, encrypted)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][SET_UNIT_CREDENTIALS] error in query execution:" + err.Error())
+		return err
+	}
+	return nil
+}
+
+func MigrateUnitCredentialsFromFileToPostgres() {
+	migrated := 0
+	files, err := os.ReadDir(configuration.Config.CredentialsDir)
+	if err != nil {
+		logs.Logs.Println("[INFO][MIGRATION] credentials directory does not exists. Skipping migration.")
+		return
+	}
+	for _, file := range files {
+		if file.IsDir() {
+			continue
+		}
+		unitID := file.Name()
+		credPath := configuration.Config.CredentialsDir + "/" + unitID
+		jsonString, errRead := os.ReadFile(credPath)
+		if errRead != nil {
+			logs.Logs.Println("[WARNING][MIGRATION] error reading credentials file:", credPath, errRead.Error())
+			continue
+		}
+		var credentials models.LoginRequest
+		if err := json.Unmarshal(jsonString, &credentials); err != nil {
+			logs.Logs.Println("[WARNING][MIGRATION] error parsing credentials JSON in file:", credPath, err.Error())
+			continue
+		}
+		if err := SetUnitCredentials(unitID, credentials.Username, credentials.Password); err != nil {
+			logs.Logs.Println("[WARNING][MIGRATION] error setting credentials for unit", unitID, ":", err.Error())
+			continue
+		}
+		if err := os.Remove(credPath); err != nil {
+			logs.Logs.Println("[WARNING][MIGRATION] error removing credentials file:", credPath, err.Error())
+		}
+		migrated++
+	}
+	logs.Logs.Printf("[INFO][MIGRATION] migrated %d unit credentials from file to Postgres\n", migrated)
 }

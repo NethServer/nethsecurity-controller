@@ -2,7 +2,6 @@
 
 mkdir -p /etc/openvpn/sockets
 mkdir -p /nethsecurity-api/tokens
-mkdir -p /nethsecurity-api/credentials
 
 cd /nethsecurity-api
 

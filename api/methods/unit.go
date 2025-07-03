@@ -126,8 +126,20 @@ func GetToken(c *gin.Context) {
 }
 
 func GetUnitInfo(c *gin.Context) {
+	// extract user from JWT claims
+	user := jwt.ExtractClaims(c)["id"].(string)
+
 	// get unit id
 	unitId := c.Param("unit_id")
+
+	if !UserCanAccessUnit(user, unitId) {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "user does not have access to this unit",
+			Data:    nil,
+		}))
+		return
+	}
 
 	// get unit info and store it
 	info, err := GetRemoteInfo(unitId)
@@ -427,32 +439,21 @@ func RegisterUnit(c *gin.Context) {
 			"vpn_address":      vpnAddress,
 		}
 
-		// read credentials from request
-		username := jsonRequest.Username
-		password := jsonRequest.Password
+		// read credentials from database
+		curUsername, _, errRead := storage.GetUnitCredentials(jsonRequest.UnitId)
 
-		// read credentials from file
-		var credentials models.LoginRequest
-		jsonString, errRead := os.ReadFile(configuration.Config.CredentialsDir + "/" + jsonRequest.UnitId)
-
+		var errWrite error
 		// credentials exists, update only if username matches
 		if errRead == nil {
-			// convert json string to struct
-			json.Unmarshal(jsonString, &credentials)
-
-			// check username
-			if credentials.Username == username {
-				credentials.Password = password
+			if curUsername == jsonRequest.Username {
+				errWrite = storage.SetUnitCredentials(jsonRequest.UnitId, curUsername, jsonRequest.Password)
 			}
 		} else {
 			// create credentials
-			credentials.Username = username
-			credentials.Password = password
+			errWrite = storage.SetUnitCredentials(jsonRequest.UnitId, jsonRequest.Username, jsonRequest.Password)
 		}
 
-		// write new credentials
-		newJsonString, _ := json.Marshal(credentials)
-		errWrite := os.WriteFile(configuration.Config.CredentialsDir+"/"+jsonRequest.UnitId, newJsonString, 0644)
+		// save new credentials
 		if errWrite != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
@@ -577,19 +578,23 @@ func ListConnectedUnits() ([]string, error) {
 func getUnitToken(unitId string) (string, string, error) {
 
 	// read credentials
-	var credentials models.LoginRequest
-	body, err := os.ReadFile(configuration.Config.CredentialsDir + "/" + unitId)
+	username, password, err := storage.GetUnitCredentials(unitId)
 	if err != nil {
-		return "", "", errors.New("cannot open credentials file for: " + unitId)
+		return "", "", errors.New("cannot read credentials for: " + unitId)
 	}
-
-	// convert json string to struct
-	json.Unmarshal(body, &credentials)
 
 	// compose request URL
 	postURL := configuration.Config.ProxyProtocol + configuration.Config.ProxyHost + ":" + configuration.Config.ProxyPort + "/" + unitId + configuration.Config.LoginEndpoint
 
 	// create request action
+	credentials := models.LoginRequest{
+		Username: username,
+		Password: password,
+	}
+	body, err := json.Marshal(credentials)
+	if err != nil {
+		return "", "", errors.New("cannot marshal credentials for: " + unitId)
+	}
 	r, err := http.NewRequest("POST", postURL, bytes.NewBuffer(body))
 	if err != nil {
 		return "", "", errors.New("cannot make request for: " + unitId)

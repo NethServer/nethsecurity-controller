@@ -275,7 +275,8 @@ func TestMainEndpoints(t *testing.T) {
 		}
 		// make sure configuration.Config.OpenVPNPKIDir does not exists
 		os.RemoveAll(configuration.Config.OpenVPNPKIDir)
-		body := `{"unit_id": "11", "username": "aa", "unit_name": "bbb", "password": "ccc"}`
+		unitID := "88860838-63bd-4717-a6c3-cbc351010843"
+		body := `{"unit_id": "` + unitID + `", "username": "myuser", "unit_name": "myname", "password": "mypassword"}`
 		req, _ := http.NewRequest("POST", "/units/register", bytes.NewBuffer([]byte(body)))
 		req.Header.Set("Content-Type", "application/json")
 		req.Header.Set("RegistrationToken", "1234")
@@ -293,10 +294,10 @@ func TestMainEndpoints(t *testing.T) {
 			}
 		}
 		// create fake certificate file and key file
-		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/issued/" + "11" + ".crt"); err != nil {
+		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/issued/" + unitID + ".crt"); err != nil {
 			t.Fatalf("failed to create file: %v", err)
 		}
-		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/private/" + "11" + ".key"); err != nil {
+		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/private/" + unitID + ".key"); err != nil {
 			t.Fatalf("failed to create file: %v", err)
 		}
 		// create face ca.crt file
@@ -308,7 +309,13 @@ func TestMainEndpoints(t *testing.T) {
 		req.Header.Set("RegistrationToken", "1234")
 		w = httptest.NewRecorder()
 		router.ServeHTTP(w, req)
-		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+		// Check password retrieval at lower level
+		user, pass, err := storage.GetUnitCredentials(unitID) // should return empty credentials
+		assert.NoError(t, err, "GetUnitCredentials should not return an error")
+		assert.Equal(t, "myuser", user)
+		assert.Equal(t, "mypassword", pass)
 	})
 
 	t.Run("TestNoRoute", func(t *testing.T) {
