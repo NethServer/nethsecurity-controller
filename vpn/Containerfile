@@ -1,6 +1,6 @@
-FROM docker.io/alpine:3.16.9 AS dist
+FROM docker.io/alpine:3.22.0 AS dist
 RUN apk add --no-cache \
-      openvpn=2.5.6-r1 \
+      openvpn \
       easy-rsa \
       postgresql-client
 COPY ip /sbin/ip
