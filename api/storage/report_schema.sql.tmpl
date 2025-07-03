@@ -41,6 +41,12 @@ CREATE TABLE IF NOT EXISTS units (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS unit_credentials (
+  uuid UUID PRIMARY KEY,
+  username TEXT,
+  password TEXT
+);
+
 CREATE TABLE IF NOT EXISTS openvpn_config (
     uuid UUID NOT NULL references units(uuid),
     instance TEXT NOT NULL,

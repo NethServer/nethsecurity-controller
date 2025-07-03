@@ -40,7 +40,7 @@ type Configuration struct {
 	RegistrationToken string   `json:"registration_token"`
 
 	TokensDir      string `json:"tokens_dir"`
-	CredentialsDir string `json:"credentials_dir"`
+	CredentialsDir string `json:"credentials_dir"` // Deprecated: it can be removed in the future
 	DataDir        string `json:"data_dir"`
 	Issuer2FA      string `json:"issuer_2fa"`
 	SecretsDir     string `json:"secrets_dir"` // Deprecated: it can be removed in the future
