@@ -437,8 +437,6 @@ func addUnit(t *testing.T) string {
 	credsBytes, _ := json.Marshal(creds)
 	werr := os.WriteFile(configuration.Config.CredentialsDir+"/"+unitID, credsBytes, 0644)
 	assert.NoError(t, werr, "failed to write credentials file")
-	conf := "ifconfig-push 10.10.10.2 255.255.255.0 \n"
-	werr = os.WriteFile(configuration.Config.OpenVPNCCDDir+"/"+unitID, []byte(conf), 0644)
 	assert.NoError(t, werr, "failed to write ccd file")
 	if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued/" + unitID + ".crt"); os.IsNotExist(err) {
 		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/issued/" + unitID + ".crt"); err != nil {
