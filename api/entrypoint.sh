@@ -26,4 +26,7 @@ while [ ! -e "$socket" ]; do
     fi
 done
 
+# Create database config for OpenVPN hooks
+echo REPORT_DB_URI=$REPORT_DB_URI > /etc/openvpn/db.env
+
 exec "$@"

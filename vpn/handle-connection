@@ -30,5 +30,6 @@ http:
           - "/$username"
 EOF
 
-echo -n "$ifconfig_pool_remote_ip" > /etc/openvpn/clients/$username
-echo -n $(date +%s) > /etc/openvpn/status/$username.vpn
+source /etc/openvpn/db.env
+
+/usr/bin/psql $REPORT_DB_URI -c "UPDATE units SET vpn_connected_since = NOW() WHERE uuid = '$common_name';"
