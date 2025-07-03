@@ -111,7 +111,7 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 	// 2. Open SQLite DB
 	sqliteDB, err := sql.Open("sqlite3", sqlitePath)
 	if err != nil {
-		logs.Logs.Println("[ERR][MIGRATION] cannot open SQLite DB: " + err.Error())
+		logs.Logs.Println("[INFO][MIGRATION] cannot open SQLite DB: skipping user migration")
 		return
 	}
 	defer sqliteDB.Close()
@@ -560,7 +560,8 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 		if !file.IsDir() {
 			uuid := file.Name()
 			infoFile := configuration.Config.OpenVPNStatusDir + "/" + uuid + ".info"
-			vpnFile := configuration.Config.OpenVPNCCDDir + "/" + uuid + ".vpn"
+			ccdFile := configuration.Config.OpenVPNCCDDir + "/" + uuid
+			// uuid.vpn file is not migrated because it does not persist: vpn status is restored as soon as the client re-connects
 			ipaddr := loadUnitIP(uuid)
 
 			// Check if the unit already exists in Postgres
@@ -579,15 +580,6 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 				logs.Logs.Println("[WARNING][MIGRATION] error adding unit to Postgres:", uuid, addUnitErr.Error())
 				continue
 			}
-			connected_since := 0
-			statusFile, err := os.ReadFile(vpnFile)
-			if err == nil {
-				connected_since, _ = strconv.Atoi(string(statusFile))
-			}
-			if connected_since > 0 {
-				// Update the unit with the connected_since timestamp
-				UpdateUnitVpnStatus(uuid, connected_since)
-			}
 			if _, err := os.Stat(infoFile); err == nil {
 				// read file, parse as JSON and then call AddUnit
 				data, err := os.ReadFile(infoFile)
@@ -603,11 +595,17 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 				if err := SetUnitInfo(uuid, info); err != nil {
 					logs.Logs.Println("[WARNING][MIGRATION] error setting unit info for", uuid, ":", err.Error())
 				}
-				// remove the file
+				// remove the info file
 				if err := os.Remove(infoFile); err != nil {
 					logs.Logs.Println("[WARNING][MIGRATION] error removing file:", infoFile, err.Error())
 				} else {
 					logs.Logs.Println("[INFO][MIGRATION] removed file:", infoFile)
+				}
+				// remove ccd file
+				if err := os.Remove(ccdFile); err != nil {
+					logs.Logs.Println("[WARNING][MIGRATION] error removing file:", ccdFile, err.Error())
+				} else {
+					logs.Logs.Println("[INFO][MIGRATION] removed file:", ccdFile)
 				}
 			}
 			ret = append(ret, uuid)

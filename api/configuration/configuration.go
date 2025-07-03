@@ -26,7 +26,7 @@ type Configuration struct {
 	OpenVPNUDPPort string `json:"openvpn_udp_port"`
 
 	OpenVPNStatusDir string `json:"openvpn_status_dir"` // Deprecated: it can be removed in the future
-	OpenVPNCCDDir    string `json:"openvpn_ccd_dir"`
+	OpenVPNCCDDir    string `json:"openvpn_ccd_dir"`    // Deprecated: it can be removed in the future
 	OpenVPNProxyDir  string `json:"openvpn_proxy_dir"`
 	OpenVPNPKIDir    string `json:"openvpn_pki_dir"`
 	OpenVPNMGMTSock  string `json:"openvpn_mgmt_sock"`

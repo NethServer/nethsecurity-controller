@@ -37,7 +37,6 @@ func GetUnits(c *gin.Context) {
 	// extract user from JWT claims
 	user := jwt.ExtractClaims(c)["id"].(string)
 
-	// list file in OpenVPNCCDDir
 	units, err := storage.ListUnits()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
@@ -237,7 +236,8 @@ func AddUnit(c *gin.Context) {
 	}
 
 	// check duplicates
-	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + jsonRequest.UnitId); err == nil {
+	_, err := storage.GetUnit(jsonRequest.UnitId)
+	if err == nil {
 		c.JSON(http.StatusConflict, structs.Map(response.StatusConflict{
 			Code:    409,
 			Message: "duplicated unit id",
@@ -286,18 +286,6 @@ func AddUnit(c *gin.Context) {
 			Code:    400,
 			Message: "cannot sign request certificate for: " + jsonRequest.UnitId,
 			Data:    err.Error(),
-		}))
-		return
-	}
-
-	// write conf
-	conf := "ifconfig-push " + freeIP + " " + configuration.Config.OpenVPNNetmask + "\n"
-	errWrite := os.WriteFile(configuration.Config.OpenVPNCCDDir+"/"+jsonRequest.UnitId, []byte(conf), 0644)
-	if errWrite != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "cannot write conf file for: " + jsonRequest.UnitId,
-			Data:    errWrite.Error(),
 		}))
 		return
 	}
@@ -525,19 +513,6 @@ func DeleteUnit(c *gin.Context) {
 			Data:    err.Error(),
 		}))
 		return
-	}
-
-	// delete reservation/auth file
-	if _, err := os.Stat(configuration.Config.OpenVPNCCDDir + "/" + unitId); err == nil {
-		errDeleteAuth := os.Remove(configuration.Config.OpenVPNCCDDir + "/" + unitId)
-		if errDeleteAuth != nil {
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Code:    500,
-				Message: "error in deletion auth file for: " + unitId,
-				Data:    errDeleteAuth.Error(),
-			}))
-			return
-		}
 	}
 
 	// delete traefik conf
