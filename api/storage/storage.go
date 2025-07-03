@@ -876,25 +876,54 @@ func GetFreeIP() string {
 	return ""
 }
 
-func ListUnits() ([]string, error) {
+func ListUnits() ([]map[string]interface{}, error) {
+
 	pgpool, pgctx := ReportInstance()
-	rows, err := pgpool.Query(pgctx, "SELECT uuid FROM units")
+	rows, err := pgpool.Query(pgctx, "SELECT uuid, vpn_address, info::text, vpn_connected_since FROM units ORDER BY created_at ASC")
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][LIST_UNITS] error in query execution:" + err.Error())
 		return nil, err
 	}
 	defer rows.Close()
 
-	var uuids []string
+	units := make([]map[string]interface{}, 0)
 	for rows.Next() {
-		var uuid string
-		if err := rows.Scan(&uuid); err != nil {
+		var uuid sql.NullString
+		var ipaddress sql.NullString
+		var infoStr sql.NullString
+		var connectedSince sql.NullTime
+		var info map[string]interface{}
+		vpn_info := make(map[string]interface{})
+		unit := make(map[string]interface{})
+
+		if err := rows.Scan(&uuid, &ipaddress, &infoStr, &connectedSince); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][LIST_UNITS] error in row scan: " + err.Error())
 			continue
 		}
-		uuids = append(uuids, uuid)
+
+		unit["id"] = uuid.String
+		unit["ipaddress"] = ipaddress.String
+		unit["netmask"] = configuration.Config.OpenVPNNetmask
+		unit["vpn"] = vpn_info
+
+		if infoStr.Valid && infoStr.String != "" {
+			if err := json.Unmarshal([]byte(infoStr.String), &info); err == nil {
+				unit["info"] = info
+			} else {
+				unit["info"] = map[string]interface{}{}
+			}
+		} else {
+			unit["info"] = map[string]interface{}{}
+		}
+
+		unit["join_code"] = utils.GetJoinCode(uuid.String)
+		if connectedSince.Valid {
+			vpn_info["connected_since"] = connectedSince.Time.Unix()
+		}
+
+		units = append(units, unit)
 	}
-	return uuids, nil
+	return units, nil
 }
 
 func ListConnectedUnits() ([]string, error) {
@@ -934,45 +963,60 @@ func UpdateUnitVpnStatus(uuid string, connectedSince int) error {
 	return nil
 }
 
-func GetUnit(uuid string) map[string]interface{} {
+func GetUnit(uuid string) (map[string]interface{}, error) {
 	pgpool, pgctx := ReportInstance()
-	var (
-		ipaddress      sql.NullString
-		infoStr        sql.NullString
-		connectedSince sql.NullTime
-	)
-	err := pgpool.QueryRow(pgctx, `
-		SELECT vpn_address, info::text, vpn_connected_since
-		FROM units
-		WHERE uuid = $1
-	`, uuid).Scan(&ipaddress, &infoStr, &connectedSince)
-	if err != nil {
+	row := pgpool.QueryRow(pgctx, "SELECT uuid, vpn_address, info::text, vpn_connected_since FROM units WHERE uuid = $1", uuid)
+
+	var unit map[string]interface{}
+	var ipaddress sql.NullString
+	var infoStr sql.NullString
+	var connectedSince sql.NullTime
+
+	if err := row.Scan(&uuid, &ipaddress, &infoStr, &connectedSince); err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_UNIT] error in query execution:" + err.Error())
-		return nil
+		return nil, err
 	}
 
-	result := make(map[string]interface{})
-	result["id"] = uuid
-	result["ipaddress"] = ipaddress.String
-	result["netmask"] = configuration.Config.OpenVPNNetmask
+	unit = make(map[string]interface{})
+	unit["id"] = uuid
+	unit["ipaddress"] = ipaddress.String
+	unit["netmask"] = configuration.Config.OpenVPNNetmask
+	vpn_info := make(map[string]interface{})
+	vpn_info["connected_since"] = 0
 
-	var info map[string]interface{}
 	if infoStr.Valid && infoStr.String != "" {
+		var info map[string]interface{}
 		if err := json.Unmarshal([]byte(infoStr.String), &info); err == nil {
-			result["info"] = info
+			unit["info"] = info
 		} else {
-			result["info"] = map[string]interface{}{}
+			unit["info"] = map[string]interface{}{}
 		}
 	} else {
-		result["info"] = map[string]interface{}{}
+		unit["info"] = map[string]interface{}{}
 	}
 
-	result["join_code"] = utils.GetJoinCode(uuid)
 	if connectedSince.Valid {
-		result["connected_since"] = connectedSince.Time.Unix()
-	} else {
-		result["connected_since"] = nil
+		vpn_info["connected_since"] = connectedSince.Time.Unix()
 	}
 
-	return result
+	unit["vpn"] = vpn_info
+	unit["join_code"] = utils.GetJoinCode(uuid)
+
+	return unit, nil
+}
+
+func DeleteUnit(uuid string) error {
+	pgpool, pgctx := ReportInstance()
+	// Delete the unit from the database
+	res, err := pgpool.Exec(pgctx, "DELETE FROM units WHERE uuid = $1", uuid)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][DELETE_UNIT] error in query execution:" + err.Error())
+		return err
+	}
+	if res.RowsAffected() == 0 {
+		logs.Logs.Println("[WARN][STORAGE][DELETE_UNIT] no unit deleted with uuid " + uuid)
+		return fmt.Errorf("no unit deleted with uuid %s", uuid)
+	}
+
+	return nil
 }

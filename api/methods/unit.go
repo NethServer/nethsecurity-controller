@@ -38,7 +38,7 @@ func GetUnits(c *gin.Context) {
 	user := jwt.ExtractClaims(c)["id"].(string)
 
 	// list file in OpenVPNCCDDir
-	units, err := ListUnits()
+	units, err := storage.ListUnits()
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -51,21 +51,12 @@ func GetUnits(c *gin.Context) {
 	// loop through units
 	var results []gin.H
 	for _, unit := range units {
-		if !UserCanAccessUnit(user, unit) {
+		unitId, ok := unit["id"].(string)
+		if !ok || !UserCanAccessUnit(user, unitId) {
 			continue
 		}
-		// read unit file
-		result := storage.GetUnit(unit)
-		if result == nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    400,
-				Message: "Can't get unit info for: " + unit,
-				Data:    nil,
-			}))
-		}
-
 		// append to array
-		results = append(results, result)
+		results = append(results, unit)
 	}
 
 	// return 200 OK with data
@@ -90,13 +81,13 @@ func GetUnit(c *gin.Context) {
 	}
 
 	// parse unit file
-	result := storage.GetUnit(unitId)
+	result, err := storage.GetUnit(unitId)
 
-	if result == nil {
+	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
 			Message: "can't get unit info for: " + unitId,
-			Data:    nil,
+			Data:    err.Error(),
 		}))
 	} else {
 		// return 200 OK with data
@@ -214,7 +205,7 @@ func AddUnit(c *gin.Context) {
 
 	// if the controller does not have a subscription, limit the number of units to 3
 	if !configuration.Config.ValidSubscription {
-		units, err := ListUnits()
+		units, err := storage.ListUnits()
 		if err != nil {
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
@@ -561,16 +552,22 @@ func DeleteUnit(c *gin.Context) {
 		}
 	}
 
+	deleteError := storage.DeleteUnit(unitId)
+	if deleteError != nil {
+		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
+			Code:    500,
+			Message: "error in deletion unit record for: " + unitId,
+			Data:    deleteError.Error(),
+		}))
+		return
+	}
+
 	// return 200 OK
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "unit deleted successfully",
 		Data:    "",
 	}))
-}
-
-func ListUnits() ([]string, error) {
-	return storage.ListUnits()
 }
 
 func ListConnectedUnits() ([]string, error) {
