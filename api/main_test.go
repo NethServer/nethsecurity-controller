@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,10 +12,10 @@ import (
 	"testing"
 	"time"
 
-	"crypto/rand"
 	mathrand "math/rand"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/methods"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
@@ -165,6 +166,7 @@ func TestMainEndpoints(t *testing.T) {
 		token = jsonResponse["token"].(string)
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.NotEmpty(t, token)
+		assert.True(t, methods.CheckTokenValidation("admin", token))
 	})
 
 	t.Run("TestRefreshEndpoint", func(t *testing.T) {
@@ -189,16 +191,25 @@ func TestMainEndpoints(t *testing.T) {
 		req.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
+		assert.False(t, methods.CheckTokenValidation("admin", token))
 	})
 
 	t.Run("TestGetAccountsEndpoint", func(t *testing.T) {
+		// Login again
+		var jsonResponse map[string]interface{}
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/accounts", nil)
+		body := `{"username": "admin", "password": "admin"}`
+		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token = jsonResponse["token"].(string)
+
+		req, _ = http.NewRequest("GET", "/accounts", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, req)
-		assert.Equal(t, http.StatusOK, w.Code)
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 		// response is: gin.H{"accounts": accounts, "total": len(accounts)},
-		var jsonResponse map[string]interface{}
 		json.NewDecoder(w.Body).Decode(&jsonResponse)
 		data := jsonResponse["data"].(map[string]interface{})
 		assert.Equal(t, data["accounts"].([]interface{})[0].(map[string]interface{})["username"], "admin")
@@ -939,7 +950,6 @@ func setupRouter() *gin.Engine {
 	// default password is "password"
 	os.Setenv("ADMIN_PASSWORD", "admin")
 	os.Setenv("SECRET_JWT", "secret")
-	os.Setenv("TOKENS_DIR", "./tokens")
 	os.Setenv("CREDENTIALS_DIR", "./credentials")
 	os.Setenv("PROMTAIL_ADDRESS", "127.0.0.1")
 	os.Setenv("PROMTAIL_PORT", "6565")
@@ -959,13 +969,6 @@ func setupRouter() *gin.Engine {
 	// create directory configuration directory
 	if _, err := os.Stat(os.Getenv("DATA_DIR")); os.IsNotExist(err) {
 		if err := os.MkdirAll(os.Getenv("DATA_DIR"), 0755); err != nil {
-			fmt.Printf("failed to create directory: %v\n", err)
-			os.Exit(1)
-		}
-	}
-	// create tokens directory
-	if _, err := os.Stat(os.Getenv("TOKENS_DIR")); os.IsNotExist(err) {
-		if err := os.MkdirAll(os.Getenv("TOKENS_DIR"), 0755); err != nil {
 			fmt.Printf("failed to create directory: %v\n", err)
 			os.Exit(1)
 		}

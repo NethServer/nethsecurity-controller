@@ -1,7 +1,6 @@
 #!/bin/sh
 
 mkdir -p /etc/openvpn/sockets
-mkdir -p /nethsecurity-api/tokens
 
 cd /nethsecurity-api
 

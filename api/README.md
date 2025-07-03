@@ -15,7 +15,6 @@ CGO_ENABLED=0 go build
 - `SECRET_JWT`: secret to sing JWT tokens
 - `REGISTRATION_TOKEN`: secret token used to register units
 
-- `TOKENS_DIR`: directory to save authenticated tokens
 - `CREDENTIALS_DIR`: directory to save credentials of connected units
 
 - `PROMTAIL_ADDRESS`: promtail address
