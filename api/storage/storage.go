@@ -55,10 +55,10 @@ func Init() *pgxpool.Pool {
 	dbpool, dbctx = InitReportDb()
 
 	// Migrate unit info from file to Postgres if needed
-	migrated_units := MigrateUnitInfoFromFileToPostgres()
+	migratedUnits := MigrateUnitInfoFromFileToPostgres()
 
 	// Migrate users from SQLite to Postgres if needed
-	MigrateUsersFromSqliteToPostgres(migrated_units)
+	MigrateUsersFromSqliteToPostgres(migratedUnits)
 
 	// Migrate unit credentials from file to Postgres
 	MigrateUnitCredentialsFromFileToPostgres()
@@ -163,7 +163,7 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 		groupID, groupErr = AddUnitGroup(group)
 		// Create a unit group for the migrated units
 		if groupErr != nil {
-			logs.Logs.Println("[ERR][MIGRATION] error creating unit group in Postgres: " + err.Error())
+			logs.Logs.Println("[ERR][MIGRATION] error creating unit group in Postgres: " + groupErr.Error())
 		}
 	}
 
