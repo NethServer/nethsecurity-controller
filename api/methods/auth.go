@@ -16,8 +16,7 @@ import (
 	"math/big"
 	"net/http"
 	"net/url"
-	"os"
-	"strings"
+	"slices"
 	"time"
 
 	"github.com/Jeffail/gabs/v2"
@@ -37,50 +36,52 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
+var activeTokens map[string][]string
+
+func GetActiveTokens() map[string][]string {
+	if activeTokens == nil {
+		activeTokens = make(map[string][]string)
+	}
+	return activeTokens
+}
+
 func CheckTokenValidation(username string, token string) bool {
-	// read whole file
-	secrestListB, err := os.ReadFile(configuration.Config.TokensDir + "/" + username)
-	if err != nil {
+	tokens, ok := GetActiveTokens()[username]
+	if !ok {
 		return false
 	}
-	secrestList := string(secrestListB)
-
-	// //check whether s contains substring text
-	return strings.Contains(secrestList, token)
+	return slices.Contains(tokens, token)
 }
 
 func SetTokenValidation(username string, token string) bool {
-	// open file
-	f, _ := os.OpenFile(configuration.Config.TokensDir+"/"+username, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	defer f.Close()
 
-	// write file with tokens
-	_, err := f.WriteString(token + "\n")
-
-	// check error
-	return err == nil
+	tokens, ok := GetActiveTokens()[username]
+	if !ok {
+		tokens = []string{}
+	}
+	// Avoid duplicates
+	if !slices.Contains(tokens, token) {
+		tokens = append(tokens, token)
+		activeTokens[username] = tokens
+	}
+	return true
 }
 
 func DelTokenValidation(username string, token string) bool {
-	// read whole file
-	secrestListB, errR := os.ReadFile(configuration.Config.TokensDir + "/" + username)
-	if errR != nil {
+	tokens, ok := GetActiveTokens()[username]
+	if !ok {
 		return false
 	}
-	secrestList := string(secrestListB)
-
-	// match token to remove
-	res := strings.Replace(secrestList, token, "", 1)
-
-	// open file
-	f, _ := os.OpenFile(configuration.Config.TokensDir+"/"+username, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	defer f.Close()
-
-	// write file with tokens
-	_, err := f.WriteString(strings.TrimSpace(res) + "\n")
-
-	// check error
-	return err == nil
+	// Remove the token from the user's tokens slice
+	newTokens := slices.DeleteFunc(tokens, func(s string) bool {
+		return s == token
+	})
+	if len(newTokens) == 0 {
+		delete(activeTokens, username)
+	} else {
+		activeTokens[username] = newTokens
+	}
+	return true
 }
 
 func OTPVerify(c *gin.Context) {
