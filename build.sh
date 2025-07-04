@@ -7,7 +7,7 @@ images=()
 container=$(buildah from docker.io/debian:bookworm)
 ui_version="1.0.6"
 
-trap "buildah rm ${container} ${container_api} ${container_proxy}" EXIT
+trap "buildah rm ${container} ${container_api} ${container_proxy} ${container_ui}" EXIT
 
 echo "Installing build dependencies..."
 buildah run ${container} apt-get update
