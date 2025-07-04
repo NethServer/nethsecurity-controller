@@ -27,6 +27,7 @@ type Account struct {
 }
 
 type AccountUpdate struct {
+	Password    string `json:"password" structs:"password"`
 	DisplayName string `json:"display_name" structs:"display_name"`
 	Admin       bool   `json:"admin" structs:"admin"`
 	UnitGroups  []int  `json:"unit_groups" structs:"unit_groups" binding:"required"`

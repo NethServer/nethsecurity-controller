@@ -240,6 +240,21 @@ func AddAccount(account models.Account) (int, error) {
 func UpdateAccount(accountID string, account models.AccountUpdate) error {
 	pgpool, pgctx := ReportInstance()
 	var err error
+	if len(account.Password) > 0 {
+		// Update password only if it is provided
+		_, err = pgpool.Exec(pgctx,
+			`UPDATE accounts
+			 SET password = $1
+			 WHERE id = $2
+			`,
+			utils.HashPassword(account.Password),
+			accountID,
+		)
+		if err != nil {
+			logs.Logs.Println("[ERR][STORAGE][UPDATE_ACCOUNT] error in update accounts password query: " + err.Error())
+			return err
+		}
+	}
 	// Set unit_groups array
 	unitGroupsStrs := make([]string, len(account.UnitGroups))
 	for i, v := range account.UnitGroups {
