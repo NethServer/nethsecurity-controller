@@ -14,17 +14,23 @@ import (
 )
 
 type Account struct {
-	ID          int       `json:"id" structs:"id"`
-	Username    string    `json:"username" structs:"username" binding:"required,excludesall= "`
-	Password    string    `json:"password" structs:"password" db:"-" binding:"required"`
+	ID       int    `json:"id" structs:"id"`
+	Username string `json:"username" structs:"username" binding:"required,excludesall= "`
+	Password string `json:"password" structs:"password" db:"-" binding:"required"`
+	// Watch out: un/marshalling booleans is a pain, see https://github.com/gin-gonic/gin/issues/814
+	Admin       bool      `json:"admin" structs:"admin"`
 	DisplayName string    `json:"display_name" structs:"display_name"`
-	Created     time.Time `json:"created" structs:"created"`
+	UnitGroups  []int     `json:"unit_groups" structs:"unit_groups"`
+	Created     time.Time `json:"created" structs:"created_at"`
+	Updated     time.Time `json:"updated" structs:"updated_at"`
 	TwoFA       bool      `json:"two_fa" structs:"two_fa"`
 }
 
 type AccountUpdate struct {
 	Password    string `json:"password" structs:"password"`
 	DisplayName string `json:"display_name" structs:"display_name"`
+	Admin       bool   `json:"admin" structs:"admin"`
+	UnitGroups  []int  `json:"unit_groups" structs:"unit_groups" binding:"required"`
 }
 
 type PasswordChange struct {

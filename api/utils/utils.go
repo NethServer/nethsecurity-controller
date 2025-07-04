@@ -12,10 +12,14 @@ package utils
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net"
-	"os"
 	"strconv"
-	"strings"
+
+	"crypto/aes"
+	"crypto/cipher"
+	"crypto/rand"
+	"io"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/gin-gonic/gin"
@@ -38,23 +42,6 @@ func Contains(a string, values []string) bool {
 		}
 	}
 	return false
-}
-
-func GetFreeIP(ip string, netmask string, usedIPs []string) string {
-	// get all ips
-	IPs, _ := ListIPs(ip, netmask)
-
-	// remove first ip used for tun
-	IPs = IPs[1:]
-
-	// loop all IPs
-	for _, ip := range IPs {
-		if !Contains(ip, usedIPs) {
-			return ip
-		}
-	}
-
-	return ""
 }
 
 func ListIPs(ipArg string, netmaskArg string) ([]string, error) {
@@ -121,9 +108,108 @@ func Remove(a string, values []string) []string {
 	return values
 }
 
-func GetUserStatus(username string) (string, error) {
-	status, err := os.ReadFile(configuration.Config.SecretsDir + "/" + username + "/status")
-	statusS := strings.TrimSpace(string(status[:]))
+// EncryptAESGCM encrypts plaintext using AES-GCM with the provided key.
+func EncryptAESGCM(plaintext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	nonce := make([]byte, gcm.NonceSize())
+	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
+		return nil, err
+	}
+	ciphertext := gcm.Seal(nonce, nonce, plaintext, nil)
+	return ciphertext, nil
+}
 
-	return statusS, err
+// EncryptAESGCMToString encrypts plaintext and returns a base64 string for DB storage.
+func EncryptAESGCMToString(plaintext, key []byte) (string, error) {
+	ciphertext, err := EncryptAESGCM(plaintext, key)
+	if err != nil {
+		return "", err
+	}
+	return base64.StdEncoding.EncodeToString(ciphertext), nil
+}
+
+// DecryptAESGCMFromString decodes base64 string and decrypts using AES-GCM.
+func DecryptAESGCMFromString(ciphertextB64 string, key []byte) ([]byte, error) {
+	ciphertext, err := base64.StdEncoding.DecodeString(ciphertextB64)
+	if err != nil {
+		return nil, err
+	}
+	plaintext, err := DecryptAESGCM(ciphertext, key)
+	if err == nil {
+		return plaintext, nil
+	}
+	return []byte(""), err
+}
+
+// DecryptAESGCM decrypts ciphertext using AES-GCM with the provided key.
+func DecryptAESGCM(ciphertext, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key)
+	if err != nil {
+		return nil, err
+	}
+	gcm, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, err
+	}
+	if len(ciphertext) < gcm.NonceSize() {
+		return nil, io.ErrUnexpectedEOF
+	}
+	nonce := ciphertext[:gcm.NonceSize()]
+	ciphertext = ciphertext[gcm.NonceSize():]
+	plaintext, err := gcm.Open(nil, nonce, ciphertext, nil)
+	if err != nil {
+		return nil, err
+	}
+	return plaintext, nil
+}
+
+// ToCIDR converts an IPv4 address and a netmask string into CIDR notation.
+// It returns an empty string if the input IP or mask is invalid.
+// For example, given "192.168.0.1" and "255.255.255.0", it returns "192.168.0.1/24".
+func ToCIDR(ipStr, maskStr string) string {
+	// Parse the IP address string.
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return ""
+	}
+	// The function works with IPv4 addresses, so we ensure it's a 4-byte representation.
+	ipv4 := ip.To4()
+	if ipv4 == nil {
+		return ""
+	}
+	// Parse the netmask string as an IP address.
+	maskIP := net.ParseIP(maskStr)
+	if maskIP == nil {
+		return ""
+	}
+	// Convert the parsed netmask IP to a 4-byte representation.
+	maskIPv4 := maskIP.To4()
+	if maskIPv4 == nil {
+		return ""
+	}
+	// Create an IPMask type from the 4-byte mask.
+	mask := net.IPMask(maskIPv4)
+	// Get the prefix size (the number of leading '1's in the mask).
+	// The second return value is the total number of bits, which is always 32 for IPv4.
+	prefixSize, _ := mask.Size()
+	return fmt.Sprintf("%s/%d", ipStr, prefixSize)
+}
+
+// ToIpMask takes an IP address in CIDR notation (e.g., "192.168.100.2/24")
+// and returns the IP address and its corresponding netmask string (e.g., "255.255.255.0").
+func ToIpMask(cidr string) (string, string) {
+	ip, ipnet, err := net.ParseCIDR(cidr)
+	if err != nil {
+		return "", ""
+	}
+	mask := ipnet.Mask
+	netmask := fmt.Sprintf("%d.%d.%d.%d", mask[0], mask[1], mask[2], mask[3])
+	return ip.String(), netmask
 }

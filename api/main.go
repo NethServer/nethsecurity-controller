@@ -52,7 +52,6 @@ func setup() *gin.Engine {
 
 	// init storage
 	storage.Init()
-	storage.InitReportDb()
 
 	// init socket connection
 	socket.Init()
@@ -91,6 +90,11 @@ func setup() *gin.Engine {
 	// define login and logout endpoint
 	api.POST("/login", middleware.InstanceJWT().LoginHandler)
 	api.POST("/logout", middleware.InstanceJWT().LogoutHandler)
+
+	// define healthcheck endpoint
+	api.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+	})
 
 	// 2FA APIs
 	api.POST("/2fa/otp-verify", methods.OTPVerify)
@@ -144,12 +148,34 @@ func setup() *gin.Engine {
 			units.POST("", methods.AddUnit)
 			units.DELETE("/:unit_id", methods.DeleteUnit)
 		}
+
+		// unit_groups APIs
+		unitGroups := api.Group("/unit_groups")
+		{
+			unitGroups.GET("", methods.ListUnitGroups)
+			unitGroups.GET("/:group_id", methods.GetUnitGroup)
+			unitGroups.POST("", methods.AddUnitGroup)
+			unitGroups.PUT("/:group_id", methods.UpdateUnitGroup)
+			unitGroups.DELETE("/:group_id", methods.DeleteUnitGroup)
+		}
+
+		// platforms APIs
+		api.GET("/platform", methods.GetPlatformInfo)
 	}
 
 	// Ingest APIs: receive data from firewalls
-	authorized := router.Group("/ingest", middleware.BasicAuth())
+	authorized := router.Group("/ingest", middleware.BasicUnitAuth())
 	authorized.POST("/info", methods.AddInfo)
 	authorized.POST("/:firewall_api", methods.HandelMonitoring)
+
+	// Forwarded authentication middleware
+	forwarded := router.Group("/auth", middleware.BasicUserAuth())
+	forwarded.GET("", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	forwarded.GET("/:unit_id", func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
 
 	// handle missing endpoint
 	router.NoRoute(func(c *gin.Context) {
@@ -165,6 +191,15 @@ func setup() *gin.Engine {
 
 func main() {
 	router := setup()
-	// run server
-	router.Run(configuration.Config.ListenAddress)
+	// Listen on multiple addresses
+	for _, addr := range configuration.Config.ListenAddress {
+		go func(a string) {
+			if err := router.Run(a); err != nil {
+				logs.Logs.Println("[CRITICAL][API] Server failed to start on address: " + a)
+			}
+		}(addr)
+	}
+
+	// Prevent main from exiting
+	select {}
 }
