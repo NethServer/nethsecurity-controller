@@ -65,7 +65,7 @@ jobs:
         run: |
           echo "built_image_sha=${{ fromJSON(steps.meta.outputs.json).tags[0] }}@${{ steps.build.outputs.imageid }}" >> $GITHUB_ENV
       - name: Generate sarif scan
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@0.32.0
         with:
           image-ref: ${{ env.built_image_sha }}
           format: sarif
@@ -76,7 +76,7 @@ jobs:
           sarif_file: ${{ matrix.directory }}.sarif
           category: ${{ matrix.directory }}
       - name: Update GitHub dependency tree
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@0.32.0
         with:
           image-ref: ${{ env.built_image_sha }}
           format: 'github'
@@ -84,7 +84,7 @@ jobs:
           github-pat: ${{ secrets.GITHUB_TOKEN }}
       - name: Generate SBOM
         if: ${{ startsWith(github.ref, 'refs/tags/') }}
-        uses: aquasecurity/trivy-action@0.31.0
+        uses: aquasecurity/trivy-action@0.32.0
         with:
           image-ref: ${{ env.built_image_sha }}
           format: 'cyclonedx'
