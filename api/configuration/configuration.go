@@ -140,8 +140,7 @@ func Init() {
 	if os.Getenv("SECRETS_DIR") != "" {
 		Config.SecretsDir = os.Getenv("SECRETS_DIR")
 	} else {
-		logs.Logs.Println("[CRITICAL][ENV] SECRETS_DIR variable is empty")
-		os.Exit(1)
+		logs.Logs.Println("[INFO][ENV] SECRETS_DIR variable is empty")
 	}
 
 	if os.Getenv("OVPN_DIR") != "" {
