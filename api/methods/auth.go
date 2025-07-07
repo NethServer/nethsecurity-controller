@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"sync"
 	"time"
 
 	"github.com/Jeffail/gabs/v2"
@@ -36,50 +37,44 @@ import (
 	"github.com/pquerna/otp/totp"
 )
 
-var activeTokens map[string][]string
-
-func GetActiveTokens() map[string][]string {
-	if activeTokens == nil {
-		activeTokens = make(map[string][]string)
-	}
-	return activeTokens
-}
+var activeTokens sync.Map
 
 func CheckTokenValidation(username string, token string) bool {
-	tokens, ok := GetActiveTokens()[username]
+	value, ok := activeTokens.Load(username)
 	if !ok {
 		return false
 	}
+	tokens := value.([]string)
 	return slices.Contains(tokens, token)
 }
 
 func SetTokenValidation(username string, token string) bool {
+	value, _ := activeTokens.LoadOrStore(username, []string{})
+	tokens := value.([]string)
 
-	tokens, ok := GetActiveTokens()[username]
-	if !ok {
-		tokens = []string{}
-	}
 	// Avoid duplicates
 	if !slices.Contains(tokens, token) {
 		tokens = append(tokens, token)
-		activeTokens[username] = tokens
+		activeTokens.Store(username, tokens)
 	}
 	return true
 }
 
 func DelTokenValidation(username string, token string) bool {
-	tokens, ok := GetActiveTokens()[username]
+	value, ok := activeTokens.Load(username)
 	if !ok {
 		return false
 	}
+	tokens := value.([]string)
+
 	// Remove the token from the user's tokens slice
 	newTokens := slices.DeleteFunc(tokens, func(s string) bool {
 		return s == token
 	})
 	if len(newTokens) == 0 {
-		delete(activeTokens, username)
+		activeTokens.Delete(username)
 	} else {
-		activeTokens[username] = newTokens
+		activeTokens.Store(username, newTokens)
 	}
 	return true
 }
