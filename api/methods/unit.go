@@ -22,6 +22,7 @@ import (
 
 	"github.com/NethServer/nethsecurity-api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 
 	"github.com/NethServer/nethsecurity-controller/api/socket"
@@ -265,7 +266,19 @@ func AddUnit(c *gin.Context) {
 		"EASYRSA_REQ_CN="+jsonRequest.UnitId,
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
 	)
+
+	// Print the executed command for debug
+	cmdStr := configuration.Config.EasyRSAPath + " gen-req " + jsonRequest.UnitId + " nopass"
+	logs.Logs.Println("[DEBUG][AddUnit] Executing command: " + cmdStr)
+
+	// Capture stdout and stderr
+	var stdout, stderr bytes.Buffer
+	cmdGenerateGenReq.Stdout = &stdout
+	cmdGenerateGenReq.Stderr = &stderr
+
+	// Print stdout and stderr after execution
 	if err := cmdGenerateGenReq.Run(); err != nil {
+		logs.Logs.Println("[ERROR][AddUnit] Command execution failed: "+err.Error(), " Stdout: "+stdout.String(), " Stderr: "+stderr.String())
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
 			Message: "cannot generate request certificate for: " + jsonRequest.UnitId,
