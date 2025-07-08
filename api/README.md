@@ -210,6 +210,7 @@ The following rules apply:
               "ipaddress": "172.23.21.3",
               "id": "<unit_id>",
               "netmask": "255.255.255.0",
+              "groups": ["group1", "group2"],
               "vpn": {
                   "bytes_rcvd": "21830",
                   "bytes_sent": "5641",
@@ -233,6 +234,7 @@ The following rules apply:
               "id": "<unit_id>",
               "netmask": "",
               "vpn": {},
+              "groups": [],
               "info": {
                   "unit_name": "",
                   "version": "",

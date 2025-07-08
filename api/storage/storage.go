@@ -895,7 +895,18 @@ func GetFreeIP() string {
 func ListUnits() ([]map[string]interface{}, error) {
 
 	pgpool, pgctx := ReportInstance()
-	rows, err := pgpool.Query(pgctx, "SELECT uuid, vpn_address, info::text, vpn_connected_since FROM units ORDER BY created_at ASC")
+	rows, err := pgpool.Query(pgctx, `
+		SELECT
+			u.uuid,
+			u.vpn_address,
+			u.info::text,
+			u.vpn_connected_since,
+			COALESCE(array_agg(g.name) FILTER (WHERE g.id IS NOT NULL), '{}') AS groups
+		FROM units u
+		LEFT JOIN unit_groups g ON u.uuid = ANY(g.units)
+		GROUP BY u.uuid, u.vpn_address, u.info, u.vpn_connected_since
+		ORDER BY u.created_at ASC
+	`)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][LIST_UNITS] error in query execution:" + err.Error())
 		return nil, err
@@ -909,10 +920,11 @@ func ListUnits() ([]map[string]interface{}, error) {
 		var infoStr sql.NullString
 		var connectedSince sql.NullTime
 		var info map[string]interface{}
+		var groups []string
 		vpn_info := make(map[string]interface{})
 		unit := make(map[string]interface{})
 
-		if err := rows.Scan(&uuid, &ipaddress, &infoStr, &connectedSince); err != nil {
+		if err := rows.Scan(&uuid, &ipaddress, &infoStr, &connectedSince, &groups); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][LIST_UNITS] error in row scan: " + err.Error())
 			continue
 		}
@@ -921,6 +933,7 @@ func ListUnits() ([]map[string]interface{}, error) {
 		unit["ipaddress"] = ipaddress.String
 		unit["netmask"] = configuration.Config.OpenVPNNetmask
 		unit["vpn"] = vpn_info
+		unit["groups"] = groups
 
 		if infoStr.Valid && infoStr.String != "" {
 			if err := json.Unmarshal([]byte(infoStr.String), &info); err == nil {
