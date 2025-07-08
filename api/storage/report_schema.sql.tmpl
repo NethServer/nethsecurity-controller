@@ -7,8 +7,12 @@
  * author: Giacomo Sanchietti <giacomo.sanchietti@nethesis.it>
  */
 
--- Create the schema for the report database
+---------------------------------------------------------------------------------------------
+-- CORE CONFIGURATION TABLES
+-- These tables are part of the core, used to store the core configuration of the application
+---------------------------------------------------------------------------------------------
 
+-- This table contains all user accounts
 CREATE TABLE IF NOT EXISTS accounts (
 		id SERIAL PRIMARY KEY,
 		username TEXT NOT NULL UNIQUE,
@@ -22,6 +26,7 @@ CREATE TABLE IF NOT EXISTS accounts (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- This table contains all unit groups
 CREATE TABLE IF NOT EXISTS unit_groups (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL UNIQUE,
@@ -31,6 +36,7 @@ CREATE TABLE IF NOT EXISTS unit_groups (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- This table contains all units
 CREATE TABLE IF NOT EXISTS units (
     uuid UUID PRIMARY KEY,
     name TEXT,
@@ -41,12 +47,19 @@ CREATE TABLE IF NOT EXISTS units (
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- This table contains all unit credentials
 CREATE TABLE IF NOT EXISTS unit_credentials (
   uuid UUID PRIMARY KEY,
   username TEXT,
   password TEXT
 );
 
+------------------------------------------------------------------
+-- REPORT TABLES
+-- All the following tables are used for reporting inside Grafana
+------------------------------------------------------------------
+
+-- This table contains the list of OpenVPN instances configured inside the units
 CREATE TABLE IF NOT EXISTS openvpn_config (
     uuid UUID NOT NULL references units(uuid),
     instance TEXT NOT NULL,
@@ -56,6 +69,7 @@ CREATE TABLE IF NOT EXISTS openvpn_config (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- This table contains the list of WAN interfaces configured inside the units
 CREATE TABLE IF NOT EXISTS wan_config (
     uuid UUID NOT NULL references units(uuid),
     interface TEXT NOT NULL,
