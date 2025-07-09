@@ -81,6 +81,7 @@ By default, a user can't access any unit.
 A user can be promoted to an admin user, which allows the user to manage other users and units.
 
 Admin users have the `admin` flag set to `true` and can:
+
 - create, modify and delete user accounts
 - create, modify and delete units
 - create, modify and delete units groups
@@ -489,7 +490,8 @@ The following rules apply:
                   "description": "This is a test group",
                   "units": ["unit_id_1", "unit_id_2"],
                   "created": "2024-03-14T09:37:28+01:00",
-                  "updated": "2024-03-14T10:00:00+01:00"
+                  "updated": "2024-03-14T10:00:00+01:00",
+                  "used_by": ["account_id_1", "account_id_2"]
               }
               ...
           ]
@@ -955,8 +957,8 @@ The following rules apply:
 
 ### Ingest
 
-This API is used to ingest metrics from connected units. It requires basic authentication and 
-takes `firewall_api` as a parameter. 
+This API is used to ingest metrics from connected units. It requires basic authentication and
+takes `firewall_api` as a parameter.
 The `firewall_api` paramater is the name of the firewall API that is sending the metrics.
 The API accepts only POST requests abd requires the following headers:
 
@@ -964,8 +966,9 @@ The API accepts only POST requests abd requires the following headers:
 - `Content-Type: application/json`: the content type must be JSON
 
 It responds with a 200 status code in case of success. Success example:
+
 ```json
-{"code":200,"data":null,"message":"success"}
+{ "code": 200, "data": null, "message": "success" }
 ```
 
 Possible error status codes are:
@@ -998,20 +1001,22 @@ Error example:
   REQ
 
   ```json
-  { "data": [
-    {
-      "timestamp": 1726819981,
-      "wan": "wan",
-      "interface": "eth1",
-      "event": "online"
-    },
-    {
-      "timestamp": 1726820241,
-      "wan": "wan2",
-      "interface": "eth2",
-      "event": "offline"
-    },
-  ]}
+  {
+    "data": [
+      {
+        "timestamp": 1726819981,
+        "wan": "wan",
+        "interface": "eth1",
+        "event": "online"
+      },
+      {
+        "timestamp": 1726820241,
+        "wan": "wan2",
+        "interface": "eth2",
+        "event": "offline"
+      }
+    ]
+  }
   ```
 
 - `POST /ingest/dump-ts-attacks`
@@ -1021,12 +1026,14 @@ Error example:
   REQ
 
   ```json
-  { "data": [
-    {
-      "timestamp": 1726812650,
-      "ip": "200.91.234.36"
-    }
-  ]}
+  {
+    "data": [
+      {
+        "timestamp": 1726812650,
+        "ip": "200.91.234.36"
+      }
+    ]
+  }
   ```
 
 - `POST /ingest/dump-ts-malware`
@@ -1036,15 +1043,17 @@ Error example:
   REQ
 
   ```json
-  { "data": [
-    {
-      "timestamp": 1726811160,
-      "src": "5.6.32.54",
-      "dst": "1.2.3.4",
-      "category": "nethesislvl3v4",
-      "chain": "inp-wan"
-    }
-  ]}
+  {
+    "data": [
+      {
+        "timestamp": 1726811160,
+        "src": "5.6.32.54",
+        "dst": "1.2.3.4",
+        "category": "nethesislvl3v4",
+        "chain": "inp-wan"
+      }
+    ]
+  }
   ```
 
 - `POST /ingest/dump-ovpn-connections`
@@ -1054,19 +1063,21 @@ Error example:
   REQ
 
   ```json
-  { "data": [
-    {
-      "timestamp": 1726812276,
-      "instance": "ns_roadwarrior1",
-      "common_name": "user1",
-      "virtual_ip_addr": "10.9.10.41",
-      "remote_ip_addr": "1.2.3.4",
-      "start_time": 1726819476,
-      "duration": 4,
-      "bytes_received": 16343,
-      "bytes_sent": 7666
-    }
-  ]}
+  {
+    "data": [
+      {
+        "timestamp": 1726812276,
+        "instance": "ns_roadwarrior1",
+        "common_name": "user1",
+        "virtual_ip_addr": "10.9.10.41",
+        "remote_ip_addr": "1.2.3.4",
+        "start_time": 1726819476,
+        "duration": 4,
+        "bytes_received": 16343,
+        "bytes_sent": 7666
+      }
+    ]
+  }
   ```
 
 - `POST /ingest/dump-dpi-stats`
@@ -1076,15 +1087,19 @@ Error example:
   REQ
 
   ```json
-  { "data": [
-    {
-      "timestamp": 1726819203,
-      "client_address": "fe80::10ac:f709:5fb8:8fc3",
-      "client_name": "host1.test.local",
-      "protocol": "mdns",
-      "bytes": 123
-    }
-  ]}
+  {
+    "data": [
+      {
+        "timestamp": 1726819203,
+        "client_address": "fe80::10ac:f709:5fb8:8fc3",
+        "client_name": "host1.test.local",
+        "protocol": "mdns",
+        "bytes": 123
+      }
+    ]
+  }
+  ```
+
   ```
 
   ```
@@ -1094,8 +1109,18 @@ Error example:
   Store the openvpn configuration in the report database.
 
   REQ
+
   ```json
-  {"data": [{"instance": "ns_roadwarrior1", "device": "tunrw1", "type": "rw", "name": "srv1"}]}
+  {
+    "data": [
+      {
+        "instance": "ns_roadwarrior1",
+        "device": "tunrw1",
+        "type": "rw",
+        "name": "srv1"
+      }
+    ]
+  }
   ```
 
 - `POST /ingest/dump-wan-config`
@@ -1103,5 +1128,10 @@ Error example:
   REQ
 
   ```json
-  {"data": [{"interface": "wan1", "device": "eth0", "status": "online"}, {"interface": "wan2", "device": "eth5", "status": "offline"}]}
+  {
+    "data": [
+      { "interface": "wan1", "device": "eth0", "status": "online" },
+      { "interface": "wan2", "device": "eth5", "status": "offline" }
+    ]
+  }
   ```
