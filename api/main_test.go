@@ -553,7 +553,10 @@ func TestGetPlatformInfo(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer "+token)
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code)
-
+	platformInfoEnv := os.Getenv("PLATFORM_INFO")
+	var platformInfo map[string]interface{}
+	err := json.Unmarshal([]byte(platformInfoEnv), &platformInfo)
+	assert.NoError(t, err)
 	// Step 3: Check response
 	var resp map[string]interface{}
 	_ = json.NewDecoder(w.Body).Decode(&resp)
@@ -962,7 +965,7 @@ func setupRouter() *gin.Engine {
 	os.Setenv("ISSUER_2FA", "test")
 	os.Setenv("SECRETS_DIR", "./secrets")
 	os.Setenv("ENCRYPTION_KEY", "12345678901234567890123456789012")
-	os.Setenv("PLATFORM_INFO", `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "nethserver_version":"1.6.0", "nethserver_system_id":"1234567890", "metrics_retention_days":30, "logs_retention_days":90}`)
+	os.Setenv("PLATFORM_INFO", `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`)
 
 	// create directory configuration directory
 	if _, err := os.Stat(os.Getenv("DATA_DIR")); os.IsNotExist(err) {
