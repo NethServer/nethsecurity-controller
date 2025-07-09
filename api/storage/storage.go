@@ -697,7 +697,20 @@ func DeleteUnitGroup(groupID int) error {
 
 func ListUnitGroups() ([]models.UnitGroup, error) {
 	pgpool, pgctx := ReportInstance()
-	rows, err := pgpool.Query(pgctx, `SELECT id, name, description, units, created_at, updated_at FROM unit_groups`)
+	rows, err := pgpool.Query(pgctx, `
+		SELECT 
+			ug.id, 
+			ug.name, 
+			ug.description, 
+			ug.units, 
+			ug.created_at, 
+			ug.updated_at,
+			COALESCE(array_agg(a.username) FILTER (WHERE a.username IS NOT NULL), '{}') AS accounts
+		FROM unit_groups ug
+		LEFT JOIN accounts a ON ug.id = ANY(a.unit_groups)
+		GROUP BY ug.id, ug.name, ug.description, ug.units, ug.created_at, ug.updated_at
+		ORDER BY ug.id ASC
+	`)
 	if err != nil {
 		logs.Logs.Println("[ERR][STORAGE][GET_UNIT_GROUPS] error in query execution:" + err.Error())
 		return nil, err
@@ -708,11 +721,13 @@ func ListUnitGroups() ([]models.UnitGroup, error) {
 	for rows.Next() {
 		var group models.UnitGroup
 		var unitsArray []string
-		if err := rows.Scan(&group.ID, &group.Name, &group.Description, &unitsArray, &group.CreatedAt, &group.UpdatedAt); err != nil {
+		var accountsArray []string
+		if err := rows.Scan(&group.ID, &group.Name, &group.Description, &unitsArray, &group.CreatedAt, &group.UpdatedAt, &accountsArray); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][GET_UNIT_GROUPS] error in query row extraction" + err.Error())
 			continue
 		}
 		group.Units = unitsArray
+		group.UsedBy = accountsArray
 		groups = append(groups, group)
 	}
 	return groups, nil

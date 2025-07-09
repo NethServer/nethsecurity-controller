@@ -61,4 +61,5 @@ type UnitGroup struct {
 	Units       []string  `json:"units" structs:"units"`
 	CreatedAt   time.Time `json:"created_at" structs:"created_at"`
 	UpdatedAt   time.Time `json:"updated_at" structs:"updated_at"`
+	UsedBy      []string  `json:"used_by" structs:"used_by"`
 }
