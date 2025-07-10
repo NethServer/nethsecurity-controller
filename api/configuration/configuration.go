@@ -10,10 +10,12 @@
 package configuration
 
 import (
+	"encoding/json"
 	"os"
 	"strings"
 
 	"github.com/NethServer/nethsecurity-controller/api/logs"
+	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/Showmax/go-fqdn"
 )
 
@@ -23,13 +25,13 @@ type Configuration struct {
 	OpenVPNNetmask string `json:"openvpn_netmask"`
 	OpenVPNUDPPort string `json:"openvpn_udp_port"`
 
-	OpenVPNStatusDir string `json:"openvpn_status_dir"`
-	OpenVPNCCDDir    string `json:"openvpn_ccd_dir"`
+	OpenVPNStatusDir string `json:"openvpn_status_dir"` // Deprecated: it can be removed in the future
+	OpenVPNCCDDir    string `json:"openvpn_ccd_dir"`    // Deprecated: it can be removed in the future
 	OpenVPNProxyDir  string `json:"openvpn_proxy_dir"`
 	OpenVPNPKIDir    string `json:"openvpn_pki_dir"`
 	OpenVPNMGMTSock  string `json:"openvpn_mgmt_sock"`
 
-	ListenAddress string `json:"listen_address"`
+	ListenAddress []string `json:"listen_address"`
 
 	AdminUsername     string   `json:"admin_username"`
 	AdminPassword     string   `json:"admin_password"`
@@ -37,11 +39,10 @@ type Configuration struct {
 	SensitiveList     []string `json:"sensitive_list"`
 	RegistrationToken string   `json:"registration_token"`
 
-	TokensDir      string `json:"tokens_dir"`
-	CredentialsDir string `json:"credentials_dir"`
+	CredentialsDir string `json:"credentials_dir"` // Deprecated: it can be removed in the future
 	DataDir        string `json:"data_dir"`
 	Issuer2FA      string `json:"issuer_2fa"`
-	SecretsDir     string `json:"secrets_dir"`
+	SecretsDir     string `json:"secrets_dir"` // Deprecated: it can be removed in the future
 
 	PromtailAddress string `json:"promtail_address"`
 	PromtailPort    string `json:"promtail_port"`
@@ -70,6 +71,10 @@ type Configuration struct {
 	GrafanaPostgresPassword string `json:"grafana_postgres_password"`
 
 	RetentionDays string `json:"retention_days"`
+
+	EncryptionKey string `json:"encryption_key"`
+
+	PlatformInfo models.PlatformInfo `json:"platform_info"`
 }
 
 var Config = Configuration{}
@@ -77,9 +82,9 @@ var Config = Configuration{}
 func Init() {
 	// read configuration from ENV
 	if os.Getenv("LISTEN_ADDRESS") != "" {
-		Config.ListenAddress = os.Getenv("LISTEN_ADDRESS")
+		Config.ListenAddress = strings.Split(os.Getenv("LISTEN_ADDRESS"), ",")
 	} else {
-		Config.ListenAddress = "127.0.0.1:5000"
+		Config.ListenAddress = []string{"127.0.0.1:5000"}
 	}
 
 	if os.Getenv("ADMIN_USERNAME") != "" {
@@ -112,12 +117,6 @@ func Init() {
 		os.Exit(1)
 	}
 
-	if os.Getenv("TOKENS_DIR") != "" {
-		Config.TokensDir = os.Getenv("TOKENS_DIR")
-	} else {
-		logs.Logs.Println("[CRITICAL][ENV] TOKENS_DIR variable is empty")
-		os.Exit(1)
-	}
 	if os.Getenv("CREDENTIALS_DIR") != "" {
 		Config.CredentialsDir = os.Getenv("CREDENTIALS_DIR")
 	} else {
@@ -141,8 +140,7 @@ func Init() {
 	if os.Getenv("SECRETS_DIR") != "" {
 		Config.SecretsDir = os.Getenv("SECRETS_DIR")
 	} else {
-		logs.Logs.Println("[CRITICAL][ENV] SECRETS_DIR variable is empty")
-		os.Exit(1)
+		logs.Logs.Println("[INFO][ENV] SECRETS_DIR variable is empty")
 	}
 
 	if os.Getenv("OVPN_DIR") != "" {
@@ -166,11 +164,7 @@ func Init() {
 		Config.OpenVPNUDPPort = "1194"
 	}
 
-	if os.Getenv("OVPN_S_DIR") != "" {
-		Config.OpenVPNStatusDir = os.Getenv("OVPN_S_DIR")
-	} else {
-		Config.OpenVPNStatusDir = Config.OpenVPNDir + "/status"
-	}
+	Config.OpenVPNStatusDir = Config.OpenVPNDir + "/status"
 	if os.Getenv("OVPN_C_DIR") != "" {
 		Config.OpenVPNCCDDir = os.Getenv("OVPN_C_DIR")
 	} else {
@@ -300,5 +294,27 @@ func Init() {
 		Config.RetentionDays = os.Getenv("RETENTION_DAYS")
 	} else {
 		Config.RetentionDays = "60"
+	}
+
+	if os.Getenv("ENCRYPTION_KEY") != "" {
+		Config.EncryptionKey = os.Getenv("ENCRYPTION_KEY")
+		if len(Config.EncryptionKey) != 32 {
+			logs.Logs.Println("[CRITICAL][ENV] ENCRYPTION_KEY variable is not 32 bytes")
+			os.Exit(1)
+		}
+	} else {
+		logs.Logs.Println("[CRITICAL][ENV] ENCRYPTION_KEY variable is empty")
+		os.Exit(1)
+	}
+
+	if os.Getenv("PLATFORM_INFO") != "" {
+		var platformInfo models.PlatformInfo
+		err := json.Unmarshal([]byte(os.Getenv("PLATFORM_INFO")), &platformInfo)
+		if err != nil {
+			logs.Logs.Println("[WARNING][ENV] PLATFORM_INFO variable is not valid JSON:", err)
+		}
+		Config.PlatformInfo = platformInfo
+	} else {
+		Config.PlatformInfo = models.PlatformInfo{}
 	}
 }
