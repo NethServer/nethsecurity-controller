@@ -132,7 +132,11 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 			continue
 		}
 		acc.Created, _ = time.Parse(time.RFC3339, createdStr)
-		acc.Admin = true
+		if acc.ID == 1 {
+			acc.Admin = true
+		} else {
+			acc.Admin = false // Default to false for other users
+		}
 		users = append(users, acc)
 	}
 	if len(users) == 0 {
