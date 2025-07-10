@@ -5,7 +5,7 @@ repobase="ghcr.io/nethserver"
 
 images=()
 container=$(buildah from docker.io/debian:bookworm)
-ui_version="1.0.6"
+ui_version="controller_refactor"
 
 trap "buildah rm ${container} ${container_api} ${container_proxy} ${container_ui}" EXIT
 
