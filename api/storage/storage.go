@@ -132,7 +132,11 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 			continue
 		}
 		acc.Created, _ = time.Parse(time.RFC3339, createdStr)
-		acc.Admin = true
+		if acc.ID == 1 {
+			acc.Admin = true
+		} else {
+			acc.Admin = false // Default to false for other users
+		}
 		users = append(users, acc)
 	}
 	if len(users) == 0 {
@@ -184,8 +188,8 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 		}
 		// remove acc.Username directory
 		os.RemoveAll(configuration.Config.SecretsDir + "/" + acc.Username)
-		if groupID > 0 {
-			acc.UnitGroups = []int{groupID} // Set unit group for the user
+		if groupID > 0 && !acc.Admin {
+			acc.UnitGroups = []int{groupID} // Set unit group for non admin users
 		}
 		// Insert user into Postgres
 		_, accountError := AddAccount(acc) // Use AddAccount to handle password hashing and other logic
