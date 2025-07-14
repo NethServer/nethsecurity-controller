@@ -1,0 +1,162 @@
+services:
+  vpn:
+    image: ghcr.io/nethserver/nethsecurity-vpn:${IMAGE_TAG:-latest}
+    container_name: nethsecurity-vpn
+    network_mode: host
+    privileged: true
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    volumes:
+      - ./openvpn:/etc/openvpn
+    restart: unless-stopped
+
+  db:
+    image: docker.io/timescale/timescaledb:2.20.3-pg16
+    container_name: nethsecurity-db
+    network_mode: host
+    environment:
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_USER=report
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U report"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  api:
+    image: ghcr.io/nethserver/nethsecurity-api:${IMAGE_TAG:-latest}
+    container_name: nethsecurity-api
+    network_mode: host
+    depends_on:
+      db:
+        condition: service_healthy
+      vpn:
+        condition: service_started
+    environment:
+      - LISTEN_ADDRESS=0.0.0.0:5000
+      - ADMIN_USERNAME=admin
+      - ADMIN_PASSWORD=admin
+      - SECRET_JWT=secret
+      - PROMTAIL_ADDRESS=127.0.0.1
+      - PROMTAIL_PORT=6565
+      - PROMETHEUS_PATH=/prometheus
+      - WEBSSH_PATH=/webssh
+      - GRAFANA_PATH=/grafana
+      - REGISTRATION_TOKEN=1234
+      - DATA_DIR=data
+      - OVPN_DIR=/etc/openvpn
+      - REPORT_DB_URI=postgres://report:password@127.0.0.1:5432/report
+      - GRAFANA_POSTGRES_PASSWORD=password
+      - ISSUER_2FA=test
+      - ENCRYPTION_KEY=12345678901234567890123456789012
+      - GIN_MODE=debug
+      - FQDN=${FQDN:-localhost}
+      - VALID_SUBSCRIPTION=true
+      - 'PLATFORM_INFO={"vpn_port": "1194", "vpn_network": "172.21.0.0/16", "controller_version": "${IMAGE_TAG:-latest}", "metrics_retention_days": 15, "logs_retention_days": 180}'
+    volumes:
+      - ./openvpn:/etc/openvpn
+    restart: unless-stopped
+
+  ui:
+    image: ghcr.io/nethserver/nethsecurity-ui:${IMAGE_TAG:-latest}
+    container_name: nethsecurity-ui
+    network_mode: host
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  proxy:
+    image: ghcr.io/nethserver/nethsecurity-proxy:${IMAGE_TAG:-latest}
+    container_name: nethsecurity-proxy
+    network_mode: host
+    depends_on:
+      - ui
+    restart: unless-stopped
+    
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: nethsecurity-grafana
+    network_mode: host
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_ROOT_URL=http://${FQDN:-localhost}/grafana
+      - GF_SERVER_SERVE_FROM_SUB_PATH=true
+      - GF_SERVER_HTTP_PORT=4000
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: nethsecurity-prometheus
+    network_mode: host
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.external-url=http://${FQDN:-localhost}/prometheus'
+      - '--web.route-prefix=/prometheus'
+    depends_on:
+      - api
+    restart: unless-stopped
+
+  traefik:
+    image: traefik:v3.4
+    container_name: nethsecurity-traefik
+    network_mode: host
+    command:
+      - "--providers.file.directory=/etc/traefik/dynamic"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--accesslog=true"
+      - "--log.level=DEBUG"
+      - "--api=true"
+      - "--api.dashboard=true"
+      - "--api.insecure=false"
+    volumes:
+      - ./traefik:/etc/traefik/dynamic:ro
+    depends_on:
+      - proxy
+      - grafana
+      - prometheus
+      - webssh
+    restart: unless-stopped
+
+  webssh:
+    image: ghcr.io/nethserver/webssh:latest
+    container_name: nethsecurity-webssh
+    network_mode: host
+    environment:
+      - WEBSSH_BASE_URL=/webssh
+      - WEBSSH_HOST=127.0.0.1
+      - WEBSSH_PORT=8888
+    depends_on:
+      - vpn
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: nethsecurity-loki
+    network_mode: host
+    command:
+      - "-config.file=/etc/loki/local-config.yaml"
+    environment:
+      - LOKI_CONFIG_PATH=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  promtail:
+    image: grafana/promtail:2.9.0
+    container_name: nethsecurity-promtail
+    network_mode: host
+    command:
+      - "-config.file=/etc/promtail/config.yml"
+    volumes:
+      - ./promtail:/etc/promtail:ro
+    depends_on:
+      - loki
+    restart: unless-stopped

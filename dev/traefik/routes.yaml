@@ -1,0 +1,120 @@
+http:
+  routers:
+    # NethSecurity UI Router - Root path
+    ui-router:
+      rule: "PathPrefix(`/`)"
+      service: ui-service
+      priority: 1
+      entryPoints:
+        - web
+        - websecure
+      tls: {}
+
+    # API Router
+    api-router:
+      rule: "PathPrefix(`/api`)"
+      service: api-service
+      priority: 100
+      middlewares:
+      - api-strip-prefix
+      entryPoints:
+      - web
+      - websecure
+      tls: {}
+    
+    # Grafana Router
+    grafana-router:
+      rule: "PathPrefix(`/grafana`)"
+      service: grafana-service
+      priority: 100
+      middlewares:
+        - grafana-strip-prefix
+      entryPoints:
+        - web
+        - websecure
+      tls: {}
+    
+    # Prometheus Router
+    prometheus-router:
+      rule: "PathPrefix(`/prometheus`)"
+      service: prometheus-service
+      priority: 100
+      middlewares:
+        - prometheus-strip-prefix
+      entryPoints:
+        - web
+        - websecure
+
+    # WebSSH Router
+    webssh-router:
+      rule: "PathPrefix(`/webssh`)"
+      service: webssh-service
+      priority: 100
+      middlewares:
+        - webssh-strip-prefix
+      entryPoints:
+        - web
+        - websecure
+
+    # Traefik Dashboard Router
+    traefik-dashboard-router:
+      rule: "PathPrefix(`/traefik`)"
+      service: api@internal
+      priority: 100
+      middlewares:
+        - traefik-strip-prefix
+      entryPoints:
+        - web
+        - websecure
+
+  middlewares:
+    traefik-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/traefik"
+
+    grafana-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/grafana"
+
+    prometheus-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/prometheus"
+
+    webssh-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/webssh"
+
+    api-strip-prefix:
+      stripPrefix:
+        prefixes:
+          - "/api"
+
+  services:
+    ui-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:3000"
+    
+    grafana-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:4000"
+    
+    prometheus-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:9090"
+    
+    webssh-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:8888"
+
+    api-service:
+      loadBalancer:
+        servers:
+          - url: "http://127.0.0.1:5000"

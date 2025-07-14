@@ -11,8 +11,19 @@ Firewalls can register to the server using [ns-plug](https://github.com/NethServ
 
 You can install the controller on [NS8](https://github.com/NethServer/ns8-nethsecurity-controller#install).
 
-If you need a development environment, you can use the `dev.sh` script to start a podman pod with all the containers needed to run the controller.
-First make sure to have [podman](https://podman.io/) installed on your server.
+The dev environement has been tested on Ubuntu 24.10.
+Fist, prepare the machine:
+- [install Docker](https://docs.docker.com/engine/install/ubuntu/)
+- [install Docker Compose](https://docs.docker.com/compose/install/linux/)
+
+Then, clone this repository, enter the `dev` directory and execute the `dev.sh` script:
+```
+git clone https://github.com/NethServer/nethsecurity-controller.git
+cd dev
+./dev.sh start
+```
+
+you can use the `dev.sh` script to start a podman pod with all the containers needed to run the controller.
 Containers should run under non-root users, but first you need to configure the tun device and the user.
 
 As root, execute:
