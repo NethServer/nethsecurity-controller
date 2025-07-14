@@ -46,6 +46,7 @@ type UnitInfo struct {
 	SSHPort          int    `json:"ssh_port"`
 	FQDN             string `json:"fqdn"`
 	APIVersion       string `json:"api_version"`
+	Description      string `json:"description"`
 }
 
 type CheckSystemUpdate struct {

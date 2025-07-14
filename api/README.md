@@ -1135,3 +1135,53 @@ Error example:
     ]
   }
   ```
+
+- `POST /ingest/info`
+
+  This endpoint is used to store general information about the unit in the report database. It requires basic authentication and accepts the following headers:
+
+  - `Authorization:`: basic authentication header, where the username is the unit UUID and the password is the registration token.
+  - `Content-Type: application/json`: the content type must be JSON.
+
+  REQ
+
+  ```json
+  {
+    "unit_name": "NethSec",
+    "version": "NethSecurity 8 24.10.0-ns.1.6.0",
+    "subscription_type": "",
+    "system_id": "",
+    "ssh_port": 22,
+    "fqdn": "NethSec",
+    "description": "This is my description",
+    "api_version": "3.2.0-r1",
+    "scheduled_update": -1,
+    "version_update": "NethSecurity 8-24.10.0-ns.1.6.0"
+  }
+  ```
+
+  RES
+
+  ```json
+  {
+    "code": 200,
+    "data": null,
+    "message": "success"
+  }
+  ```
+
+  Possible error status codes:
+
+  - 400 if the request is malformed.
+  - 401 if the authentication headers are missing or invalid.
+  - 500 if there is an internal server error.
+
+  Error example:
+
+  ```json
+  {
+    "code": 401,
+    "data": null,
+    "message": "invalid unit id"
+  }
+    ```
