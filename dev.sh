@@ -86,7 +86,7 @@ case "$1" in
         start_pod
         ;;
     *)
-        echo "Usage: $0 {start|stop} [htdocs_path]"
+        echo "Usage: $0 {start|stop}"
         exit 1
         ;;
 esac
