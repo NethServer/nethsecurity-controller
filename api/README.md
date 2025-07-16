@@ -489,8 +489,8 @@ The following rules apply:
                   "name": "Group 1",
                   "description": "This is a test group",
                   "units": ["unit_id_1", "unit_id_2"],
-                  "created": "2024-03-14T09:37:28+01:00",
-                  "updated": "2024-03-14T10:00:00+01:00",
+                  "created_at": "2024-03-14T09:37:28+01:00",
+                  "updated_at": "2024-03-14T10:00:00+01:00",
                   "used_by": ["account_id_1", "account_id_2"]
               }
               ...
@@ -523,8 +523,8 @@ The following rules apply:
               "name": "Group 1",
               "description": "This is a test group",
               "units": ["unit_id_1", "unit_id_2"],
-              "created": "2024-03-14T09:37:28+01:00",
-              "updated": "2024-03-14T10:00:00+01:00"
+              "created_at": "2024-03-14T09:37:28+01:00",
+              "updated_at": "2024-03-14T10:00:00+01:00"
           }
       },
       "message": "success"
