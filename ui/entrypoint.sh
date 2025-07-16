@@ -14,7 +14,6 @@ server.modules = (
     "mod_access",
     "mod_accesslog"
 )
-include "mime-types.conf"
 server.bind          = "${ui_bind}"
 server.port          = ${ui_port}
 server.username      = "lighttpd"
