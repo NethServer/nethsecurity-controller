@@ -3,7 +3,5 @@
 source /etc/openvpn/conf.env
 # Mark the unit as disconnected
 /usr/bin/psql $REPORT_DB_URI -c "UPDATE units SET vpn_connected_since = NULL WHERE uuid = '$common_name';" >/dev/null
-# Remove proxy pass configuration
-rm -f /etc/openvpn/proxy/${common_name}.yaml
 
 exit 0
