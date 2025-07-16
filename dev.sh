@@ -58,6 +58,7 @@ ENCRYPTION_KEY=12345678901234567890123456789012
 GIN_MODE=debug
 FQDN=localhost
 VALID_SUBSCRIPTION=true
+SECRETS_DIR=secrets
 PLATFORM_INFO={"vpn_port": "20011", "vpn_network": "172.28.222.0/24", "controller_version": "${IMAGE_TAG}", "metrics_retention_days": 15, "logs_retention_days": 180}
 EOF
     podman run --rm --detach --network=host --volumes-from=$POD-vpn --pod $POD --name $POD-api --env-file=api.env ghcr.io/nethserver/nethsecurity-api:$image_tag
