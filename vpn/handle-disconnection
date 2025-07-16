@@ -1,5 +1,7 @@
 #!/bin/sh
 
-# Remove openvpn instance
-username=$common_name
-rm -f /etc/openvpn/status/$username.vpn
+source /etc/openvpn/conf.env
+# Mark the unit as disconnected
+/usr/bin/psql $REPORT_DB_URI -c "UPDATE units SET vpn_connected_since = NULL WHERE uuid = '$common_name';" >/dev/null
+
+exit 0

@@ -98,20 +98,20 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				role := "user"
 
 				// check if username is admin
-				isAdmin, _ := storage.IsAdmin(user.Username)
+				isAdmin := storage.IsAdmin(user.Username)
 				if isAdmin {
 					role = "admin"
 				}
 
 				// check if user require 2fa
-				status, _ := utils.GetUserStatus(user.Username)
+				status := storage.Is2FAEnabled(user.Username)
 
 				// create claims map
 				return jwt.MapClaims{
 					identityKey: user.Username,
 					"role":      role,
 					"actions":   []string{},
-					"2fa":       status == "1",
+					"2fa":       status,
 				}
 			}
 
@@ -265,7 +265,7 @@ func InitJWT() *jwt.GinJWTMiddleware {
 	return authMiddleware
 }
 
-func BasicAuth() gin.HandlerFunc {
+func BasicUnitAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		uuid, token, _ := c.Request.BasicAuth()
 		if uuid == "" || token == "" {
@@ -300,6 +300,60 @@ func BasicAuth() gin.HandlerFunc {
 		}
 
 		c.Set("UnitId", uuid)
+		c.Next()
+	}
+}
+
+func BasicUserAuth() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username, password, _ := c.Request.BasicAuth()
+
+		if username == "" || password == "" {
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusUnauthorized{
+				Code:    400,
+				Message: "missing username or password",
+				Data:    nil,
+			}))
+			c.Abort()
+			return
+		}
+
+		// read user password hash
+		passwordHash := storage.GetPassword(username)
+
+		// check password and username
+		valid := utils.CheckPasswordHash(password, passwordHash)
+
+		if !valid {
+			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusUnauthorized{
+				Code:    401,
+				Message: "invalid username or password",
+				Data:    nil,
+			}))
+			logs.Logs.Println("[INFO][AUTH] user " + username + " authentication failed")
+			c.Abort()
+			return
+		}
+
+		// Optionally load unit_id from query or header
+		unitID := c.Param("unit_id")
+		extra_log := ""
+		if unitID != "" {
+			if !methods.UserCanAccessUnit(username, unitID) {
+				c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+					Code:    403,
+					Message: "user does not have access to this unit",
+					Data:    nil,
+				}))
+				logs.Logs.Println("[INFO][AUTH] user " + username + " does not have access to unit " + unitID)
+				c.Abort()
+				return
+			}
+			extra_log = " to unit " + unitID
+		}
+		// Just return success
+		logs.Logs.Println("[INFO][AUTH] user "+username+" authenticated successfully", extra_log)
+		c.Header("X-Auth-User", username)
 		c.Next()
 	}
 }

@@ -1,8 +1,6 @@
 #!/bin/sh
 
 mkdir -p /etc/openvpn/sockets
-mkdir -p /nethsecurity-api/tokens
-mkdir -p /nethsecurity-api/credentials
 
 cd /nethsecurity-api
 
@@ -25,5 +23,9 @@ while [ ! -e "$socket" ]; do
         break
     fi
 done
+
+# Create database config for OpenVPN hooks
+echo REPORT_DB_URI=$REPORT_DB_URI > /etc/openvpn/conf.env
+echo OVPN_NETMASK=$OVPN_NETMASK >> /etc/openvpn/conf.env
 
 exec "$@"

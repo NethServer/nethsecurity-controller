@@ -13,70 +13,70 @@ import (
 	"crypto/rand"
 	"encoding/base32"
 	"fmt"
+	"math/big"
+	"net/http"
+	"net/url"
+	"slices"
+	"sync"
+	"time"
+
 	"github.com/Jeffail/gabs/v2"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/response"
+	"github.com/NethServer/nethsecurity-controller/api/storage"
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 	jwt "github.com/appleboy/gin-jwt/v2"
-	"github.com/dgryski/dgoogauth"
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	jwtl "github.com/golang-jwt/jwt"
-	"net/http"
-	"net/url"
-	"os"
-	"os/exec"
-	"strings"
+	jwtl "github.com/golang-jwt/jwt/v4"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/pquerna/otp"
+	"github.com/pquerna/otp/totp"
 )
 
+var activeTokens sync.Map
+
 func CheckTokenValidation(username string, token string) bool {
-	// read whole file
-	secrestListB, err := os.ReadFile(configuration.Config.TokensDir + "/" + username)
-	if err != nil {
+	value, ok := activeTokens.Load(username)
+	if !ok {
 		return false
 	}
-	secrestList := string(secrestListB)
-
-	// //check whether s contains substring text
-	return strings.Contains(secrestList, token)
+	tokens := value.([]string)
+	return slices.Contains(tokens, token)
 }
 
 func SetTokenValidation(username string, token string) bool {
-	// open file
-	f, _ := os.OpenFile(configuration.Config.TokensDir+"/"+username, os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
-	defer f.Close()
+	value, _ := activeTokens.LoadOrStore(username, []string{})
+	tokens := value.([]string)
 
-	// write file with tokens
-	_, err := f.WriteString(token + "\n")
-
-	// check error
-	return err == nil
+	// Avoid duplicates
+	if !slices.Contains(tokens, token) {
+		tokens = append(tokens, token)
+		activeTokens.Store(username, tokens)
+	}
+	return true
 }
 
 func DelTokenValidation(username string, token string) bool {
-	// read whole file
-	secrestListB, errR := os.ReadFile(configuration.Config.TokensDir + "/" + username)
-	if errR != nil {
+	value, ok := activeTokens.Load(username)
+	if !ok {
 		return false
 	}
-	secrestList := string(secrestListB)
+	tokens := value.([]string)
 
-	// match token to remove
-	res := strings.Replace(secrestList, token, "", 1)
-
-	// open file
-	f, _ := os.OpenFile(configuration.Config.TokensDir+"/"+username, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	defer f.Close()
-
-	// write file with tokens
-	_, err := f.WriteString(strings.TrimSpace(res) + "\n")
-
-	// check error
-	return err == nil
+	// Remove the token from the user's tokens slice
+	newTokens := slices.DeleteFunc(tokens, func(s string) bool {
+		return s == token
+	})
+	if len(newTokens) == 0 {
+		activeTokens.Delete(username)
+	} else {
+		activeTokens.Store(username, newTokens)
+	}
+	return true
 }
 
 func OTPVerify(c *gin.Context) {
@@ -102,7 +102,7 @@ func OTPVerify(c *gin.Context) {
 	}
 
 	// get secret for the user
-	secret := GetUserSecret(jsonOTP.Username)
+	secret := storage.GetUserOtpSecret(jsonOTP.Username)
 
 	// check secret
 	if len(secret) == 0 {
@@ -114,19 +114,19 @@ func OTPVerify(c *gin.Context) {
 		return
 	}
 
-	// set OTP configuration
-	otpc := &dgoogauth.OTPConfig{
-		Secret:      secret,
-		WindowSize:  3,
-		HotpCounter: 0,
-	}
-
 	// verifiy OTP
-	result, err := otpc.Authenticate(jsonOTP.OTP)
-	if err != nil || !result {
+	valid := false
+	err := error(nil)
+	valid, err = totp.ValidateCustom(jsonOTP.OTP, secret, time.Now(), totp.ValidateOpts{
+		Period:    30,
+		Skew:      3, // window size
+		Digits:    otp.DigitsSix,
+		Algorithm: otp.AlgorithmSHA1,
+	})
+	if err != nil || !valid {
 
 		// check if OTP is a recovery code
-		recoveryCodes := GetRecoveryCodes(jsonOTP.Username)
+		recoveryCodes := storage.GetRecoveryCodes(jsonOTP.Username)
 
 		if !utils.Contains(jsonOTP.OTP, recoveryCodes) {
 			// compose validation error
@@ -166,28 +166,14 @@ func OTPVerify(c *gin.Context) {
 
 	}
 
-	// check if 2FA was disabled
-	status, _ := os.ReadFile(configuration.Config.SecretsDir + "/" + jsonOTP.Username + "/status")
-	statusOld := strings.TrimSpace(string(status[:]))
-
-	// then clean all previous tokens
-	if statusOld == "0" || statusOld == "" {
-		// open file
-		f, _ := os.OpenFile(configuration.Config.TokensDir+"/"+jsonOTP.Username, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-		defer f.Close()
-
-		// write file with tokens
-		_, err := f.WriteString("")
-
-		// check error
-		if err != nil {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-				Code:    400,
-				Message: "clean previous tokens error",
-				Data:    err,
-			}))
-			return
-		}
+	// Just fail if 2FA is not enabled
+	if !storage.Is2FAEnabled(jsonOTP.Username) {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "2fa_disabled",
+			Data:    "",
+		}))
+		return
 	}
 
 	// set auth token to valid
@@ -196,23 +182,6 @@ func OTPVerify(c *gin.Context) {
 			Code:    400,
 			Message: "token validation set error",
 			Data:    "",
-		}))
-		return
-	}
-
-	// set 2FA to enabled
-	f, _ := os.OpenFile(configuration.Config.SecretsDir+"/"+jsonOTP.Username+"/status", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	defer f.Close()
-
-	// write file with 2fa status
-	_, err = f.WriteString("1")
-
-	// check error
-	if err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "status set error",
-			Data:    err,
 		}))
 		return
 	}
@@ -263,76 +232,8 @@ func ValidateAuth(tokenString string, ensureTokenExists bool) bool {
 	return false
 }
 
-func GetUserSecret(username string) string {
-	// get secret
-	secret, err := os.ReadFile(configuration.Config.SecretsDir + "/" + username + "/secret")
-
-	// handle error
-	if err != nil {
-		return ""
-	}
-
-	// return string
-	return string(secret[:])
-}
-
-func GetRecoveryCodes(username string) []string {
-	// create empty array
-	var recoveryCodes []string
-
-	// check if recovery codes exists
-	codesB, _ := os.ReadFile(configuration.Config.SecretsDir + "/" + username + "/codes")
-
-	// check length
-	if len(string(codesB[:])) == 0 {
-
-		// get secret
-		secret := GetUserSecret(username)
-
-		// get recovery codes
-		if len(string(secret)) > 0 {
-			// execute oathtool to get recovery codes
-			out, err := exec.Command("/usr/bin/oathtool", "-w", "4", "-b", secret).Output()
-
-			// check errors
-			if err != nil {
-				return recoveryCodes
-			}
-
-			// open file
-			f, _ := os.OpenFile(configuration.Config.SecretsDir+"/"+username+"/codes", os.O_WRONLY|os.O_CREATE, 0600)
-			defer f.Close()
-
-			// write file with secret
-			_, _ = f.WriteString(string(out[:]))
-
-			// assign binary output
-			codesB = out
-		}
-
-	}
-
-	// parse output
-	recoveryCodes = strings.Split(string(codesB[:]), "\n")
-
-	// remove empty element, the last one
-	if recoveryCodes[len(recoveryCodes)-1] == "" {
-		recoveryCodes = recoveryCodes[:len(recoveryCodes)-1]
-	}
-
-	// return codes
-	return recoveryCodes
-}
-
 func UpdateRecoveryCodes(username string, codes []string) bool {
-	// open file
-	f, _ := os.OpenFile(configuration.Config.SecretsDir+"/"+username+"/codes", os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
-	defer f.Close()
-
-	// write file with secret
-	codes = append(codes, "")
-	_, err := f.WriteString(strings.Join(codes[:], "\n"))
-
+	err := storage.SetUserRecoveryCodes(username, codes)
 	// check error
 	return err == nil
 }
@@ -340,29 +241,23 @@ func UpdateRecoveryCodes(username string, codes []string) bool {
 func Get2FAStatus(c *gin.Context) {
 	// get claims from token
 	claims := jwt.ExtractClaims(c)
-
-	// get status
-	statusS, err := utils.GetUserStatus(claims["id"].(string))
-
-	// handle response
-	var message = "2FA set for this user"
+	var message string
 	var recoveryCodes []string
 
-	if !(statusS == "1") || err != nil {
+	twofa_enabled := storage.Is2FAEnabled(claims["id"].(string))
+	if twofa_enabled {
+		message = "2FA set for this user"
+		recoveryCodes = storage.GetRecoveryCodes(claims["id"].(string))
+	} else {
 		message = "2FA not set for this user"
-		statusS = "0"
-	}
-
-	// get recovery codes
-	if statusS == "1" {
-		recoveryCodes = GetRecoveryCodes(claims["id"].(string))
+		recoveryCodes = []string{}
 	}
 
 	// return response
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: message,
-		Data:    gin.H{"status": statusS == "1", "recovery_codes": recoveryCodes},
+		Data:    gin.H{"status": twofa_enabled, "recovery_codes": recoveryCodes},
 	}))
 }
 
@@ -370,41 +265,24 @@ func Del2FAStatus(c *gin.Context) {
 	// get claims from token
 	claims := jwt.ExtractClaims(c)
 
-	// revocate secret
-	errRevocate := os.Remove(configuration.Config.SecretsDir + "/" + claims["id"].(string) + "/secret")
-	if errRevocate != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    403,
-			Message: "error in revocate 2FA for user",
-			Data:    nil,
-		}))
-		return
-	}
-
-	// revocate recovery codes
-	errRevocateCodes := os.Remove(configuration.Config.SecretsDir + "/" + claims["id"].(string) + "/codes")
-	if errRevocateCodes != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    403,
-			Message: "error in delete 2FA recovery codes",
-			Data:    nil,
-		}))
-		return
-	}
-
-	// set 2FA to disabled
-	f, _ := os.OpenFile(configuration.Config.SecretsDir+"/"+claims["id"].(string)+"/status", os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0600)
-	defer f.Close()
-
-	// write file with tokens
-	_, err := f.WriteString("0")
-
-	// check error
+	// revoke 2FA secret
+	err := storage.SetUserOtpSecret(claims["id"].(string), "")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
-			Message: "2FA not revocated",
-			Data:    "",
+			Message: "error in revoke 2FA for user",
+			Data:    nil,
+		}))
+		return
+	}
+
+	// revoke 2FA recovery codes
+	err = storage.SetUserRecoveryCodes(claims["id"].(string), []string{})
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "error in revoke 2FA recovery codes for user",
+			Data:    nil,
 		}))
 		return
 	}
@@ -464,6 +342,8 @@ func QRCode(c *gin.Context) {
 	// print url
 	URL.RawQuery = params.Encode()
 
+	storage.SetUserRecoveryCodes(account, generateRecoveryCodes())
+
 	// response
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
@@ -473,30 +353,36 @@ func QRCode(c *gin.Context) {
 }
 
 func SetUserSecret(username string, secret string) (bool, string) {
-	// get secret
-	secretB, _ := os.ReadFile(configuration.Config.SecretsDir + "/" + username + "/secret")
+	err := storage.SetUserOtpSecret(username, secret)
+	return err == nil, secret
+}
 
-	// check error
-	if len(string(secretB[:])) == 0 {
-		// check if dir exists, otherwise create it
-		if _, errD := os.Stat(configuration.Config.SecretsDir + "/" + username); os.IsNotExist(errD) {
-			_ = os.MkdirAll(configuration.Config.SecretsDir+"/"+username, 0700)
-		}
-
-		// open file
-		f, _ := os.OpenFile(configuration.Config.SecretsDir+"/"+username+"/secret", os.O_WRONLY|os.O_CREATE, 0600)
-		defer f.Close()
-
-		// write file with secret
-		_, err := f.WriteString(secret)
-
-		// check error
+func generateRecoveryCodes() []string {
+	recoveryCodes := make([]string, 10)
+	for i := 0; i < 10; i++ {
+		num, err := rand.Int(rand.Reader, big.NewInt(1000000))
 		if err != nil {
-			return false, ""
+			recoveryCodes[i] = "000000" // fallback in case of error
+			continue
 		}
-
-		return true, secret
+		recoveryCodes[i] = fmt.Sprintf("%06d", num.Int64())
 	}
+	return recoveryCodes
+}
 
-	return true, string(secretB[:])
+func UserCanAccessUnit(user string, unitID string) bool {
+	if storage.IsAdmin(user) {
+		return true
+	}
+	userUnits := storage.GetUserUnits()
+	units, ok := userUnits[user]
+	if !ok {
+		return false
+	}
+	for _, u := range units {
+		if u == unitID {
+			return true
+		}
+	}
+	return false
 }

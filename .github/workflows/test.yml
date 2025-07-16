@@ -12,16 +12,24 @@ jobs:
     name: API Tests
     runs-on: ubuntu-24.04
     steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Run tests
-        uses: docker/build-push-action@v6
+      - name: Install Podman
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman oathtool
+      - name: Start TimescaleDB
+        run: |
+          podman run --rm -d --name timescaledb -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report timescale/timescaledb-ha:pg17
+          # Wait for DB to be ready
+          for i in {1..30}; do
+            podman exec timescaledb pg_isready -U report && break
+            sleep 1
+          done
+      - name: Setup Go
+        uses: actions/setup-go@v5
         with:
-          push: false
-          context: api
-          target: test
-          cache-to: type=gha,mode=max,scope=api-testing
-          cache-from: type=gha,scope=api-testing
-          file: api/Containerfile
+          go-version: '1.24.4'
+      - name: Test with the Go CLI
+        run: cd api && go test
