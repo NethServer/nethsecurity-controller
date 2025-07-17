@@ -966,7 +966,7 @@ func GetPrometheusTargets(c *gin.Context) {
 
 		if ok1 && ok2 {
 			target := gin.H{
-				"targets": []string{unitIp},
+				"targets": []string{unitIp + ":19999"},
 				"labels": gin.H{
 					"node":                  unitIp,
 					"unit":                  unitId,
