@@ -75,6 +75,10 @@ type Configuration struct {
 	EncryptionKey string `json:"encryption_key"`
 
 	PlatformInfo models.PlatformInfo `json:"platform_info"`
+
+	// Prometheus basi authenticatin to access target list
+	PrometheusAuthUsername string `json:"prometheus_auth_username"`
+	PrometheusAuthPassword string `json:"prometheus_auth_password"`
 }
 
 var Config = Configuration{}
@@ -316,5 +320,17 @@ func Init() {
 		Config.PlatformInfo = platformInfo
 	} else {
 		Config.PlatformInfo = models.PlatformInfo{}
+	}
+
+	if os.Getenv("PROMETHEUS_AUTH_USERNAME") != "" {
+		Config.PrometheusAuthUsername = os.Getenv("PROMETHEUS_AUTH_USERNAME")
+	} else {
+		Config.PrometheusAuthUsername = "prometheus"
+	}
+
+	if os.Getenv("PROMETHEUS_AUTH_PASSWORD") != "" {
+		Config.PrometheusAuthPassword = os.Getenv("PROMETHEUS_AUTH_PASSWORD")
+	} else {
+		Config.PrometheusAuthPassword = "prometheus"
 	}
 }
