@@ -971,7 +971,6 @@ func GetPrometheusTargets(c *gin.Context) {
 					"node":             unitIp,
 					"unit":             unitId,
 					"__metrics_path__": "/api/v1/allmetrics?format=prometheus&help=no"},
-				"__scrape_timeout__": "30s", // VPN can be slow, so we set a longer scrape timeout
 			}
 			targets = append(targets, target)
 		}
