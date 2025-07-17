@@ -4,8 +4,9 @@
 # It can start or stop a pod with multiple containers (VPN, API, UI, Proxy, and TimescaleDB).
 # Optionally, it mounts a local directory as the UI's document root if provided: this option is useful for development purposes.
 
-image_tag=${IMAGE_TAG:-latest}
 POD="nethsecurity-pod"
+branch_name=$(git -C "$(dirname "$0")" rev-parse --abbrev-ref HEAD 2>/dev/null || echo "latest")
+image_tag=${IMAGE_TAG:-$branch_name}
 
 start_pod() {
     # Check if network device tunsec exists, if not fail

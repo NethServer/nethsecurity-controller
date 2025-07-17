@@ -52,6 +52,9 @@ To stop the pod, execute:
 ./dev.sh stop
 ```
 
+By default, the script will use images tagged with the current branch name.
+If you want to use a specific image tag, you can set the `IMAGE_TAG` environment
+
 To run a specific image tag, you can use:
 ```
 IMAGE_TAG=<tag> ./dev.sh start
