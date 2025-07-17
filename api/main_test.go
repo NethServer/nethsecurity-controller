@@ -941,6 +941,56 @@ func TestToIpMask(t *testing.T) {
 	}
 }
 
+func TestPrometheusEndpoints(t *testing.T) {
+	router = setupRouter()
+
+	// Add unit for testing
+	unitId := addUnit(t)
+
+	// Test without authentication - should fail
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/prometheus/targets", nil)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code, "should require authentication")
+
+	// Test with wrong credentials - should fail
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/prometheus/targets", nil)
+	req.SetBasicAuth("wrong", "credentials")
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusUnauthorized, w.Code, "should reject wrong credentials")
+
+	// Test with correct credentials
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/prometheus/targets", nil)
+	req.SetBasicAuth(configuration.Config.PrometheusAuthUsername, configuration.Config.PrometheusAuthPassword)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "should allow access with correct credentials")
+
+	var resp []map[string]interface{}
+	err := json.NewDecoder(w.Body).Decode(&resp)
+	assert.NoError(t, err, "response should be valid JSON")
+	assert.NotEmpty(t, resp, "response should not be empty")
+
+	// Verify that the returned list contains the unit we just added
+	found := false
+	for _, item := range resp {
+		labels, ok := item["labels"].(map[string]interface{})
+		if !ok {
+			continue
+		}
+		if unit, ok := labels["unit"].(string); ok && unit == unitId {
+			found = true
+			// Optionally check targets field
+			targets, ok := item["targets"].([]interface{})
+			assert.True(t, ok, "targets should be a slice")
+			assert.NotEmpty(t, targets, "targets should not be empty")
+			break
+		}
+	}
+	assert.True(t, found, "should find the added unit in prometheus targets list")
+}
+
 func setupRouter() *gin.Engine {
 	// Singleton
 	if router != nil {

@@ -177,6 +177,12 @@ func setup() *gin.Engine {
 		c.Status(http.StatusOK)
 	})
 
+	// Prometheus metrics endpoint
+	prometheus := router.Group("/prometheus", gin.BasicAuth(gin.Accounts{
+		configuration.Config.PrometheusAuthUsername: configuration.Config.PrometheusAuthPassword,
+	}))
+	prometheus.GET("/targets", methods.GetPrometheusTargets)
+
 	// handle missing endpoint
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, structs.Map(response.StatusNotFound{

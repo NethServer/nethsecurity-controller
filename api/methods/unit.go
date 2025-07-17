@@ -944,3 +944,40 @@ func GetUnitGroup(c *gin.Context) {
 		Data:    group,
 	}))
 }
+
+func GetPrometheusTargets(c *gin.Context) {
+	// Get all units
+	units, err := storage.ListUnits()
+	if err != nil {
+		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+			Code:    400,
+			Message: "can't list units",
+			Data:    err.Error(),
+		}))
+		return
+	}
+
+	// Create Prometheus target format
+	// Format reference: https://prometheus.io/docs/prometheus/latest/http_sd/
+	var targets []gin.H
+	for _, unit := range units {
+		unitId, ok1 := unit["id"].(string)
+		unitIp, ok2 := unit["ipaddress"].(string)
+
+		if ok1 && ok2 {
+			target := gin.H{
+				"targets": []string{unitIp},
+				"labels": gin.H{
+					"node":                  unitIp,
+					"unit":                  unitId,
+					"__meta_metrics_path__": "/api/v1/allmetrics?format=prometheus&help=no",
+					"__meta_prometheus_job": "node",
+				},
+			}
+			targets = append(targets, target)
+		}
+	}
+
+	// Return targets in Prometheus HTTP SD format
+	c.JSON(http.StatusOK, targets)
+}
