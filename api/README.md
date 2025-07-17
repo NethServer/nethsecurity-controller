@@ -67,6 +67,9 @@ CGO_ENABLED=0 go build
 - `PLATFORM_INFO`: a JSON string with platform information, used to store the controller version and other information. It can be left empty.
   Example: `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`
 
+- `PROMETHEUS_AUTH_PASSWORD` and `PROMETHEUS_AUTH_USERNAME`: credentials to access the `/prometheus/targets` endpoint for listing connected units
+  in Prometheus target format. - _default_: `prometheus:prometheus`
+  
 ## User and units authorizations
 
 A unit is a NethSecurity firewall that is connected to the controller.
