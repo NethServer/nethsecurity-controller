@@ -61,7 +61,7 @@ func Init() *pgxpool.Pool {
 	MigrateUsersFromSqliteToPostgres(migratedUnits)
 
 	// Migrate unit credentials from file to Postgres
-	MigrateUnitCredentialsFromFileToPostgres()
+	MigrateUnitCredentialsFromFileToPostgres(migratedUnits)
 
 	ReloadACLs()
 
@@ -578,8 +578,16 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 	for _, file := range files {
 		if !file.IsDir() {
 			uuid := file.Name()
+			softErrors := 0
 			infoFile := configuration.Config.OpenVPNStatusDir + "/" + uuid + ".info"
 			ccdFile := configuration.Config.OpenVPNCCDDir + "/" + uuid
+			proxyFile := configuration.Config.OpenVPNProxyDir + "/" + uuid + ".yaml"
+			// If the proxy file does not exist, skip migration for this unit: this means that the unit is in a dirty state
+			if _, err := os.Stat(proxyFile); os.IsNotExist(err) {
+				logs.Logs.Println("[INFO][MIGRATION] proxy file missing for unit", uuid, "- skipping migration (dirty state)")
+				continue
+			}
+
 			// uuid.vpn file is not migrated because it does not persist: vpn status is restored as soon as the client re-connects
 			ipaddr := loadUnitIP(uuid)
 
@@ -604,30 +612,36 @@ func MigrateUnitInfoFromFileToPostgres() []string {
 				data, err := os.ReadFile(infoFile)
 				if err != nil {
 					logs.Logs.Println("[WARNING][MIGRATION] error reading file:", infoFile, err.Error())
+					softErrors++
 					continue
 				}
 				var info models.UnitInfo
 				if err := json.Unmarshal(data, &info); err != nil {
 					logs.Logs.Println("[WARNING][MIGRATION] error parsing JSON in file:", infoFile, err.Error())
+					softErrors++
 					continue
 				}
 				if err := SetUnitInfo(uuid, info); err != nil {
 					logs.Logs.Println("[WARNING][MIGRATION] error setting unit info for", uuid, ":", err.Error())
+					softErrors++
 				}
 				// remove the info file
 				if err := os.Remove(infoFile); err != nil {
 					logs.Logs.Println("[WARNING][MIGRATION] error removing file:", infoFile, err.Error())
+					softErrors++
 				} else {
 					logs.Logs.Println("[INFO][MIGRATION] removed file:", infoFile)
 				}
-				// remove ccd file
-				if err := os.Remove(ccdFile); err != nil {
-					logs.Logs.Println("[WARNING][MIGRATION] error removing file:", ccdFile, err.Error())
-				} else {
-					logs.Logs.Println("[INFO][MIGRATION] removed file:", ccdFile)
-				}
+			}
+			// remove ccd file
+			if err := os.Remove(ccdFile); err != nil {
+				logs.Logs.Println("[WARNING][MIGRATION] error removing file:", ccdFile, err.Error())
+			} else {
+				logs.Logs.Println("[INFO][MIGRATION] removed file:", ccdFile)
 			}
 			ret = append(ret, uuid)
+			softErrors = 0
+			logs.Logs.Println("[INFO][MIGRATION] migrated unit", uuid, "with IP address", ipaddr, "Error count:", softErrors)
 		}
 	}
 	logs.Logs.Println("[INFO][MIGRATION] migrated", len(ret), "units from file to Postgres")
@@ -1116,7 +1130,7 @@ func SetUnitCredentials(uuid string, username string, password string) error {
 	return nil
 }
 
-func MigrateUnitCredentialsFromFileToPostgres() {
+func MigrateUnitCredentialsFromFileToPostgres(units []string) {
 	migrated := 0
 	files, err := os.ReadDir(configuration.Config.CredentialsDir)
 	if err != nil {
@@ -1128,6 +1142,10 @@ func MigrateUnitCredentialsFromFileToPostgres() {
 			continue
 		}
 		unitID := file.Name()
+		if len(units) > 0 && !utils.Contains(unitID, units) {
+			logs.Logs.Println("[INFO][MIGRATION] skipping unit credentials for", unitID)
+			continue
+		}
 		credPath := configuration.Config.CredentialsDir + "/" + unitID
 		jsonString, errRead := os.ReadFile(credPath)
 		if errRead != nil {
