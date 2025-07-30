@@ -116,7 +116,17 @@ func MigrateUsersFromSqliteToPostgres(units []string) {
 	}
 	defer sqliteDB.Close()
 
-	// 3. Check if SQLite has users
+	// 3. Check if SQLite exists and has users
+	var tableExists bool
+	err = sqliteDB.QueryRow("SELECT name FROM sqlite_master WHERE type='table' AND name='accounts'").Scan(&tableExists)
+	if err != nil && err != sql.ErrNoRows {
+		logs.Logs.Println("[ERR][MIGRATION] error checking accounts table in SQLite: " + err.Error())
+		return
+	}
+	if !tableExists {
+		logs.Logs.Println("[INFO][MIGRATION] accounts table does not exist in SQLite: skipping user migration")
+		return
+	}
 	rows, err := sqliteDB.Query("SELECT id, username, password, display_name, created FROM accounts")
 	if err != nil {
 		logs.Logs.Println("[ERR][MIGRATION] cannot query SQLite accounts: " + err.Error())
