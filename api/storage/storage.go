@@ -931,6 +931,7 @@ func ListUnits() ([]map[string]interface{}, error) {
 	rows, err := pgpool.Query(pgctx, `
 		SELECT
 			u.uuid,
+			u.name,
 			u.vpn_address,
 			u.info::text,
 			u.vpn_connected_since,
@@ -949,6 +950,7 @@ func ListUnits() ([]map[string]interface{}, error) {
 	units := make([]map[string]interface{}, 0)
 	for rows.Next() {
 		var uuid sql.NullString
+		var name sql.NullString
 		var ipaddress sql.NullString
 		var infoStr sql.NullString
 		var connectedSince sql.NullTime
@@ -957,7 +959,7 @@ func ListUnits() ([]map[string]interface{}, error) {
 		vpn_info := make(map[string]interface{})
 		unit := make(map[string]interface{})
 
-		if err := rows.Scan(&uuid, &ipaddress, &infoStr, &connectedSince, &groups); err != nil {
+		if err := rows.Scan(&uuid, &name, &ipaddress, &infoStr, &connectedSince, &groups); err != nil {
 			logs.Logs.Println("[ERR][STORAGE][LIST_UNITS] error in row scan: " + err.Error())
 			continue
 		}
@@ -972,10 +974,14 @@ func ListUnits() ([]map[string]interface{}, error) {
 			if err := json.Unmarshal([]byte(infoStr.String), &info); err == nil {
 				unit["info"] = info
 			} else {
-				unit["info"] = map[string]interface{}{}
+				unit["info"] = map[string]interface{}{
+					"unit_name": name.String,
+				}
 			}
 		} else {
-			unit["info"] = map[string]interface{}{}
+			unit["info"] = map[string]interface{}{
+				"unit_name": name.String,
+			}
 		}
 
 		unit["join_code"] = utils.GetJoinCode(uuid.String)
