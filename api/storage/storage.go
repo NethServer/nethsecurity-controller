@@ -61,7 +61,7 @@ func Init() *pgxpool.Pool {
 	MigrateUsersFromSqliteToPostgres(migratedUnits)
 
 	// Migrate unit credentials from file to Postgres
-	MigrateUnitCredentialsFromFileToPostgres(migratedUnits)
+	MigrateUnitCredentialsFromFileToPostgres()
 
 	ReloadACLs()
 
@@ -1146,7 +1146,7 @@ func SetUnitCredentials(uuid string, username string, password string) error {
 	return nil
 }
 
-func MigrateUnitCredentialsFromFileToPostgres(units []string) {
+func MigrateUnitCredentialsFromFileToPostgres() {
 	migrated := 0
 	files, err := os.ReadDir(configuration.Config.CredentialsDir)
 	if err != nil {
@@ -1158,8 +1158,10 @@ func MigrateUnitCredentialsFromFileToPostgres(units []string) {
 			continue
 		}
 		unitID := file.Name()
-		if len(units) > 0 && !utils.Contains(unitID, units) {
-			logs.Logs.Println("[INFO][MIGRATION] skipping unit credentials for", unitID)
+		// Check if the unit already exists in Postgres
+		exists, _ := UnitExists(unitID)
+		if !exists {
+			logs.Logs.Println("[INFO][MIGRATION] skipping unit credentials for", unitID, "because the unit does not exist")
 			continue
 		}
 		credPath := configuration.Config.CredentialsDir + "/" + unitID
