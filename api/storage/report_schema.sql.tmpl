@@ -66,7 +66,8 @@ CREATE TABLE IF NOT EXISTS openvpn_config (
     name TEXT,
     device TEXT NOT NULL,
     type TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
 );
 
 -- This table contains the list of WAN interfaces configured inside the units
@@ -75,7 +76,8 @@ CREATE TABLE IF NOT EXISTS wan_config (
     interface TEXT NOT NULL,
     device TEXT,
     status TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
 );
 
 -- General retention policies
