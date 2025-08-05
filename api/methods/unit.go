@@ -504,12 +504,7 @@ func DeleteUnit(c *gin.Context) {
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
 	)
 	if err := cmdRevoke.Run(); err != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
-			Message: "cannot revoke certificate for: " + unitId,
-			Data:    err.Error(),
-		}))
-		return
+		logs.Logs.Println("[ERROR][DeleteUnit] cannot revoke certificate for: " + unitId + " - " + err.Error())
 	}
 
 	// renew certificate revocation list
@@ -520,24 +515,14 @@ func DeleteUnit(c *gin.Context) {
 		"EASYRSA_CRL_DAYS=3650",
 	)
 	if err := cmdGen.Run(); err != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
-			Message: "cannot renew certificate revocation list (CLR)",
-			Data:    err.Error(),
-		}))
-		return
+		logs.Logs.Println("[ERROR][DeleteUnit] cannot renew certificate revocation list for: " + unitId + " - " + err.Error())
 	}
 
 	// delete traefik conf
 	if _, err := os.Stat(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml"); err == nil {
 		errDeleteProxy := os.Remove(configuration.Config.OpenVPNProxyDir + "/" + unitId + ".yaml")
 		if errDeleteProxy != nil {
-			c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-				Code:    500,
-				Message: "error in deletion proxy file for: " + unitId,
-				Data:    errDeleteProxy.Error(),
-			}))
-			return
+			logs.Logs.Println("[ERROR][DeleteUnit] cannot delete proxy file for: " + unitId + " - " + errDeleteProxy.Error())
 		}
 	}
 
