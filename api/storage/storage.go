@@ -1154,8 +1154,20 @@ func GetUnit(uuid string) (map[string]interface{}, error) {
 	return unit, nil
 }
 
+func IsUnitInAnyGroup(unitId string) (bool, error) {
+	pgpool, pgctx := ReportInstance()
+	var count int
+	err := pgpool.QueryRow(pgctx, "SELECT COUNT(*) FROM unit_groups WHERE $1=ANY(units)", unitId).Scan(&count)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][IS_UNIT_IN_GROUP] error in query execution:" + err.Error())
+		return false, err
+	}
+	return count > 0, nil
+}
+
 func DeleteUnit(uuid string) error {
 	pgpool, pgctx := ReportInstance()
+
 	// Delete the unit from the database
 	res, err := pgpool.Exec(pgctx, "DELETE FROM units WHERE uuid = $1", uuid)
 	if err != nil {

@@ -615,6 +615,13 @@ func TestUnitGroupsAPI(t *testing.T) {
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
+	// Try to delete unitId_1, expect failure with 400 (Bad Request)
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/units/"+unitId_1, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusBadRequest, w.Code, "deleting unitId_1 should fail with 400 Bad Request")
+
 	// List unit groups
 	w = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/unit_groups", nil)
