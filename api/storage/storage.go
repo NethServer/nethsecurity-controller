@@ -1174,6 +1174,7 @@ func DeleteUnit(uuid string) error {
 		return err
 	}
 
+	// Delete of report data is not required: data are cleaned up by a database job
 	return nil
 }
 

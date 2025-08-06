@@ -61,24 +61,24 @@ CREATE TABLE IF NOT EXISTS unit_credentials (
 
 -- This table contains the list of OpenVPN instances configured inside the units
 CREATE TABLE IF NOT EXISTS openvpn_config (
-    uuid UUID NOT NULL references units(uuid),
+    uuid UUID NOT NULL,
     instance TEXT NOT NULL,
     name TEXT,
     device TEXT NOT NULL,
     type TEXT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_openvpn_config_uuid ON openvpn_config (uuid);
 
 -- This table contains the list of WAN interfaces configured inside the units
 CREATE TABLE IF NOT EXISTS wan_config (
-    uuid UUID NOT NULL references units(uuid),
+    uuid UUID NOT NULL,
     interface TEXT NOT NULL,
     device TEXT,
     status TEXT,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+CREATE INDEX IF NOT EXISTS idx_wan_config_uuid ON wan_config (uuid);
 
 -- General retention policies
 
@@ -92,13 +92,13 @@ CREATE TABLE IF NOT EXISTS wan_config (
 
 CREATE TABLE IF NOT EXISTS mwan_events (
     time TIMESTAMPTZ NOT NULL,
-    uuid UUID NOT NULL references units(uuid),
+    uuid UUID NOT NULL,
     wan TEXT NOT NULL,
     event TEXT NOT NULL,
     interface TEXT,
-    UNIQUE (time, uuid),
-    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
+    UNIQUE (time, uuid)
 );
+CREATE INDEX IF NOT EXISTS idx_mwan_events_uuid ON mwan_events (uuid);
 
 SELECT
     create_hypertable('mwan_events', by_range('time'), if_not_exists => TRUE);
@@ -137,15 +137,15 @@ SELECT add_retention_policy('ca_mwan_events_hourly', drop_after => INTERVAL '{{ 
 
 CREATE TABLE IF NOT EXISTS ts_malware (
     time TIMESTAMPTZ NOT NULL,
-    uuid UUID NOT NULL references units(uuid),
+    uuid UUID NOT NULL,
     src TEXT NOT NULL,
     dst TEXT NOT NULL,
     category TEXT NOT NULL,
     chain TEXT NOT NULL,
     country VARCHAR(2),
-    UNIQUE (time, uuid),
-    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
+    UNIQUE (time, uuid)
 );
+CREATE INDEX IF NOT EXISTS idx_ts_malware_uuid ON ts_malware (uuid);
 
 SELECT
     create_hypertable('ts_malware', by_range('time'), if_not_exists => TRUE);
@@ -242,7 +242,7 @@ SELECT add_retention_policy('ca_ts_malware_hourly_country', drop_after => INTERV
 
 CREATE TABLE IF NOT EXISTS ovpnrw_connections (
     time TIMESTAMPTZ NOT NULL,
-    uuid UUID NOT NULL references units(uuid),
+    uuid UUID NOT NULL,
     instance TEXT NOT NULL,
     common_name TEXT NOT NULL,
     virtual_ip_addr TEXT NOT NULL,
@@ -252,9 +252,9 @@ CREATE TABLE IF NOT EXISTS ovpnrw_connections (
     bytes_received BIGINT,
     bytes_sent BIGINT,
     country VARCHAR(2),
-    UNIQUE (time, uuid, instance, common_name),
-    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
+    UNIQUE (time, uuid, instance, common_name)
 );
+CREATE INDEX IF NOT EXISTS idx_ovpnrw_connections_uuid ON ovpnrw_connections (uuid);
 
 SELECT
     create_hypertable('ovpnrw_connections', by_range('time'), if_not_exists => TRUE);
@@ -314,12 +314,12 @@ SELECT add_retention_policy('ca_ovpnrw_connections_hourly_bytes', drop_after => 
 
 CREATE TABLE IF NOT EXISTS ts_attacks (
     time TIMESTAMPTZ NOT NULL,
-    uuid UUID NOT NULL references units(uuid),
+    uuid UUID NOT NULL,
     ip TEXT NOT NULL,
     country VARCHAR(2),
-    UNIQUE (time, uuid, ip),
-    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
+    UNIQUE (time, uuid, ip)
 );
+CREATE INDEX IF NOT EXISTS idx_ts_attacks_uuid ON ts_attacks (uuid);
 
 SELECT
     create_hypertable('ts_attacks', by_range('time'), if_not_exists => TRUE);
@@ -356,16 +356,24 @@ SELECT add_retention_policy('ca_ts_attacks_hourly', drop_after => INTERVAL '{{ .
 
 CREATE TABLE IF NOT EXISTS dpi_stats (
     time TIMESTAMPTZ NOT NULL,
-    uuid UUID NOT NULL references units(uuid),
+    uuid UUID NOT NULL,
     client_address TEXT NOT NULL,
     client_name TEXT,
     protocol TEXT,
     host TEXT,
     application TEXT,
     bytes BIGINT,
-    UNIQUE (time, uuid, client_address, protocol, host, application),
-    CONSTRAINT fk_unit FOREIGN KEY(uuid) REFERENCES units(uuid) ON DELETE CASCADE
+    UNIQUE (time, uuid, client_address, protocol, host, application)
 );
+-- Create index on uuid for dpi_stats only if the table is empty (clean install)
+-- A production table is too large to create an index on uuid if it already contains data
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT uuid FROM dpi_stats LIMIT 1) THEN
+        CREATE INDEX IF NOT EXISTS idx_dpi_stats_uuid ON dpi_stats (uuid);
+    END IF;
+END
+$$;
 
 SELECT
     create_hypertable('dpi_stats', by_range('time'), if_not_exists => TRUE);
@@ -479,3 +487,60 @@ SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_client',
 
 SELECT remove_retention_policy('ca_dpi_stats_hourly_client', if_exists => TRUE);
 SELECT add_retention_policy('ca_dpi_stats_hourly_client', drop_after => INTERVAL '{{ .RetentionDays }} days', if_not_exists => TRUE);
+
+-- Stored procedures --
+
+-- This function cleans up orphaned data in various tables that reference units
+-- It deletes records in these tables where the uuid does not exist in the units table
+CREATE OR REPLACE FUNCTION cleanup_orphaned_unit_data(job_id INT DEFAULT NULL, config JSONB DEFAULT NULL)
+RETURNS void AS $$
+DECLARE
+    cnt INTEGER;
+BEGIN
+    -- openvpn_config
+    DELETE FROM openvpn_config WHERE uuid NOT IN (SELECT uuid FROM units);
+    GET DIAGNOSTICS cnt = ROW_COUNT;
+    RAISE NOTICE 'openvpn_config: % rows deleted', cnt;
+
+    -- wan_config
+    DELETE FROM wan_config WHERE uuid NOT IN (SELECT uuid FROM units);
+    GET DIAGNOSTICS cnt = ROW_COUNT;
+    RAISE NOTICE 'wan_config: % rows deleted', cnt;
+
+    -- mwan_events
+    DELETE FROM mwan_events WHERE uuid NOT IN (SELECT uuid FROM units);
+    GET DIAGNOSTICS cnt = ROW_COUNT;
+    RAISE NOTICE 'mwan_events: % rows deleted', cnt;
+
+    -- ts_malware
+    DELETE FROM ts_malware WHERE uuid NOT IN (SELECT uuid FROM units);
+    GET DIAGNOSTICS cnt = ROW_COUNT;
+    RAISE NOTICE 'ts_malware: % rows deleted', cnt;
+
+    -- ovpnrw_connections
+    DELETE FROM ovpnrw_connections WHERE uuid NOT IN (SELECT uuid FROM units);
+    GET DIAGNOSTICS cnt = ROW_COUNT;
+    RAISE NOTICE 'ovpnrw_connections: % rows deleted', cnt;
+
+    -- ts_attacks
+    DELETE FROM ts_attacks WHERE uuid NOT IN (SELECT uuid FROM units);
+    GET DIAGNOSTICS cnt = ROW_COUNT;
+    RAISE NOTICE 'ts_attacks: % rows deleted', cnt;
+
+    -- dpi_stats
+    DELETE FROM dpi_stats WHERE uuid NOT IN (SELECT uuid FROM units);
+    GET DIAGNOSTICS cnt = ROW_COUNT;
+    RAISE NOTICE 'dpi_stats: % rows deleted', cnt;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Add a job to run the cleanup function daily, if it does not already exist
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM timescaledb_information.jobs WHERE proc_name = 'cleanup_orphaned_unit_data'
+    ) THEN
+        PERFORM add_job('cleanup_orphaned_unit_data', '1d');
+    END IF;
+END
+$$;

@@ -99,6 +99,25 @@ The following rules apply:
 - a non-existing unit group cannot be assigned to a user account
 - when a unit is deleted from the database, it is removed from all groups
 
+## Database design
+
+The database is designed to efficiently manage and report on a large number of NethSecurity firewall units connected to a central controller. Each unit is uniquely identified and related data is stored in several reporting tables (such as `dpi_stats`, `ovpnrw_connections`, `ts_attacks`, etc.), supporting analytics and monitoring via TimescaleDB continuous aggregates.
+
+Key design choices include:
+
+- **No Foreign Keys:**  
+  Foreign key constraints (especially with `ON DELETE CASCADE`) were removed from all tables. With high-volume tables like `dpi_stats` (which can grow by millions of rows per day on a controller with 70 units), cascading deletes caused severe performance issues—deleting a unit could take hours due to the volume of related data.
+
+- **Orphaned Data Cleanup:**  
+  Instead of relying on foreign keys, a stored procedure (`cleanup_orphaned_unit_data`) is scheduled to run daily. This procedure deletes all records from reporting tables where the `uuid` is not present in the `units` table, ensuring data consistency and preventing orphaned records.
+
+- **Indexes on UUID:**  
+  All reporting tables have an index on the `uuid` field to speed up deletion and lookup operations. For the `dpi_stats` table, the index is only created on new (empty) installations, as creating it on an existing, large table would be prohibitively slow.
+
+- **TimescaleDB Features:**  
+  The schema leverages TimescaleDB hypertables and continuous aggregates for efficient time-series data storage and reporting, with retention policies to automatically drop old data.
+  Queries can be perfomed on aggregated tables even if the original data is deleted, as the continuous aggregates are updated periodically.
+
 ## APIs
 
 ### Auth
