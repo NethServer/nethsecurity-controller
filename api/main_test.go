@@ -615,13 +615,6 @@ func TestUnitGroupsAPI(t *testing.T) {
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
-	// Try to delete unitId_1, expect failure with 400 (Bad Request)
-	w = httptest.NewRecorder()
-	req, _ = http.NewRequest("DELETE", "/units/"+unitId_1, nil)
-	req.Header.Set("Authorization", "Bearer "+token)
-	router.ServeHTTP(w, req)
-	assert.Equal(t, http.StatusBadRequest, w.Code, "deleting unitId_1 should fail with 400 Bad Request")
-
 	// List unit groups
 	w = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/unit_groups", nil)
@@ -698,6 +691,26 @@ func TestUnitGroupsAPI(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusBadRequest, w.Code, "should fail when adding non-existing group ID")
+
+	// Delete unitId_1, it must be removed from the group
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("DELETE", "/units/"+unitId_1, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code, "deleting unitId_1 should succeed")
+	// Get the unit group again and check that unitId_1 is removed
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/unit_groups/"+groupID, nil)
+	req.Header.Set("Authorization", "Bearer "+token)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusOK, w.Code)
+	var afterDeleteUpdatedGroupResp map[string]interface{}
+	_ = json.NewDecoder(w.Body).Decode(&afterDeleteUpdatedGroupResp)
+	afterDeleteUpdatedGroupData := afterDeleteUpdatedGroupResp["data"].(map[string]interface{})
+	units = afterDeleteUpdatedGroupData["units"].([]interface{})
+	assert.Len(t, units, 1, "unitId_1 should be removed from the group")
+	assert.Contains(t, units, unitId_2, "unitId_2 should still be in the group")
+	assert.NotContains(t, units, unitId_1, "unitId_1 should not be in the group anymore")
 
 	// Add unit group to user account
 	w = httptest.NewRecorder()

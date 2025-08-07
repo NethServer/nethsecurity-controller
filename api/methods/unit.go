@@ -494,24 +494,6 @@ func DeleteUnit(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
 
-	unitInGroup, err := storage.IsUnitInAnyGroup(unitId)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
-			Message: "error checking if unit is inside group",
-			Data:    err.Error(),
-		}))
-		return
-	}
-	if unitInGroup {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "unit is inside a group, cannot delete",
-			Data:    nil,
-		}))
-		return
-	}
-
 	// kill vpn connection
 	_ = socket.Write("kill " + unitId)
 

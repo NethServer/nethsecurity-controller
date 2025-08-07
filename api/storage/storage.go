@@ -1154,17 +1154,6 @@ func GetUnit(uuid string) (map[string]interface{}, error) {
 	return unit, nil
 }
 
-func IsUnitInAnyGroup(unitId string) (bool, error) {
-	pgpool, pgctx := ReportInstance()
-	var count int
-	err := pgpool.QueryRow(pgctx, "SELECT COUNT(*) FROM unit_groups WHERE $1=ANY(units)", unitId).Scan(&count)
-	if err != nil {
-		logs.Logs.Println("[ERR][STORAGE][IS_UNIT_IN_GROUP] error in query execution:" + err.Error())
-		return false, err
-	}
-	return count > 0, nil
-}
-
 func DeleteUnit(uuid string) error {
 	pgpool, pgctx := ReportInstance()
 
@@ -1185,6 +1174,18 @@ func DeleteUnit(uuid string) error {
 		logs.Logs.Println("[ERR][STORAGE][DELETE_UNIT] error deleting unit credentials:" + err.Error())
 		return err
 	}
+
+	// Remove the unit from all unit_groups arrays
+	_, err = pgpool.Exec(pgctx, `
+		UPDATE unit_groups
+		SET units = array_remove(units, $1)
+		WHERE $1 = ANY(units)
+	`, uuid)
+	if err != nil {
+		logs.Logs.Println("[ERR][STORAGE][DELETE_UNIT] error removing unit from unit_groups:" + err.Error())
+		return err
+	}
+	ReloadACLs()
 
 	// Delete of report data is not required: data are cleaned up by a database job
 	return nil
