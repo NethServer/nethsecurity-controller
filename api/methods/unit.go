@@ -333,6 +333,7 @@ func RegisterUnit(c *gin.Context) {
 			Code:    403,
 			Message: "registration token required",
 		}))
+		logs.Logs.Println("[ERROR][RegisterUnit] registration token required")
 		return
 	}
 
@@ -342,6 +343,7 @@ func RegisterUnit(c *gin.Context) {
 			Code:    403,
 			Message: "invalid registration token",
 		}))
+		logs.Logs.Println("[ERROR][RegisterUnit] invalid registration token")
 		return
 	}
 
@@ -353,6 +355,7 @@ func RegisterUnit(c *gin.Context) {
 			Message: "request fields malformed",
 			Data:    err.Error(),
 		}))
+		logs.Logs.Println("[ERROR][RegisterUnit] request fields malformed:", err.Error())
 		return
 	}
 
@@ -360,9 +363,10 @@ func RegisterUnit(c *gin.Context) {
 	if configuration.Config.ValidSubscription && jsonRequest.SubscriptionType == "" {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusBadRequest{
 			Code:    403,
-			Message: "subscription is required",
+			Message: "unit subscription is required",
 			Data:    "",
 		}))
+		logs.Logs.Println("[ERROR][RegisterUnit] unit subscription is required")
 		return
 	}
 
@@ -370,9 +374,10 @@ func RegisterUnit(c *gin.Context) {
 	if !configuration.Config.ValidSubscription && jsonRequest.SubscriptionType != "" {
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusBadRequest{
 			Code:    403,
-			Message: "subscription is not allowed",
+			Message: "unit with subscription is not allowed",
 			Data:    "",
 		}))
+		logs.Logs.Println("[ERROR][RegisterUnit] unit with subscription is not allowed")
 		return
 	}
 
@@ -474,9 +479,10 @@ func RegisterUnit(c *gin.Context) {
 		// return forbidden state
 		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
 			Code:    403,
-			Message: "unit not allowed",
+			Message: "unit not allowed, no certificate found",
 			Data:    "",
 		}))
+		logs.Logs.Println("[ERROR][RegisterUnit] unit not allowed, no certificate found for: " + jsonRequest.UnitId)
 	}
 }
 
