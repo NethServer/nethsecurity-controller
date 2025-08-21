@@ -64,10 +64,13 @@ func Init() *pgxpool.Pool {
 		migrateUsersFromSqliteToPostgres(toBeMigratedUnits)
 
 		// Migrate unit credentials from file to Postgres
-		migrateUnitCredentialsFromFileToPostgres()
+		migrated := migrateUnitCredentialsFromFileToPostgres()
 
-		// Remove all units that are not inside the migrated units
-		cleanupUnusedUnits(toBeMigratedUnits)
+		// Safe guard to avoid data loss
+		if migrated > 0 {
+			// Remove all units that are not inside the migrated units
+			cleanupUnusedUnits(toBeMigratedUnits)
+		}
 	} else {
 		logs.Logs.Println("[INFO][MIGRATION] skipping migration: no units found in CCD directory")
 	}
@@ -665,6 +668,11 @@ func migrateUnitInfoFromFileToPostgres(toBeMigratedUnits []string) {
 		// If the proxy file does not exist, skip migration for this unit: this means that the unit is in a dirty state
 		if _, err := os.Stat(proxyFile); os.IsNotExist(err) {
 			logs.Logs.Println("[INFO][MIGRATION] proxy file missing for unit", uuid, "- skipping migration (dirty state)")
+			if err := os.Remove(ccdFile); err != nil {
+				logs.Logs.Println("[INFO][MIGRATION] could not remove CCD file for unit", uuid, ":", err.Error())
+			} else {
+				logs.Logs.Println("[INFO][MIGRATION] removed CCD file for unit", uuid)
+			}
 			continue
 		}
 
@@ -1231,12 +1239,12 @@ func SetUnitCredentials(uuid string, username string, password string) error {
 	return nil
 }
 
-func migrateUnitCredentialsFromFileToPostgres() {
+func migrateUnitCredentialsFromFileToPostgres() int {
 	migrated := 0
 	files, err := os.ReadDir(configuration.Config.CredentialsDir)
 	if err != nil {
 		logs.Logs.Println("[INFO][MIGRATION] credentials directory does not exists. Skipping migration.")
-		return
+		return migrated
 	}
 	for _, file := range files {
 		if file.IsDir() {
@@ -1270,4 +1278,5 @@ func migrateUnitCredentialsFromFileToPostgres() {
 		migrated++
 	}
 	logs.Logs.Printf("[INFO][MIGRATION] migrated %d unit credentials from file to Postgres\n", migrated)
+	return migrated
 }
