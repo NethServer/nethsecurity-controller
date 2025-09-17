@@ -10,8 +10,14 @@
 package main
 
 import (
+	"context"
 	"io"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/fatih/structs"
 	"github.com/gin-contrib/cors"
@@ -197,15 +203,56 @@ func setup() *gin.Engine {
 
 func main() {
 	router := setup()
-	// Listen on multiple addresses
-	for _, addr := range configuration.Config.ListenAddress {
-		go func(a string) {
-			if err := router.Run(a); err != nil {
-				logs.Logs.Println("[CRITICAL][API] Server failed to start on address: " + a)
-			}
-		}(addr)
+
+	// Create HTTP servers for each listen address
+	servers := make([]*http.Server, len(configuration.Config.ListenAddress))
+	for i, addr := range configuration.Config.ListenAddress {
+		servers[i] = &http.Server{
+			Addr:    addr,
+			Handler: router,
+		}
 	}
 
-	// Prevent main from exiting
-	select {}
+	// Start servers in goroutines
+	for _, srv := range servers {
+		go func(server *http.Server) {
+			if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Fatalf("listen: %s\n", err)
+			}
+		}(srv)
+	}
+
+	// Wait for interrupt signal
+	// - SIGINT and SIGTERM for graceful shutdown
+	// - SIGUSR1 to reload ACLs
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM, syscall.SIGUSR1)
+
+	for {
+		sig := <-quit
+
+		switch sig {
+		case syscall.SIGUSR1:
+			logs.Logs.Println("[INFO][API] Received SIGUSR1, reloading ACLs...")
+			storage.ReloadACLs()
+			// Continue running after ACL reload
+		case syscall.SIGINT, syscall.SIGTERM:
+			logs.Logs.Println("[INFO][API] Shutdown signal received, shutting down servers...")
+
+			// The context is used to inform the server it has 5 seconds to finish
+			// the request it is currently handling
+			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+
+			// Shutdown all servers gracefully
+			for _, srv := range servers {
+				if err := srv.Shutdown(ctx); err != nil {
+					log.Fatal("Server forced to shutdown:", err)
+				}
+			}
+
+			logs.Logs.Println("[INFO][API] Servers exiting")
+			return
+		}
+	}
 }
