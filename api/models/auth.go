@@ -29,3 +29,7 @@ type OTPJson struct {
 	Token    string `json:"token" structs:"token"`
 	OTP      string `json:"otp" structs:"otp"`
 }
+
+type OTP struct {
+	OTP string `json:"otp" binding:"required"`
+}

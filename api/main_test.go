@@ -179,7 +179,7 @@ func TestMainEndpoints(t *testing.T) {
 
 	t.Run("TestGet2FAStatusEndpoint", func(t *testing.T) {
 		w := httptest.NewRecorder()
-		req, _ := http.NewRequest("GET", "/2fa", nil)
+		req, _ := http.NewRequest("GET", "/2fa/status", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -336,7 +336,7 @@ func TestMainEndpoints(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 
-	// 2FA test: enable, verify with OTP, verify with recovery code, remove
+	// 2FA test: generate secret, verify OTP, set 2FA, verify with OTP, verify with recovery code, remove
 	t.Run("Test2FAEnableVerifyRemove", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		// Execute login to get token
@@ -350,22 +350,61 @@ func TestMainEndpoints(t *testing.T) {
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.NotEmpty(t, token)
 
-		// Enable 2FA (get QR code and secret)
-		qrReq, _ := http.NewRequest("GET", "/2fa/qr-code", nil)
-		qrReq.Header.Set("Authorization", "Bearer "+token)
-		router.ServeHTTP(w, qrReq)
+		// Step 1: Generate 2FA secret (temporary)
+		secretReq, _ := http.NewRequest("GET", "/2fa/secret", bytes.NewBuffer([]byte("{}")))
+		secretReq.Header.Set("Authorization", "Bearer "+token)
+		secretReq.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, secretReq)
 		assert.Equal(t, http.StatusOK, w.Code)
-		var qrResp map[string]interface{}
-		json.NewDecoder(w.Body).Decode(&qrResp)
-		secret := qrResp["data"].(map[string]interface{})["key"].(string)
+		var secretResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&secretResp)
+		secret := secretResp["data"].(map[string]interface{})["key"].(string)
 		assert.NotEmpty(t, secret)
 
+		// Generate OTP code for verification
 		otp, err := totp.GenerateCode(secret, time.Now())
 		assert.NoError(t, err)
 		assert.NotEmpty(t, otp)
 
-		// Verify 2FA login with OTP code
-		otpBody := map[string]string{"username": "admin", "token": token, "otp": otp}
+		// Step 2: invalid OTP should fail
+		verifyBodyInvalid := map[string]string{"otp": "000000"}
+		verifyBodyInvalidBytes, _ := json.Marshal(verifyBodyInvalid)
+		verifyReqInvalid, _ := http.NewRequest("PUT", "/2fa/secret", bytes.NewBuffer(verifyBodyInvalidBytes))
+		verifyReqInvalid.Header.Set("Content-Type", "application/json")
+		verifyReqInvalid.Header.Set("Authorization", "Bearer "+token)
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, verifyReqInvalid)
+		assert.Equal(t, http.StatusBadRequest, w.Code)
+
+		// Step 3: Verify OTP and set 2FA secret (enable 2FA)
+		verifyBody := map[string]string{"otp": otp}
+		verifyBodyBytes, _ := json.Marshal(verifyBody)
+		verifyReq, _ := http.NewRequest("PUT", "/2fa/secret", bytes.NewBuffer(verifyBodyBytes))
+		verifyReq.Header.Set("Content-Type", "application/json")
+		verifyReq.Header.Set("Authorization", "Bearer "+token)
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, verifyReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Step 4: Check 2FA is now enabled and get recovery codes
+		w = httptest.NewRecorder()
+		statusReq, _ := http.NewRequest("GET", "/2fa/status", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp)
+		assert.Equal(t, true, statusResp["data"].(map[string]interface{})["status"])
+		recoveryCodes := statusResp["data"].(map[string]interface{})["recovery_codes"].([]interface{})
+		assert.NotEmpty(t, recoveryCodes)
+		recoveryCode := recoveryCodes[0].(string)
+
+		// Step 5: Verify 2FA login with new OTP code
+		newOtp, err := totp.GenerateCode(secret, time.Now())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, newOtp)
+		otpBody := map[string]string{"username": "admin", "token": token, "otp": newOtp}
 		otpBodyBytes, _ := json.Marshal(otpBody)
 		otpReq, _ := http.NewRequest("POST", "/2fa/otp-verify", bytes.NewBuffer(otpBodyBytes))
 		otpReq.Header.Set("Content-Type", "application/json")
@@ -373,19 +412,7 @@ func TestMainEndpoints(t *testing.T) {
 		router.ServeHTTP(w, otpReq)
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		// Get recovery codes
-		w = httptest.NewRecorder()
-		statusReq, _ := http.NewRequest("GET", "/2fa", nil)
-		statusReq.Header.Set("Authorization", "Bearer "+token)
-		router.ServeHTTP(w, statusReq)
-		assert.Equal(t, http.StatusOK, w.Code)
-		var statusResp map[string]interface{}
-		json.NewDecoder(w.Body).Decode(&statusResp)
-		recoveryCodes := statusResp["data"].(map[string]interface{})["recovery_codes"].([]interface{})
-		assert.NotEmpty(t, recoveryCodes)
-		recoveryCode := recoveryCodes[0].(string)
-
-		// Verify 2FA login with recovery code
+		// Step 6: Verify 2FA login with recovery code
 		recBody := map[string]string{"username": "admin", "token": token, "otp": recoveryCode}
 		recBodyBytes, _ := json.Marshal(recBody)
 		recReq, _ := http.NewRequest("POST", "/2fa/otp-verify", bytes.NewBuffer(recBodyBytes))
@@ -394,16 +421,16 @@ func TestMainEndpoints(t *testing.T) {
 		router.ServeHTTP(w, recReq)
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		// Remove 2FA
+		// Step 7: Remove 2FA
 		w = httptest.NewRecorder()
-		delReq, _ := http.NewRequest("DELETE", "/2fa", nil)
+		delReq, _ := http.NewRequest("DELETE", "/2fa/status", nil)
 		delReq.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, delReq)
 		assert.Equal(t, http.StatusOK, w.Code)
 
-		// Check 2FA is disabled
+		// Step 8: Check 2FA is disabled
 		w = httptest.NewRecorder()
-		statusReq, _ = http.NewRequest("GET", "/2fa", nil)
+		statusReq, _ = http.NewRequest("GET", "/2fa/status", nil)
 		statusReq.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, statusReq)
 		assert.Equal(t, http.StatusOK, w.Code)
@@ -412,6 +439,96 @@ func TestMainEndpoints(t *testing.T) {
 		assert.Equal(t, false, statusResp2fa["data"].(map[string]interface{})["status"])
 		// recovery codes should be empty
 		assert.Equal(t, []interface{}{}, statusResp2fa["data"].(map[string]interface{})["recovery_codes"])
+	})
+
+	// 2FA test: generate secret and cancel setup
+	t.Run("Test2FACancelSetup", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		// Execute login to get token
+		var jsonResponse map[string]interface{}
+		body := `{"username": "admin", "password": "admin"}`
+		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token := jsonResponse["token"].(string)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.NotEmpty(t, token)
+
+		// Step 1: Generate 2FA secret (temporary)
+		secretReq, _ := http.NewRequest("GET", "/2fa/secret", bytes.NewBuffer([]byte("{}")))
+		secretReq.Header.Set("Authorization", "Bearer "+token)
+		secretReq.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, secretReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var secretResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&secretResp)
+		secret := secretResp["data"].(map[string]interface{})["key"].(string)
+		assert.NotEmpty(t, secret)
+
+		// Step 2: Cancel 2FA setup (delete temporary secret)
+		cancelReq, _ := http.NewRequest("DELETE", "/2fa/secret", nil)
+		cancelReq.Header.Set("Authorization", "Bearer "+token)
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, cancelReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Step 3: Verify 2FA is still disabled
+		w = httptest.NewRecorder()
+		statusReq, _ := http.NewRequest("GET", "/2fa/status", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp)
+		assert.Equal(t, false, statusResp["data"].(map[string]interface{})["status"])
+	})
+
+	// 2FA test: generate secret and complete setup
+	t.Run("Test2FACompleteSetup", func(t *testing.T) {
+		var secretResp map[string]interface{}
+
+		// Step 1: Generate a 2FA secret
+		secretReq, _ := http.NewRequest("GET", "/2fa/secret", bytes.NewBuffer([]byte("{}")))
+		secretReq.Header.Set("Authorization", "Bearer "+token)
+		secretReq.Header.Set("Content-Type", "application/json")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, secretReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		json.NewDecoder(w.Body).Decode(&secretResp)
+		secret := secretResp["data"].(map[string]interface{})["key"].(string)
+		assert.NotEmpty(t, secret)
+
+		// Step 2: Enable 2FA properly
+		otp, err := totp.GenerateCode(secret, time.Now())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, otp)
+		verifyBody := map[string]string{"otp": otp}
+		verifyBodyBytes, _ := json.Marshal(verifyBody)
+		verifyReq, _ := http.NewRequest("PUT", "/2fa/secret", bytes.NewBuffer(verifyBodyBytes))
+		verifyReq.Header.Set("Content-Type", "application/json")
+		verifyReq.Header.Set("Authorization", "Bearer "+token)
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, verifyReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Step 3: Check 2FA is now enabled
+		w = httptest.NewRecorder()
+		statusReq, _ := http.NewRequest("GET", "/2fa/status", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp2fa map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp2fa)
+		assert.Equal(t, true, statusResp2fa["data"].(map[string]interface{})["status"])
+
+		// Cleanup: remove 2FA
+		w = httptest.NewRecorder()
+		delReq, _ := http.NewRequest("DELETE", "/2fa/status", nil)
+		delReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, delReq)
+		assert.Equal(t, http.StatusOK, w.Code)
 	})
 }
 

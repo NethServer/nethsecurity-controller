@@ -22,3 +22,9 @@ type StatusNotFound struct {
 	Message string      `json:"message" example:"Not found" structs:"message"`
 	Data    interface{} `json:"data" structs:"data"`
 }
+
+type StatusInternalServerError struct {
+	Code    int         `json:"code" example:"500" structs:"code"`
+	Message string      `json:"message" example:"Internal server error" structs:"message"`
+	Data    interface{} `json:"data" structs:"data"`
+}
