@@ -253,9 +253,17 @@ func migrateUsersFromSqliteToPostgres(units []string) {
 	for _, acc := range users {
 		// Read OTP secret
 		otp_secret := ""
-		secret, serr := os.ReadFile(configuration.Config.SecretsDir + "/" + acc.Username + "/secret")
-		if serr == nil {
-			otp_secret = string(secret[:])
+		otp_status := "0"
+		otp_status_f, otp_status_err := os.ReadFile(configuration.Config.SecretsDir + "/" + acc.Username + "/status")
+		if otp_status_err == nil {
+			otp_status = string(otp_status_f[:])
+		}
+		// Only if status is 1, load the actual secret
+		if otp_status == "1" {
+			otp_secret_f, otp_secret_err := os.ReadFile(configuration.Config.SecretsDir + "/" + acc.Username + "/secret")
+			if otp_secret_err == nil {
+				otp_secret = string(otp_secret_f[:])
+			}
 		}
 
 		// Read recovery codes
