@@ -38,6 +38,7 @@ import (
 )
 
 var activeTokens sync.Map
+var tempOtpSecrets sync.Map
 
 func CheckTokenValidation(username string, token string) bool {
 	value, ok := activeTokens.Load(username)
@@ -102,35 +103,32 @@ func OTPVerify(c *gin.Context) {
 	}
 
 	// get secret for the user
+	// - first, search inside the database
+	// - then, search inside the temporary secrets (for new 2FA setup)
+	isTempSecret := false
 	secret := storage.GetUserOtpSecret(jsonOTP.Username)
 
 	// check secret
 	if len(secret) == 0 {
-		c.JSON(http.StatusNotFound, structs.Map(response.StatusNotFound{
-			Code:    404,
-			Message: "user secret not found",
-			Data:    "",
-		}))
-		return
+		// search inside the temporary secrets
+		value, ok := tempOtpSecrets.Load(jsonOTP.Username)
+		if !ok {
+			c.JSON(http.StatusNotFound, structs.Map(response.StatusNotFound{
+				Code:    404,
+				Message: "user secret not found",
+				Data:    "",
+			}))
+			return
+		}
+		secret = value.(string)
+		isTempSecret = true
 	}
 
 	// verifiy OTP
 	valid := false
 	err := error(nil)
-	valid, err = totp.ValidateCustom(jsonOTP.OTP, secret, time.Now(), totp.ValidateOpts{
-		Period:    30,
-		Skew:      3, // window size
-		Digits:    otp.DigitsSix,
-		Algorithm: otp.AlgorithmSHA1,
-	})
-	if err != nil || !valid {
-
-		// check if OTP is a recovery code
-		recoveryCodes := storage.GetRecoveryCodes(jsonOTP.Username)
-
-		if !utils.Contains(jsonOTP.OTP, recoveryCodes) {
-			// compose validation error
-			jsonParsed, _ := gabs.ParseJSON([]byte(`{
+	// compose validation error
+	jsonParsed, _ := gabs.ParseJSON([]byte(`{
 				"validation": {
 				  "errors": [
 					{
@@ -142,6 +140,53 @@ func OTPVerify(c *gin.Context) {
 				}
 			}`))
 
+	valid, err = totp.ValidateCustom(jsonOTP.OTP, secret, time.Now(), totp.ValidateOpts{
+		Period:    30,
+		Skew:      3, // window size
+		Digits:    otp.DigitsSix,
+		Algorithm: otp.AlgorithmSHA1,
+	})
+	// fail if temp secret and not valid
+	if isTempSecret {
+		if err != nil || !valid {
+			// return validation error
+			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+				Code:    400,
+				Message: "validation_failed",
+				Data:    jsonParsed,
+			}))
+			return
+		} else {
+			// move secret from temp to permanent
+			ok, _ := SetUserSecret(jsonOTP.Username, secret)
+			if !ok {
+				c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
+					Code:    400,
+					Message: "user secret set error",
+					Data:    "",
+				}))
+				return
+			}
+			storage.SetUserRecoveryCodes(jsonOTP.Username, generateRecoveryCodes())
+
+			// remove from temp
+			tempOtpSecrets.Delete(jsonOTP.Username)
+
+			// response
+			c.JSON(http.StatusOK, structs.Map(response.StatusOK{
+				Code:    200,
+				Message: "2FA enabled successfully",
+				Data:    jsonOTP.Token,
+			}))
+			return
+
+		}
+	}
+	// check for OTP recovery codes only for permanent secrets
+	if err != nil || !valid {
+		recoveryCodes := storage.GetRecoveryCodes(jsonOTP.Username)
+
+		if !utils.Contains(jsonOTP.OTP, recoveryCodes) {
 			// return validation error
 			c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 				Code:    400,
@@ -313,16 +358,8 @@ func QRCode(c *gin.Context) {
 	account := claims["id"].(string)
 	issuer := configuration.Config.Issuer2FA
 
-	// set secret for user
-	result, setSecret := SetUserSecret(account, secretBase32)
-	if !result {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "user secret set error",
-			Data:    "",
-		}))
-		return
-	}
+	// set temporary secret for user
+	tempOtpSecrets.Store(account, secretBase32)
 
 	// define URL
 	URL, err := url.Parse("otpauth://totp")
@@ -333,7 +370,7 @@ func QRCode(c *gin.Context) {
 	// add params
 	URL.Path += "/" + issuer + ":" + account
 	params := url.Values{}
-	params.Add("secret", setSecret)
+	params.Add("secret", secretBase32)
 	params.Add("issuer", issuer)
 	params.Add("algorithm", "SHA1")
 	params.Add("digits", "6")
@@ -342,13 +379,11 @@ func QRCode(c *gin.Context) {
 	// print url
 	URL.RawQuery = params.Encode()
 
-	storage.SetUserRecoveryCodes(account, generateRecoveryCodes())
-
 	// response
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
 		Message: "QR code string",
-		Data:    gin.H{"url": URL.String(), "key": setSecret},
+		Data:    gin.H{"url": URL.String(), "key": secretBase32},
 	}))
 }
 

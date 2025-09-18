@@ -413,6 +413,47 @@ func TestMainEndpoints(t *testing.T) {
 		// recovery codes should be empty
 		assert.Equal(t, []interface{}{}, statusResp2fa["data"].(map[string]interface{})["recovery_codes"])
 	})
+
+	// 2FA test partial setup (issue #1376)
+	t.Run("Test2FAPartialSetup", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		// Execute login to get token
+		var jsonResponse map[string]interface{}
+		body := `{"username": "admin", "password": "admin"}`
+		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token = jsonResponse["token"].(string)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.NotEmpty(t, token)
+
+		// Enable 2FA (get QR code and secret)
+		qrReq, _ := http.NewRequest("GET", "/2fa/qr-code", nil)
+		qrReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, qrReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var qrResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&qrResp)
+		secret := qrResp["data"].(map[string]interface{})["key"].(string)
+		assert.NotEmpty(t, secret)
+
+		otp, err := totp.GenerateCode(secret, time.Now())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, otp)
+
+		// Check 2FA is disabled
+		w = httptest.NewRecorder()
+		statusReq, _ := http.NewRequest("GET", "/2fa", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp2fa map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp2fa)
+		assert.Equal(t, false, statusResp2fa["data"].(map[string]interface{})["status"])
+		// recovery codes should be empty
+		assert.Equal(t, []interface{}{}, statusResp2fa["data"].(map[string]interface{})["recovery_codes"])
+	})
 }
 
 func addUnit(t *testing.T) string {
