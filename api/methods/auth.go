@@ -38,7 +38,6 @@ import (
 )
 
 var activeTokens sync.Map
-var tempOtpSecrets sync.Map
 
 func CheckTokenValidation(username string, token string) bool {
 	value, ok := activeTokens.Load(username)
@@ -296,97 +295,26 @@ func Del2FAStatus(c *gin.Context) {
 	}))
 }
 
-func Generate2FASecret(c *gin.Context) {
+func QRCode(c *gin.Context) {
 	// generate random secret
 	secret := make([]byte, 20)
 	_, err := rand.Read(secret)
 	if err != nil {
 		logs.Logs.Println("[ERR][2FA] Failed to generate random secret for QRCode: " + err.Error())
-		c.JSON(http.StatusInternalServerError, structs.Map(response.StatusInternalServerError{
-			Code:    500,
-			Message: "failed to generate random secret",
-			Data:    err.Error(),
-		}))
-		return
 	}
 
-	// get user account from claims
-	claims := jwt.ExtractClaims(c)
-	account := claims["id"].(string)
-
-	// store temporary secret
+	// convert to string
 	secretBase32 := base32.StdEncoding.EncodeToString(secret)
-	tempOtpSecrets.Store(account, secretBase32)
 
-	// prepare QR code
+	// get claims from token
+	claims := jwt.ExtractClaims(c)
+
+	// define issuer
+	account := claims["id"].(string)
 	issuer := configuration.Config.Issuer2FA
 
-	// define URL
-	URL, _ := url.Parse("otpauth://totp")
-	// add params
-	URL.Path += "/" + issuer + ":" + account
-	params := url.Values{}
-	params.Add("secret", secretBase32)
-	params.Add("issuer", issuer)
-	params.Add("algorithm", "SHA1")
-	params.Add("digits", "6")
-	params.Add("period", "30")
-	URL.RawQuery = params.Encode()
-
-	// response
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "QR code string",
-		Data:    gin.H{"url": URL.String(), "key": secretBase32},
-	}))
-}
-
-func Set2FASecret(c *gin.Context) {
-	// get payload
-	var otpRequest models.OTP
-	if err := c.ShouldBindBodyWith(&otpRequest, binding.JSON); err != nil {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "request fields malformed",
-			Data:    err.Error(),
-		}))
-		return
-	}
-
-	// get user account from claims
-	claims := jwt.ExtractClaims(c)
-	account := claims["id"].(string)
-
-	secretBase32, ok := tempOtpSecrets.Load(account)
-	if !ok {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "no temporary secret found for user, please generate a new one",
-			Data:    "",
-		}))
-		return
-	}
-
-	// verifiy OTP
-	valid, err := totp.ValidateCustom(otpRequest.OTP, secretBase32.(string), time.Now(), totp.ValidateOpts{
-		Period:    30,
-		Skew:      3, // window size
-		Digits:    otp.DigitsSix,
-		Algorithm: otp.AlgorithmSHA1,
-	})
-
-	// OTP not valid, return error
-	if err != nil || !valid {
-		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
-			Code:    400,
-			Message: "invalid OTP code",
-			Data:    "",
-		}))
-		return
-	}
-
-	// OTP is valid, set secret for user
-	result, _ := SetUserSecret(account, secretBase32.(string))
+	// set secret for user
+	result, setSecret := SetUserSecret(account, secretBase32)
 	if !result {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
 			Code:    400,
@@ -395,30 +323,32 @@ func Set2FASecret(c *gin.Context) {
 		}))
 		return
 	}
-	// save recovery codes
+
+	// define URL
+	URL, err := url.Parse("otpauth://totp")
+	if err != nil {
+		logs.Logs.Println("[ERR][2FA] Failed to parse URL for QRCode: " + err.Error())
+	}
+
+	// add params
+	URL.Path += "/" + issuer + ":" + account
+	params := url.Values{}
+	params.Add("secret", setSecret)
+	params.Add("issuer", issuer)
+	params.Add("algorithm", "SHA1")
+	params.Add("digits", "6")
+	params.Add("period", "30")
+
+	// print url
+	URL.RawQuery = params.Encode()
+
 	storage.SetUserRecoveryCodes(account, generateRecoveryCodes())
 
 	// response
 	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
 		Code:    200,
-		Message: "2FA enabled successfully",
-		Data:    "",
-	}))
-}
-
-func Del2FASecret(c *gin.Context) {
-	// get user account from claims
-	claims := jwt.ExtractClaims(c)
-	account := claims["id"].(string)
-
-	// delete temporary secret
-	tempOtpSecrets.Delete(account)
-
-	// response
-	c.JSON(http.StatusOK, structs.Map(response.StatusOK{
-		Code:    200,
-		Message: "temporary secret deleted successfully",
-		Data:    "",
+		Message: "QR code string",
+		Data:    gin.H{"url": URL.String(), "key": setSecret},
 	}))
 }
 

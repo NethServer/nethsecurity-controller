@@ -108,18 +108,10 @@ func setup() *gin.Engine {
 		// refresh handler
 		api.GET("/refresh", middleware.InstanceJWT().RefreshHandler)
 
-		// 2FA APIs: manage current saved status
-		api.GET("/2fa/status", methods.Get2FAStatus)
-		api.DELETE("/2fa/status", methods.Del2FAStatus)
-
-		// 2FA APIs: manage temporary secret during setup
-		// Workflow:
-		// 1. GET /2fa/secret -> generate a new secret and save it in a temporary map (not saved on disk)
-		// 2. PUT /2fa/secret -> verify the OTP code with the temporary keyand save the secret on disk, enable 2FA for the user
-		// The UI can call the DELETE /2fa/secret to cancel the operation and remove the temporary secret
-		api.GET("/2fa/secret", methods.Generate2FASecret)
-		api.PUT("/2fa/secret", methods.Set2FASecret)
-		api.DELETE("/2fa/secret", methods.Del2FASecret)
+		// 2FA APIs
+		api.GET("/2fa", methods.Get2FAStatus)
+		api.DELETE("/2fa", methods.Del2FAStatus)
+		api.GET("/2fa/qr-code", methods.QRCode)
 
 		// accounts APIs
 		accounts := api.Group("/accounts")
