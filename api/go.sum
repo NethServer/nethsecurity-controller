@@ -4,6 +4,8 @@ github.com/Jeffail/gabs/v2 v2.7.0/go.mod h1:dp5ocw1FvBBQYssgHsG7I1WYsiLRtkUaB1FE
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/NethServer/nethsecurity-api v0.0.0-20241002122635-8157091120e5 h1:yBttZobscZce41QM5zluFn6Yees2jEnp67WwdHT71Tw=
 github.com/NethServer/nethsecurity-api v0.0.0-20241002122635-8157091120e5/go.mod h1:J7avk5KJCxBC1xKnE7dhbi0Kh9v8UNO+KFUNFg6dG8Q=
+github.com/NethServer/nethsecurity-api v0.0.0-20251002102226-f648b9d1b42b h1:rtGaH8MXhEmyRpyx4kYFsJVYHL/dkA8/NoPYWLQRHDg=
+github.com/NethServer/nethsecurity-api v0.0.0-20251002102226-f648b9d1b42b/go.mod h1:sDpqpJmef5iZ8Yh/Q7STcQdI7rfjUnO8fKvD/mG1soY=
 github.com/NethServer/ns8-core/core/api-server v0.0.0-20230511093202-c2f91171c039/go.mod h1:pMPGsATL4dPazf1RPv8EqJuvPJ/+hVEZIGzUYzHzXwY=
 github.com/PuerkitoBio/purell v1.1.0/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
 github.com/PuerkitoBio/purell v1.1.1/go.mod h1:c11w/QuzBsJSee3cPx9rAFu61PvFxuPbtSwDGJws/X0=
