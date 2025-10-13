@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.22.1 AS dist
+FROM docker.io/alpine:3.22.2 AS dist
 RUN apk add --no-cache \
       openvpn \
       easy-rsa \
