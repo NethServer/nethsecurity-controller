@@ -23,7 +23,7 @@ RUN go build -ldflags='-extldflags=-static' -tags sqlite_omit_load_extension
 FROM build AS test
 RUN go test
 
-FROM docker.io/alpine:3.22.1 AS dist
+FROM docker.io/alpine:3.22.2 AS dist
 RUN apk add --no-cache \
       curl \
       easy-rsa \
