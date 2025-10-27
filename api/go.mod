@@ -11,7 +11,7 @@ require (
 	github.com/appleboy/gin-jwt/v2 v2.10.3
 	github.com/fatih/structs v1.1.0
 	github.com/gin-contrib/cors v1.7.6
-	github.com/gin-contrib/gzip v1.2.4
+	github.com/gin-contrib/gzip v1.2.5
 	github.com/gin-gonic/gin v1.11.0
 	github.com/golang-jwt/jwt/v4 v4.5.2
 	github.com/golang-jwt/jwt/v5 v5.3.0
