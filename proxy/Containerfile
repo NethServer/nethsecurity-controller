@@ -1,4 +1,4 @@
-FROM docker.io/traefik:v3.5.3 AS dist
+FROM docker.io/traefik:v3.5.4 AS dist
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/usr/local/bin/traefik", "--configFile=/config.yaml"]
