@@ -3,7 +3,7 @@
   "extends": [
     "config:base",
     "customManagers:dockerfileVersions",
-    ":automergeMinor",
+    ":automergePatch",
     ":disableRateLimiting",
     ":enableVulnerabilityAlerts",
     "schedule:earlyMondays"
