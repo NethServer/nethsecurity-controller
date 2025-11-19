@@ -8,15 +8,13 @@ import (
 	"testing"
 
 	"github.com/NethServer/nethsecurity-controller/api/models"
-	"github.com/NethServer/nethsecurity-controller/api/testhelpers"
 	"github.com/stretchr/testify/assert"
 )
 
-// These tests exercise the /ingest/* endpoints in a conservative way.
-// They call testhelpers.SkipIfNoDB to avoid failing when no test DB is configured.
+// These tests exercise the /ingest/* endpoints and require a database.
+// Set REPORT_DB_URI environment variable before running tests.
 
 func TestIngestUnitName(t *testing.T) {
-	testhelpers.SkipIfNoDB(t)
 	ginRouter := setupRouter()
 
 	unitID := addUnit(t)
@@ -34,7 +32,6 @@ func TestIngestUnitName(t *testing.T) {
 }
 
 func TestIngestWanConfig(t *testing.T) {
-	testhelpers.SkipIfNoDB(t)
 	ginRouter := setupRouter()
 	unitID := addUnit(t)
 
@@ -49,7 +46,6 @@ func TestIngestWanConfig(t *testing.T) {
 }
 
 func TestIngestOvpnConfig(t *testing.T) {
-	testhelpers.SkipIfNoDB(t)
 	ginRouter := setupRouter()
 	unitID := addUnit(t)
 
@@ -64,7 +60,6 @@ func TestIngestOvpnConfig(t *testing.T) {
 }
 
 func TestIngestMwanEvents(t *testing.T) {
-	testhelpers.SkipIfNoDB(t)
 	ginRouter := setupRouter()
 	unitID := addUnit(t)
 
@@ -79,7 +74,6 @@ func TestIngestMwanEvents(t *testing.T) {
 }
 
 func TestIngestTsAttacksAndDpiAndOvpnConnections(t *testing.T) {
-	testhelpers.SkipIfNoDB(t)
 	ginRouter := setupRouter()
 	unitID := addUnit(t)
 

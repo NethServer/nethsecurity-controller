@@ -21,33 +21,11 @@ import (
 	"github.com/NethServer/nethsecurity-controller/api/utils"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-    
+	"github.com/pquerna/otp/totp"
 	"github.com/stretchr/testify/assert"
 )
 
 var router *gin.Engine
-
-// getTokenFromResponse decodes a JSON response body and returns the token string.
-// It will fail the test with a helpful message if the token is missing or not a string.
-func getTokenFromResponse(t *testing.T, body *bytes.Buffer) (string, bool) {
-	var jsonResponse map[string]interface{}
-	if err := json.NewDecoder(body).Decode(&jsonResponse); err != nil {
-		t.Fatalf("failed to decode JSON response: %v", err)
-		return "", false
-	}
-	tokIface, ok := jsonResponse["token"]
-	if !ok || tokIface == nil {
-		t.Logf("login response body: %v", jsonResponse)
-		t.Fatalf("login did not return a token; status may be %v", jsonResponse["status"])
-		return "", false
-	}
-	token, ok := tokIface.(string)
-	if !ok {
-		t.Fatalf("token in response is not a string: %T", tokIface)
-		return "", false
-	}
-	return token, true
-}
 
 // TestAESGCMEncryption tests AES-GCM encryption and decryption.
 func TestAESGCMEncryption(t *testing.T) {
@@ -169,44 +147,23 @@ func TestHealthEndpoint(t *testing.T) {
 	}
 }
 
-// TestMainEndpoints runs a sequence of endpoint tests that require authentication
-// and a clean DB. If initial login fails we abort the test suite so dependent
-// subtests don't run with an invalid token.
 func TestMainEndpoints(t *testing.T) {
+	// Tests assume to run on a clean database, otherwise 2FA tests will fail
 	gin.SetMode(gin.TestMode)
 	router = setupRouter()
+	var token string
 
-	// Remove 2FA config from previous tests
-	os.RemoveAll(configuration.Config.SecretsDir + "/" + "admin")
-	w := httptest.NewRecorder()
-	body := `{"username": "admin", "password": "admin"}`
-	req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
-	req.Header.Set("Content-Type", "application/json")
-	router.ServeHTTP(w, req)
-	token, ok := getTokenFromResponse(t, w.Body)
-	if !ok {
-		t.Fatalf("initial login failed; aborting TestMainEndpoints")
-	}
-	if w.Code != http.StatusOK {
-		t.Fatalf("initial login returned status %d; aborting TestMainEndpoints", w.Code)
-	}
-	if token == "" {
-		t.Fatalf("initial login returned empty token; aborting TestMainEndpoints")
-	}
-	if !methods.CheckTokenValidation("admin", token) {
-		t.Fatalf("initial login token validation failed; aborting TestMainEndpoints")
-	}
-
-	// Subtests start here. They assume `token` is valid.
 	t.Run("TestLoginEndpoint", func(t *testing.T) {
 		// Remove 2FA config from previous tests
 		os.RemoveAll(configuration.Config.SecretsDir + "/" + "admin")
 		w := httptest.NewRecorder()
+		var jsonResponse map[string]interface{}
 		body := `{"username": "admin", "password": "admin"}`
 		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
-		token, _ = getTokenFromResponse(t, w.Body)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token = jsonResponse["token"].(string)
 		assert.Equal(t, http.StatusOK, w.Code)
 		assert.NotEmpty(t, token)
 		assert.True(t, methods.CheckTokenValidation("admin", token))
@@ -237,26 +194,22 @@ func TestMainEndpoints(t *testing.T) {
 		assert.False(t, methods.CheckTokenValidation("admin", token))
 	})
 
-	// Remaining subtests (GetAccounts, Add/Update/Delete Account, Register Unit,
-	// 2FA flows, etc.) follow the same pattern. We'll reuse the existing code
-	// from the previous version below by invoking the same requests and
-	// assertions.
-
-	// TestGetAccountsEndpoint
 	t.Run("TestGetAccountsEndpoint", func(t *testing.T) {
 		// Login again
+		var jsonResponse map[string]interface{}
 		w := httptest.NewRecorder()
 		body := `{"username": "admin", "password": "admin"}`
 		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
 		req.Header.Set("Content-Type", "application/json")
 		router.ServeHTTP(w, req)
-		token, _ = getTokenFromResponse(t, w.Body)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token = jsonResponse["token"].(string)
 
 		req, _ = http.NewRequest("GET", "/accounts", nil)
 		req.Header.Set("Authorization", "Bearer "+token)
 		router.ServeHTTP(w, req)
 		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
-		var jsonResponse map[string]interface{}
+		// response is: gin.H{"accounts": accounts, "total": len(accounts)},
 		json.NewDecoder(w.Body).Decode(&jsonResponse)
 		data := jsonResponse["data"].(map[string]interface{})
 		assert.Equal(t, data["accounts"].([]interface{})[0].(map[string]interface{})["username"], "admin")
@@ -264,7 +217,6 @@ func TestMainEndpoints(t *testing.T) {
 		assert.Equal(t, data["accounts"].([]interface{})[0].(map[string]interface{})["two_fa"], false)
 	})
 
-	// TestAddUpdateDeleteAccount
 	t.Run("TestAddUpdateDeleteAccount", func(t *testing.T) {
 		w := httptest.NewRecorder()
 		// Add account
@@ -325,7 +277,183 @@ func TestMainEndpoints(t *testing.T) {
 		assert.Equal(t, http.StatusNotFound, w.Code)
 	})
 
-	// Additional subtests (register unit, 2FA flows, etc.) remain below unchanged.
+	t.Run("TestRegisterUnitEndpoint", func(t *testing.T) {
+		// create credentials directory
+		if _, err := os.Stat(configuration.Config.CredentialsDir); os.IsNotExist(err) {
+			if err := os.MkdirAll(configuration.Config.CredentialsDir, 0755); err != nil {
+				t.Fatalf("failed to create directory: %v", err)
+			}
+		}
+		// make sure configuration.Config.OpenVPNPKIDir does not exists
+		os.RemoveAll(configuration.Config.OpenVPNPKIDir)
+		unitID := "88860838-63bd-4717-a6c3-cbc351010843"
+		body := `{"unit_id": "` + unitID + `", "username": "myuser", "unit_name": "myname", "password": "mypassword"}`
+		req, _ := http.NewRequest("POST", "/units/register", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("RegistrationToken", "1234")
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusForbidden, w.Code)
+
+		// create OpenVPN directory
+		if _, err := os.Stat(configuration.Config.OpenVPNPKIDir + "/issued"); os.IsNotExist(err) {
+			if err := os.MkdirAll(configuration.Config.OpenVPNPKIDir+"/issued", 0755); err != nil {
+				t.Fatalf("failed to create directory: %v", err)
+			}
+			if err := os.MkdirAll(configuration.Config.OpenVPNPKIDir+"/private", 0755); err != nil {
+				t.Fatalf("failed to create directory: %v", err)
+			}
+		}
+		// create fake certificate file and key file
+		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/issued/" + unitID + ".crt"); err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/private/" + unitID + ".key"); err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		// create face ca.crt file
+		if _, err := os.Create(configuration.Config.OpenVPNPKIDir + "/ca.crt"); err != nil {
+			t.Fatalf("failed to create file: %v", err)
+		}
+		req, _ = http.NewRequest("POST", "/units/register", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("RegistrationToken", "1234")
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+		// Check password retrieval at lower level
+		user, pass, err := storage.GetUnitCredentials(unitID) // should return empty credentials
+		assert.NoError(t, err, "GetUnitCredentials should not return an error")
+		assert.Equal(t, "myuser", user)
+		assert.Equal(t, "mypassword", pass)
+	})
+
+	t.Run("TestNoRoute", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		req, _ := http.NewRequest("GET", "/nonexistent", nil)
+		router.ServeHTTP(w, req)
+		assert.Equal(t, http.StatusNotFound, w.Code)
+	})
+
+	// 2FA test: enable, verify with OTP, verify with recovery code, remove
+	t.Run("Test2FAEnableVerifyRemove", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		// Execute login to get token
+		var jsonResponse map[string]interface{}
+		body := `{"username": "admin", "password": "admin"}`
+		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token = jsonResponse["token"].(string)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.NotEmpty(t, token)
+
+		// Enable 2FA (get QR code and secret)
+		qrReq, _ := http.NewRequest("GET", "/2fa/qr-code", nil)
+		qrReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, qrReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var qrResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&qrResp)
+		secret := qrResp["data"].(map[string]interface{})["key"].(string)
+		assert.NotEmpty(t, secret)
+
+		otp, err := totp.GenerateCode(secret, time.Now())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, otp)
+
+		// Verify 2FA login with OTP code
+		otpBody := map[string]string{"username": "admin", "token": token, "otp": otp}
+		otpBodyBytes, _ := json.Marshal(otpBody)
+		otpReq, _ := http.NewRequest("POST", "/2fa/otp-verify", bytes.NewBuffer(otpBodyBytes))
+		otpReq.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, otpReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Get recovery codes
+		w = httptest.NewRecorder()
+		statusReq, _ := http.NewRequest("GET", "/2fa", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp)
+		recoveryCodes := statusResp["data"].(map[string]interface{})["recovery_codes"].([]interface{})
+		assert.NotEmpty(t, recoveryCodes)
+		recoveryCode := recoveryCodes[0].(string)
+
+		// Verify 2FA login with recovery code
+		recBody := map[string]string{"username": "admin", "token": token, "otp": recoveryCode}
+		recBodyBytes, _ := json.Marshal(recBody)
+		recReq, _ := http.NewRequest("POST", "/2fa/otp-verify", bytes.NewBuffer(recBodyBytes))
+		recReq.Header.Set("Content-Type", "application/json")
+		w = httptest.NewRecorder()
+		router.ServeHTTP(w, recReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Remove 2FA
+		w = httptest.NewRecorder()
+		delReq, _ := http.NewRequest("DELETE", "/2fa", nil)
+		delReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, delReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		// Check 2FA is disabled
+		w = httptest.NewRecorder()
+		statusReq, _ = http.NewRequest("GET", "/2fa", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp2fa map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp2fa)
+		assert.Equal(t, false, statusResp2fa["data"].(map[string]interface{})["status"])
+		// recovery codes should be empty
+		assert.Equal(t, []interface{}{}, statusResp2fa["data"].(map[string]interface{})["recovery_codes"])
+	})
+
+	// 2FA test partial setup (issue #1376)
+	t.Run("Test2FAPartialSetup", func(t *testing.T) {
+		w := httptest.NewRecorder()
+		// Execute login to get token
+		var jsonResponse map[string]interface{}
+		body := `{"username": "admin", "password": "admin"}`
+		req, _ := http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		router.ServeHTTP(w, req)
+		json.NewDecoder(w.Body).Decode(&jsonResponse)
+		token = jsonResponse["token"].(string)
+		assert.Equal(t, http.StatusOK, w.Code)
+		assert.NotEmpty(t, token)
+
+		// Enable 2FA (get QR code and secret)
+		qrReq, _ := http.NewRequest("GET", "/2fa/qr-code", nil)
+		qrReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, qrReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var qrResp map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&qrResp)
+		secret := qrResp["data"].(map[string]interface{})["key"].(string)
+		assert.NotEmpty(t, secret)
+
+		otp, err := totp.GenerateCode(secret, time.Now())
+		assert.NoError(t, err)
+		assert.NotEmpty(t, otp)
+
+		// Check 2FA is disabled
+		w = httptest.NewRecorder()
+		statusReq, _ := http.NewRequest("GET", "/2fa", nil)
+		statusReq.Header.Set("Authorization", "Bearer "+token)
+		router.ServeHTTP(w, statusReq)
+		assert.Equal(t, http.StatusOK, w.Code)
+		var statusResp2fa map[string]interface{}
+		json.NewDecoder(w.Body).Decode(&statusResp2fa)
+		assert.Equal(t, false, statusResp2fa["data"].(map[string]interface{})["status"])
+		// recovery codes should be empty
+		assert.Equal(t, []interface{}{}, statusResp2fa["data"].(map[string]interface{})["recovery_codes"])
+	})
 }
 
 func addUnit(t *testing.T) string {
@@ -397,7 +525,8 @@ func TestAddInfoAndGetRemoteInfo(t *testing.T) {
 	req, _ = http.NewRequest("POST", "/login", bytes.NewBuffer([]byte(body)))
 	req.Header.Set("Content-Type", "application/json")
 	router.ServeHTTP(w, req)
-	token, _ := getTokenFromResponse(t, w.Body)
+	json.NewDecoder(w.Body).Decode(&jsonResponse)
+	token := jsonResponse["token"].(string)
 
 	// Call /units/:unit_id to retrieve unit info
 	req = httptest.NewRequest("GET", "/units/"+unitID, nil)
@@ -921,6 +1050,140 @@ func TestPrometheusEndpoints(t *testing.T) {
 		}
 	}
 	assert.True(t, found, "should find the added unit in prometheus targets list")
+}
+
+// TestPasswordHashingConsistency tests that password hashing is consistent and secure.
+func TestPasswordHashingConsistency(t *testing.T) {
+	password := "TestPassword123!"
+
+	// Hash the same password twice
+	hash1 := utils.HashPassword(password)
+	hash2 := utils.HashPassword(password)
+
+	// Hashes should be different (bcrypt uses salt)
+	assert.NotEqual(t, hash1, hash2, "bcrypt should generate different hashes due to salt")
+
+	// Both hashes should verify the original password
+	assert.True(t, utils.CheckPasswordHash(password, hash1), "first hash should verify password")
+	assert.True(t, utils.CheckPasswordHash(password, hash2), "second hash should verify password")
+
+	// Different password should not verify
+	wrongPassword := "WrongPassword123!"
+	assert.False(t, utils.CheckPasswordHash(wrongPassword, hash1), "wrong password should not verify")
+	assert.False(t, utils.CheckPasswordHash(wrongPassword, hash2), "wrong password should not verify")
+}
+
+// TestNetworkUtilitiesListIPs tests the ListIPs utility function for various network sizes.
+func TestNetworkUtilitiesListIPs(t *testing.T) {
+	tests := []struct {
+		name     string
+		ip       string
+		netmask  string
+		minCount int
+		wantErr  bool
+	}{
+		{"Small network /28", "192.168.1.0", "255.255.255.240", 13, false},
+		{"Medium network /24", "10.0.0.0", "255.255.255.0", 250, false},
+		{"Large network /16", "172.16.0.0", "255.255.0.0", 65000, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ips, err := utils.ListIPs(tt.ip, tt.netmask)
+
+			if tt.wantErr {
+				assert.Error(t, err, "expected error for invalid input")
+			} else {
+				assert.NoError(t, err, "should not return error for valid input")
+				assert.GreaterOrEqual(t, len(ips), tt.minCount, "should return expected number of IPs")
+
+				// Verify all IPs are strings
+				for _, ip := range ips {
+					assert.NotEmpty(t, ip, "IP should not be empty")
+					// Basic IP format check
+					octets := 0
+					for i := 0; i < len(ip); i++ {
+						if ip[i] == '.' {
+							octets++
+						}
+					}
+					assert.Equal(t, 3, octets, "IP should have valid format")
+				}
+			}
+		})
+	}
+}
+
+// TestListIPsEdgeCases tests edge cases for ListIPs utility.
+func TestListIPsEdgeCases(t *testing.T) {
+	// Test single host network (/32)
+	ips, err := utils.ListIPs("192.168.1.1", "255.255.255.255")
+	assert.NoError(t, err, "should handle /32 network")
+	assert.Equal(t, 1, len(ips), "/32 network should return the single host IP")
+
+	// Test /31 network (point-to-point)
+	ips, err = utils.ListIPs("192.168.1.0", "255.255.255.254")
+	assert.NoError(t, err, "should handle /31 network")
+	assert.Equal(t, 0, len(ips), "/31 network excludes network and broadcast addresses")
+
+	// Test /30 network (smallest typical network)
+	ips, err = utils.ListIPs("192.168.1.0", "255.255.255.252")
+	assert.NoError(t, err, "should handle /30 network")
+	assert.Equal(t, 2, len(ips), "/30 network should return usable IPs (excludes network and broadcast)")
+}
+
+// TestEncryptionKeyRotation tests encryption and decryption with key management.
+func TestEncryptionKeyRotation(t *testing.T) {
+	key1 := []byte("key12345678901234567890123456789") // 32 bytes for AES-256
+	key2 := []byte("key22345678901234567890123456789") // 32 bytes for AES-256, different key
+	plaintext := []byte("sensitive data to encrypt")
+
+	// Encrypt with key1
+	ciphertext, err := utils.EncryptAESGCM(plaintext, key1)
+	assert.NoError(t, err, "encryption should succeed")
+	assert.NotEmpty(t, ciphertext, "ciphertext should not be empty")
+
+	// Decrypt with key1 should work
+	decrypted, err := utils.DecryptAESGCM(ciphertext, key1)
+	assert.NoError(t, err, "decryption with same key should succeed")
+	assert.Equal(t, plaintext, decrypted, "decrypted text should match original")
+
+	// Decrypt with key2 should fail
+	_, err = utils.DecryptAESGCM(ciphertext, key2)
+	assert.Error(t, err, "decryption with different key should fail")
+}
+
+// TestEncryptionRobustness tests encryption with various input sizes.
+func TestEncryptionRobustness(t *testing.T) {
+	key := []byte("12345678901234567890123456789012") // 32 bytes
+
+	tests := []struct {
+		name      string
+		plaintext []byte
+	}{
+		{"Empty data", []byte("")},
+		{"Single byte", []byte("A")},
+		{"Small data", []byte("Hello")},
+		{"Medium data", []byte("This is a longer message with special chars: !@#$%^&*()")},
+		{"Large data", make([]byte, 10000)},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ciphertext, err := utils.EncryptAESGCM(tt.plaintext, key)
+			assert.NoError(t, err, "encryption should succeed for %s", tt.name)
+
+			decrypted, err := utils.DecryptAESGCM(ciphertext, key)
+			assert.NoError(t, err, "decryption should succeed for %s", tt.name)
+
+			// For empty data, both plaintext and decrypted could be empty slice or nil
+			if len(tt.plaintext) == 0 {
+				assert.True(t, len(decrypted) == 0, "decrypted data should be empty for %s", tt.name)
+			} else {
+				assert.Equal(t, tt.plaintext, decrypted, "decrypted data should match original for %s", tt.name)
+			}
+		})
+	}
 }
 
 func setupRouter() *gin.Engine {
