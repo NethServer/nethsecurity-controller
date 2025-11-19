@@ -30,6 +30,7 @@ The development environment is managed by Podman and the `dev.sh` script. This s
   ```
 
 ## Testing Instructions
+- Do not validate tests if database is not running: the datbase is required
 - The backend tests are written in Go.
 - Before running the tests, ensure that the TimescaleDB database is running. You can use Podman to start a TimescaleDB container:
   ```bash
