@@ -10,15 +10,15 @@
 package utils
 
 import (
-	"github.com/NethServer/nethsecurity-controller/api/configuration"
-	"github.com/NethServer/nethsecurity-controller/api/logs"
-	"github.com/oschwald/geoip2-golang"
-	"log"
 	"net"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
+	"github.com/oschwald/geoip2-golang"
 )
 
 var db *geoip2.Reader
@@ -48,10 +48,11 @@ func GetCountryShort(ip string) string {
 		return ""
 	}
 
-	// If you are using strings that may be invalid, check that ip is not nil
-	record, err := db.City(net.ParseIP(ip))
+	// Parse IP and get country record from GeoLite2-Country database
+	record, err := db.Country(net.ParseIP(ip))
 	if err != nil {
-		log.Fatal(err)
+		logs.Logs.Println("[ERR][GEOIP] error looking up IP " + ip + ": " + err.Error())
+		return ""
 	}
 
 	return record.Country.IsoCode
@@ -87,6 +88,7 @@ func DownloadGeoIpDatabase() error {
 		configuration.Config.GeoIPDbDir+"/GeoLite2-Country.tar.gz",
 		"--strip-components=1",
 	)
+	cmd.Dir = configuration.Config.GeoIPDbDir
 	cmd.Stderr = &out
 	err = cmd.Run()
 	if err != nil {

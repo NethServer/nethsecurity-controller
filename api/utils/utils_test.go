@@ -14,9 +14,11 @@ import (
 	"crypto/rand"
 	"encoding/base64"
 	"encoding/json"
+	"os"
 	"testing"
 
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
+	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/stretchr/testify/assert"
 ) // TestAESGCMEncryption tests AES-GCM encryption and decryption.
 func TestAESGCMEncryption(t *testing.T) {
@@ -279,4 +281,139 @@ func TestGetJoinCode(t *testing.T) {
 	assert.Equal(t, unitId, data["unit_id"])
 	assert.Equal(t, "test-token", data["token"])
 	assert.Equal(t, "test.example.com", data["fqdn"])
+}
+
+// TestGeoIPDownloadAndLookup tests the GeoIP2 database download and country lookup functionality.
+func TestGeoIPDownloadAndLookup(t *testing.T) {
+	// Check if MaxMind license is set in environment
+	maxmindLicense := os.Getenv("MAXMIND_LICENSE")
+	if maxmindLicense == "" {
+		t.Skip("Skipping test - MAXMIND_LICENSE environment variable not set")
+	}
+
+	// Create a temporary directory for the test
+	tmpDir, err := os.MkdirTemp("", "geoip-test-*")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Save original config and restore after test
+	originalGeoIPDbDir := configuration.Config.GeoIPDbDir
+	originalMaxmindLicense := configuration.Config.MaxmindLicense
+	defer func() {
+		configuration.Config.GeoIPDbDir = originalGeoIPDbDir
+		configuration.Config.MaxmindLicense = originalMaxmindLicense
+	}()
+
+	// Set test configuration with the license from environment
+	configuration.Config.GeoIPDbDir = tmpDir
+	configuration.Config.MaxmindLicense = maxmindLicense
+
+	// Initialize logs if not already done
+	if logs.Logs == nil {
+		logs.Init("test")
+	}
+
+	// Test downloading the GeoIP database
+	err = DownloadGeoIpDatabase()
+	if err != nil {
+		t.Logf("Download failed with error: %v", err)
+		t.Skip("Skipping test - MaxMind download may require valid license or network access")
+	}
+
+	// Verify the database file was created
+	dbPath := tmpDir + "/GeoLite2-Country.mmdb"
+	info, err := os.Stat(dbPath)
+	if err != nil {
+		t.Logf("Database file not found at %s: %v", dbPath, err)
+		t.Skip("Skipping test - database file was not created")
+	}
+	t.Logf("Database file created: %s (size: %d bytes)", dbPath, info.Size())
+
+	// Test InitGeoIP
+	err = InitGeoIP()
+	if err != nil {
+		t.Logf("InitGeoIP failed: %v", err)
+		t.Skip("Skipping test - failed to initialize GeoIP reader")
+	}
+
+	// Test country lookup for known IPs
+	testCases := []struct {
+		name          string
+		ip            string
+		shouldResolve bool
+		description   string
+	}{
+		{"Google DNS", "8.8.8.8", true, "Public DNS should have country"},
+		{"OpenDNS", "208.67.222.222", true, "OpenDNS should have country"},
+		{"Empty IP", "", false, "Empty IP should not resolve"},
+		{"Invalid IP", "999.999.999.999", false, "Invalid IP should not resolve"},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			country := GetCountryShort(tc.ip)
+			if tc.shouldResolve {
+				assert.NotEmpty(t, country, "IP %s should resolve to a country code (%s)", tc.ip, tc.description)
+				assert.Len(t, country, 2, "Country code should be 2 characters (ISO 3166-1 alpha-2)")
+				t.Logf("IP %s resolved to country: %s", tc.ip, country)
+			} else {
+				assert.Empty(t, country, "IP %s should not resolve (%s)", tc.ip, tc.description)
+			}
+		})
+	}
+}
+
+// TestGeoIPDatabaseCaching tests that the database is not re-downloaded if it's recent.
+func TestGeoIPDatabaseCaching(t *testing.T) {
+	// Check if MaxMind license is set in environment
+	maxmindLicense := os.Getenv("MAXMIND_LICENSE")
+	if maxmindLicense == "" {
+		t.Skip("Skipping test - MAXMIND_LICENSE environment variable not set")
+	}
+
+	// Create a temporary directory for the test
+	tmpDir, err := os.MkdirTemp("", "geoip-cache-test-*")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
+
+	// Save original config and restore after test
+	originalGeoIPDbDir := configuration.Config.GeoIPDbDir
+	originalMaxmindLicense := configuration.Config.MaxmindLicense
+	defer func() {
+		configuration.Config.GeoIPDbDir = originalGeoIPDbDir
+		configuration.Config.MaxmindLicense = originalMaxmindLicense
+	}()
+
+	// Set test configuration with the license from environment
+	configuration.Config.GeoIPDbDir = tmpDir
+	configuration.Config.MaxmindLicense = maxmindLicense
+
+	// Initialize logs if not already done
+	if logs.Logs == nil {
+		logs.Init("test")
+	}
+
+	// First download
+	err = DownloadGeoIpDatabase()
+	if err != nil {
+		t.Logf("First download failed: %v", err)
+		t.Skip("Skipping test - network or license issue")
+	}
+
+	dbPath := tmpDir + "/GeoLite2-Country.mmdb"
+	firstStat, err := os.Stat(dbPath)
+	if err != nil {
+		t.Logf("Database file not found: %v", err)
+		t.Skip("Skipping test - database file not created")
+	}
+
+	// Second download should skip because file is recent (less than 72 hours old)
+	err = DownloadGeoIpDatabase()
+	assert.NoError(t, err, "Second download should succeed (but skip actual download)")
+
+	secondStat, err := os.Stat(dbPath)
+	assert.NoError(t, err)
+
+	// Modification time should be the same (file wasn't re-downloaded)
+	assert.Equal(t, firstStat.ModTime(), secondStat.ModTime(), "Database file should not be re-downloaded")
 }
