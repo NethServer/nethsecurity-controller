@@ -7,6 +7,8 @@ ovpn_netmask=${OVPN_NETMASK:-255.255.0.0}
 cn=${OVPN_CN:-nethsec}
 ovpn_port=${OVPN_UDP_PORT:-1194}
 tun=${OVPN_TUN:-tunsec}
+tun_mtu=${OVPN_TUN_MTU:-1500}
+mssfix=${OVPN_MSSFIX:-1450}
 
 if [ ! -f /etc/openvpn/pki/ca.crt ]; then
     cd /etc/openvpn
@@ -51,6 +53,9 @@ port $ovpn_port
 script-security 3
 float
 multihome
+
+tun-mtu $tun_mtu
+mssfix $mssfix
 
 tls-server
 remote-cert-tls server
