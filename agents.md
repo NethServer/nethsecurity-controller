@@ -34,7 +34,7 @@ The development environment is managed by Podman and the `dev.sh` script. This s
 - The backend tests are written in Go.
 - Before running the tests, ensure that the TimescaleDB database is running. You can use Podman to start a TimescaleDB container:
   ```bash
-  podman run --rm -d --name timescaledb -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report timescale/timescaledb-ha:pg17
+  podman run --rm -d --name timescaledb -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report timescale/timescaledb:latest-pg16
   # Wait for DB to be ready
   for i in {1..30}; do
     podman exec timescaledb pg_isready -U report && break
