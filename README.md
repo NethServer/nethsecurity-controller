@@ -239,6 +239,11 @@ See the [API documentation](api/README.md) for more details.
 
 Each container is built using a Containerfile, which is both compatible with `docker build` command and `podman build`.
 
+Use the following command to build all images using buildah: 
+```bash
+./build.sh
+```
+
 To build the images using podman, you can use the following:
 
 ```bash
@@ -248,3 +253,27 @@ podman build --target dist --layers --force-rm --jobs 0 <directory>
 Where `<directory>` is the path to any of the directory to build.
 
 Optionally, you can add the `--tag <imagetag>` to tag the image with a specific name.
+
+## Smoke Testing
+
+A comprehensive smoke test is provided to verify the entire stack is working correctly. The test:
+1. Builds all containers from the current branch
+2. Starts the development environment
+3. Verifies all services are running and responsive
+
+To run the smoke test:
+```bash
+./test/smoke.sh
+```
+
+The script will:
+- Check prerequisites (podman, buildah, curl, jq, tunsec device)
+- Build all containers using `./build.sh`
+- Start the stack with images tagged from the current git branch
+- Verify all 5 containers (vpn, db, api, ui, proxy) are running
+- Test login and JWT token generation
+- Test unit creation and retrieval
+- Verify health endpoints
+- Check VPN PKI directory and database connectivity
+
+The test automatically cleans up and stops the stack on exit.

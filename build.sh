@@ -73,4 +73,4 @@ for dir in "${!MAP[@]}"; do
     "${dir}"
 done
 
-echo "Built images with tag ${TAG}. Use 'docker images' to see them."
+echo "Built images with tag ${TAG}. Use 'podman images' to see them."
