@@ -1,67 +1,76 @@
-#!/bin/bash
-set -e
+#!/usr/bin/env bash
 
-repobase="ghcr.io/nethserver"
+#
+# Build local container images using buildah:
+# this emulates the images built in the CI/CD pipeline and pushed to GitHub Container Registry.
+#
 
-images=()
-container=$(buildah from docker.io/debian:bookworm)
-ui_version="1.0.6"
+set -euo pipefail
 
-trap "buildah rm ${container} ${container_api} ${container_proxy} ${container_ui}" EXIT
+# ensure required commands are available
+REQUIRED_CMDS=(git buildah)
+for cmd in "${REQUIRED_CMDS[@]}"; do
+    if ! command -v "$cmd" >/dev/null 2>&1; then
+        echo "Error: required command '$cmd' not found. Install it and retry." >&2
+        exit 1
+    fi
+done
 
-echo "Installing build dependencies..."
-buildah run ${container} apt-get update
-buildah run ${container} apt-get install openvpn easy-rsa -y
-
-echo "Setup image"
-buildah add "${container}" vpn/ip /sbin/ip
-buildah add "${container}" vpn/controller-auth /usr/local/bin/controller-auth
-buildah add "${container}" vpn/handle-connection /usr/local/bin/handle-connection
-buildah add "${container}" vpn/entrypoint.sh /entrypoint.sh
-buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/sbin/openvpn", "/etc/openvpn/server.conf"]' ${container}
-buildah commit "${container}" "${repobase}/nethsecurity-vpn"
-images+=("${repobase}/nethsecurity-vpn")
-
-container_api=$(buildah from docker.io/alpine:3.16)
-buildah run ${container_api} apk add --no-cache go easy-rsa openssh sqlite
-buildah run ${container_api} mkdir /nethsecurity-api
-buildah add "${container_api}" api/ /nethsecurity-api/
-buildah config --workingdir /nethsecurity-api ${container_api}
-buildah config --env GOOS=linux --env GOARCH=amd64 --env CGO_ENABLED=1 ${container_api}
-buildah run ${container_api} go build -ldflags='-extldflags=-static' -tags sqlite_omit_load_extension
-buildah run ${container_api} rm -rf root/go
-buildah run ${container_api} apk del --no-cache go
-buildah add "${container_api}" api/entrypoint.sh /entrypoint.sh
-buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["./api"]' ${container_api}
-buildah commit "${container_api}" "${repobase}/nethsecurity-api"
-images+=("${repobase}/nethsecurity-api")
-
-container_proxy=$(buildah from docker.io/library/traefik:v2.6)
-buildah add "${container_proxy}" proxy/entrypoint.sh /entrypoint.sh
-buildah config --entrypoint='["/entrypoint.sh"]' --cmd='["/usr/local/bin/traefik", "--configFile=/config.yaml"]' ${container_proxy}
-buildah commit "${container_proxy}" "${repobase}/nethsecurity-proxy"
-images+=("${repobase}/nethsecurity-proxy")
-
-container_ui=$(buildah from docker.io/alpine:3.17)
-buildah run ${container_ui} apk add --no-cache lighttpd git nodejs npm
-buildah run ${container_ui} git clone --depth 1 --branch ${ui_version} https://github.com/NethServer/nethsecurity-ui.git
-buildah config --workingdir /nethsecurity-ui ${container_ui}
-buildah run ${container_ui} sh -c "sed -i 's/standalone/controller/g' .env.production"
-buildah run ${container_ui} sh -c "npm ci && npm run build"
-buildah run ${container_ui} sh -c "cp -r dist/* /var/www/localhost/htdocs/"
-buildah add ${container_ui} ui/entrypoint.sh /entrypoint.sh
-buildah run ${container_ui} sh -c "rm -rf /nethsecurity-ui"
-buildah run ${container_ui} apk del --no-cache git nodejs npm
-buildah config --workingdir / ${container_ui}
-buildah config --entrypoint='["/entrypoint.sh"]' ${container_ui}
-buildah commit ${container_ui} "${repobase}/nethsecurity-ui"
-images+=("${repobase}/nethsecurity-ui")
-
-if [[ -n "${CI}" ]]; then
-    # Set output value for Github Actions
-    printf "::set-output name=images::%s\n" "${images[*]}"
-else
-    printf "Publish the images with:\n\n"
-    for image in "${images[@]}"; do printf "  buildah push %s docker://%s:latest\n" "${image}" "${image}" ; done
-    printf "\n"
+# ensure we're inside a git repository and have an 'origin' remote
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "Error: not inside a git repository." >&2
+    exit 1
 fi
+
+if ! git remote get-url origin >/dev/null 2>&1; then
+    echo "Error: git remote 'origin' not found. Please add a remote named 'origin' or run this from a clone." >&2
+    exit 1
+fi
+
+# basic sanity checks for expected service directories and Containerfiles
+SERVICES=(vpn api proxy ui)
+missing=0
+for s in "${SERVICES[@]}"; do
+    if [ ! -d "$s" ]; then
+        echo "Error: expected directory '$s' not found." >&2
+        missing=1
+        continue
+    fi
+    if [ ! -f "${s}/Containerfile" ]; then
+        echo "Error: '${s}/Containerfile' not found." >&2
+        missing=1
+    fi
+done
+
+if [ "$missing" -ne 0 ]; then
+    echo "Resolve the above issues and re-run the script." >&2
+    exit 1
+fi
+# adjust if your remote is different
+OWNER=$(git remote get-url origin | sed -E 's#.*[:/](.+)/(.+)(.git)?#\1#' | head -n1 | tr '[:upper:]' '[:lower:]')
+# use branch name for the tag (fallback to short commit hash if detached); sanitize it
+branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)
+if [ -z "$branch" ] || [ "$branch" = "HEAD" ]; then
+    branch=$(git rev-parse --short HEAD)
+fi
+safe_branch=$(printf '%s' "$branch" | sed 's#[^A-Za-z0-9._-]#-#g')
+TAG="${safe_branch}"
+
+# mapping: directory -> image name used in the workflow
+declare -A MAP=(
+  [vpn]=nethsecurity-vpn
+  [api]=nethsecurity-api
+  [proxy]=nethsecurity-proxy
+  [ui]=nethsecurity-ui
+)
+
+for dir in "${!MAP[@]}"; do
+  image="ghcr.io/${OWNER}/${MAP[$dir]}:${TAG}"
+  echo "Building ${image} from ${dir}/Containerfile"
+  buildah build --layers \
+    --file "${dir}/Containerfile" \
+    --tag "${image}" \
+    "${dir}"
+done
+
+echo "Built images with tag ${TAG}. Use 'docker images' to see them."
