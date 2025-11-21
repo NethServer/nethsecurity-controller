@@ -51,6 +51,10 @@ The development environment is managed by Podman and the `dev.sh` script. This s
   podman stop timescaledb
   ```
 
+## Documentation
+
+- Make sure to always update all README files in the respective service directories when making changes.
+
 ## PR & Commit Instructions
 - This project follows the [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/) specification.
 - Please format your commit messages accordingly. The scope of the commit should be one of the services (`api`, `vpn`, `ui`, `proxy`).

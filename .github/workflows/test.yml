@@ -33,3 +33,21 @@ jobs:
           go-version: '1.25.4'
       - name: Test with the Go CLI
         run: cd api && go test ./... -coverpkg=./... -coverprofile=coverage.out -v
+
+  smoke:
+    name: Smoke Tests
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman buildah jq
+      - name: Create tunsec device
+        run: |
+          sudo ip tuntap add dev tunsec mod tun
+          sudo ip addr add 172.21.0.1/16 dev tunsec
+          sudo ip link set dev tunsec up
+      - name: Run smoke test
+        run: ./test/smoke.sh

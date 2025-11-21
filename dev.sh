@@ -26,8 +26,22 @@ start_pod() {
     fi
     echo "Starting pod $POD with image tag $image_tag"
     podman pod create --replace --name $POD
-    podman run --rm --detach --network=host --privileged --cap-add=NET_ADMIN --device /dev/net/tun -v ovpn-data:/etc/openvpn/:z --pod $POD --name $POD-vpn  ghcr.io/nethserver/nethsecurity-vpn:$image_tag
-    podman run --rm --detach --network=host --name $POD-db --pod $POD -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report docker.io/timescale/timescaledb:latest-pg16
+
+    # Helper function to determine image pull policy
+    get_image() {
+        local image_name="$1"
+        # Check if image exists locally
+        if podman image exists "$image_name"; then
+            echo "$image_name"
+        else
+            # If not local, podman run will try to pull it
+            echo "$image_name"
+        fi
+    }
+
+    # The --pull option, sets pull policy to never if image exists locally to avoid registry lookup errors (required for GitHub CI)
+    podman run --rm --detach --pull="missing" --network=host --privileged --cap-add=NET_ADMIN --device /dev/net/tun -v ovpn-data:/etc/openvpn/:z --pod $POD --name $POD-vpn  $(get_image ghcr.io/nethserver/nethsecurity-vpn:$image_tag)
+    podman run --rm --detach --pull="missing" --network=host --name $POD-db --pod $POD -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report docker.io/timescale/timescaledb:latest-pg16
     # Wait for Postgres to be ready
     echo -n "Waiting for Postgres to start..."
     for i in {1..30}; do
@@ -62,10 +76,10 @@ VALID_SUBSCRIPTION=true
 SECRETS_DIR=secrets
 PLATFORM_INFO={"vpn_port": "20011", "vpn_network": "172.28.222.0/24", "controller_version": "${IMAGE_TAG}", "metrics_retention_days": 15, "logs_retention_days": 180}
 EOF
-    podman run --rm --detach --network=host --volumes-from=$POD-vpn --pod $POD --name $POD-api --env-file=api.env ghcr.io/nethserver/nethsecurity-api:$image_tag
-    podman run --rm --detach --network=host --pod $POD --name $POD-ui ghcr.io/nethserver/nethsecurity-ui:$image_tag
+    podman run --rm --detach --pull=$PULL_POLICY --network=host --volumes-from=$POD-vpn --pod $POD --name $POD-api --env-file=api.env $(get_image ghcr.io/nethserver/nethsecurity-api:$image_tag)
+    podman run --rm --detach --pull=$PULL_POLICY --network=host --pod $POD --name $POD-ui $(get_image ghcr.io/nethserver/nethsecurity-ui:$image_tag)
     sleep 2
-    podman run --rm --detach --network=host --volumes-from=$POD-vpn --pod $POD --name $POD-proxy ghcr.io/nethserver/nethsecurity-proxy:$image_tag
+    podman run --rm --detach --pull=$PULL_POLICY --network=host --volumes-from=$POD-vpn --pod $POD --name $POD-proxy $(get_image ghcr.io/nethserver/nethsecurity-proxy:$image_tag)
 }
 
 stop_pod() {
