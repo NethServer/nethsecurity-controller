@@ -1207,3 +1207,10 @@ Error example:
     "message": "invalid unit id"
   }
     ```
+
+## Testing
+
+Execute tests with coverage:
+```
+go test ./... -coverpkg=./... -coverprofile=coverage.out -v
+```
