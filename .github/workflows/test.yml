@@ -21,7 +21,7 @@ jobs:
           sudo apt-get install -y podman oathtool
       - name: Start TimescaleDB
         run: |
-          podman run --rm -d --name timescaledb -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report timescale/timescaledb-ha:pg17
+          podman run --rm -d --name timescaledb -p 5432:5432 -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report timescale/timescaledb-ha:latest-pg16
           # Wait for DB to be ready
           for i in {1..30}; do
             podman exec timescaledb pg_isready -U report && break

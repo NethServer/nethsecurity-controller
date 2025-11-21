@@ -1,10 +1,10 @@
 /*
- * Copyright (C) 2024 Nethesis S.r.l.
+ * Copyright (C) 2025 Nethesis S.r.l.
  * http://www.nethesis.it - info@nethesis.it
  *
  * SPDX-License-Identifier: GPL-2.0-only
  *
- * author: Edoardo Spadoni <edoardo.spadoni@nethesis.it>
+ * author: Giacomo Sanchietti <giacomo.sanchietti@nethesis.it>
  */
 
 package configuration

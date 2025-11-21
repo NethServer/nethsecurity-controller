@@ -27,7 +27,7 @@ start_pod() {
     echo "Starting pod $POD with image tag $image_tag"
     podman pod create --replace --name $POD
     podman run --rm --detach --network=host --privileged --cap-add=NET_ADMIN --device /dev/net/tun -v ovpn-data:/etc/openvpn/:z --pod $POD --name $POD-vpn  ghcr.io/nethserver/nethsecurity-vpn:$image_tag
-    podman run --rm --detach --network=host --name $POD-db --pod $POD -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report docker.io/timescale/timescaledb:2.20.3-pg16
+    podman run --rm --detach --network=host --name $POD-db --pod $POD -e POSTGRES_PASSWORD=password -e POSTGRES_USER=report docker.io/timescale/timescaledb:latest-pg16
     # Wait for Postgres to be ready
     echo -n "Waiting for Postgres to start..."
     for i in {1..30}; do
