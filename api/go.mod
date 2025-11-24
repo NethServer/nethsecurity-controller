@@ -8,7 +8,7 @@ require (
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/NethServer/nethsecurity-api v0.0.0-20251002102226-f648b9d1b42b
 	github.com/Showmax/go-fqdn v1.0.0
-	github.com/appleboy/gin-jwt/v2 v2.9.1
+	github.com/appleboy/gin-jwt/v2 v2.9.2
 	github.com/appleboy/gin-jwt/v3 v3.2.0
 	github.com/fatih/structs v1.1.0
 	github.com/gin-contrib/cors v1.7.6
