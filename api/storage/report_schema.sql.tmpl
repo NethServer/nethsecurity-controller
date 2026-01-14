@@ -384,12 +384,33 @@ SELECT add_retention_policy('dpi_stats', drop_after => INTERVAL '{{ .RetentionDa
 
 -- Continuous aggregates
 
+DO $$
+BEGIN
+    -- Check if the continuous aggregate exists and doesn't have the application filter
+    IF EXISTS (
+        SELECT 1
+        FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'ca_dpi_stats_hourly_bytes'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'ca_dpi_stats_hourly_bytes'
+        AND view_definition LIKE '%WHERE application != ''''%'
+    ) THEN
+        -- Drop the existing continuous aggregate
+        DROP MATERIALIZED VIEW ca_dpi_stats_hourly_bytes CASCADE;
+        RAISE NOTICE 'Dropped ca_dpi_stats_hourly_bytes for recreation with application filter';
+    END IF;
+END
+$$;
+
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_bytes
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    sum(bytes) as bytes
 FROM dpi_stats
+WHERE application != ''
 GROUP BY uuid, bucket
 WITH NO DATA;
 
@@ -466,6 +487,26 @@ SELECT add_continuous_aggregate_policy('ca_dpi_stats_hourly_application',
 SELECT remove_retention_policy('ca_dpi_stats_hourly_application', if_exists => TRUE);
 SELECT add_retention_policy('ca_dpi_stats_hourly_application', drop_after => INTERVAL '{{ .RetentionDays }} days', if_not_exists => TRUE);
 
+DO $$
+BEGIN
+    -- Check if the continuous aggregate exists and doesn't have the client_address filter
+    IF EXISTS (
+        SELECT 1
+        FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'ca_dpi_stats_hourly_client'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'ca_dpi_stats_hourly_client'
+        AND view_definition LIKE '%WHERE client_address != ''''%'
+    ) THEN
+        -- Drop the existing continuous aggregate
+        DROP MATERIALIZED VIEW ca_dpi_stats_hourly_client CASCADE;
+        RAISE NOTICE 'Dropped ca_dpi_stats_hourly_client for recreation with client_address filter';
+    END IF;
+END
+$$;
+
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_client
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT uuid,
@@ -474,7 +515,7 @@ SELECT uuid,
    client_name,
    sum(bytes) as bytes
 FROM dpi_stats
-WHERE client_address != ''
+WHERE client_address != '' AND application != ''
 GROUP BY uuid, bucket, client_address, client_name
 WITH NO DATA;
 
