@@ -384,12 +384,33 @@ SELECT add_retention_policy('dpi_stats', drop_after => INTERVAL '{{ .RetentionDa
 
 -- Continuous aggregates
 
+DO $$
+BEGIN
+    -- Check if the continuous aggregate exists and doesn't have the application filter
+    IF EXISTS (
+        SELECT 1
+        FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'ca_dpi_stats_hourly_bytes'
+    ) AND NOT EXISTS (
+        SELECT 1
+        FROM timescaledb_information.continuous_aggregates
+        WHERE view_name = 'ca_dpi_stats_hourly_bytes'
+        AND view_definition LIKE '%WHERE application != ''''%'
+    ) THEN
+        -- Drop the existing continuous aggregate
+        DROP MATERIALIZED VIEW ca_dpi_stats_hourly_bytes CASCADE;
+        RAISE NOTICE 'Dropped ca_dpi_stats_hourly_bytes for recreation with application filter';
+    END IF;
+END
+$$;
+
 CREATE MATERIALIZED VIEW IF NOT EXISTS ca_dpi_stats_hourly_bytes
 WITH (timescaledb.continuous, timescaledb.materialized_only = false) AS
 SELECT uuid,
    time_bucket(INTERVAL '1 hour', time) AS bucket,
    sum(bytes) as bytes
 FROM dpi_stats
+WHERE application != ''
 GROUP BY uuid, bucket
 WITH NO DATA;
 

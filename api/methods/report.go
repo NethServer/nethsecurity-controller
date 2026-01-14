@@ -255,9 +255,7 @@ func updateDpiStats(dbpool *pgxpool.Pool, dbctx context.Context, c *gin.Context)
 			logs.Logs.Println("[WARN][DPISTATS] skipping invalid object")
 			continue
 		}
-		// align timestamp to the beginning of the hour
-		ts := time.Unix((dpi.Timestamp/3600)*3600, 0)
-		batch.Queue("INSERT INTO dpi_stats (time, uuid, client_address, client_name, protocol, host, application, bytes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (time, uuid, client_address, protocol, host, application) DO UPDATE SET bytes = EXCLUDED.bytes", ts, c.MustGet("UnitId").(string), dpi.ClientAddress, dpi.ClientName, dpi.Protocol, dpi.Host, dpi.Application, dpi.Bytes)
+		batch.Queue("INSERT INTO dpi_stats (time, uuid, client_address, client_name, protocol, host, application, bytes) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) ON CONFLICT (time, uuid, client_address, protocol, host, application) DO UPDATE SET bytes = EXCLUDED.bytes", time.Unix(dpi.Timestamp, 0), c.MustGet("UnitId").(string), dpi.ClientAddress, dpi.ClientName, dpi.Protocol, dpi.Host, dpi.Application, dpi.Bytes)
 	}
 	if batch.Len() != 0 {
 		err := dbpool.SendBatch(dbctx, batch).Close()
