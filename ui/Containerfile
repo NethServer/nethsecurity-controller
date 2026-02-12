@@ -5,7 +5,7 @@ RUN apk add --no-cache  \
       npm
 WORKDIR /build
 # renovate: datasource=github-releases depName=NethServer/nethsecurity-ui
-ARG UI_VERSION=2.7.2
+ARG UI_VERSION=2.13.0
 # FIXME: when git 2.49 is available in alpine, use --revision="$UI_VERSION" instead of --branch="$UI_VERSION"
 RUN git clone --depth=1 --branch="$UI_VERSION" https://github.com/NethServer/nethsecurity-ui . \
     && npm ci \
