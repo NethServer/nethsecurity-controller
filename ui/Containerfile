@@ -1,4 +1,4 @@
-FROM docker.io/alpine:3.22.2 AS build
+FROM docker.io/alpine:3.22.3 AS build
 RUN apk add --no-cache  \
       git \
       nodejs \
@@ -12,7 +12,7 @@ RUN git clone --depth=1 --branch="$UI_VERSION" https://github.com/NethServer/net
     && sed -i 's/standalone/controller/g' .env.production \
     && npm run build
 
-FROM docker.io/alpine:3.22.2 AS dist
+FROM docker.io/alpine:3.22.3 AS dist
 RUN apk add --no-cache lighttpd
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
