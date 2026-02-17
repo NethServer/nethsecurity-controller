@@ -17,7 +17,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.3.1
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.7.6
-	github.com/mattn/go-sqlite3 v1.14.32
+	github.com/mattn/go-sqlite3 v1.14.34
 	github.com/nqd/flat v0.2.0
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/oschwald/geoip2-golang/v2 v2.0.0
