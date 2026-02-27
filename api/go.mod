@@ -6,7 +6,7 @@ toolchain go1.25.7
 
 require (
 	github.com/Jeffail/gabs/v2 v2.7.0
-	github.com/NethServer/nethsecurity-api v0.0.0-20251002102226-f648b9d1b42b
+	github.com/NethServer/nethsecurity-api v0.0.0-20251209115120-300d8f56a1fb
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/appleboy/gin-jwt/v2 v2.10.3
 	github.com/appleboy/gin-jwt/v3 v3.2.0
