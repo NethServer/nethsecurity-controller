@@ -38,6 +38,8 @@ type login struct {
 	Password string `form:"password" json:"password" binding:"required"`
 }
 
+const cookieName = "ns_jwt"
+
 var jwtMiddleware *jwt.GinJWTMiddleware
 var identityKey = "id"
 
@@ -243,9 +245,14 @@ func InitJWT() *jwt.GinJWTMiddleware {
 				Data:    nil,
 			}))
 		},
-		TokenLookup:   "header: Authorization, token: jwt",
-		TokenHeadName: "Bearer",
-		TimeFunc:      time.Now,
+		SendCookie:     true,
+		CookieName:     cookieName,
+		SecureCookie:    gin.Mode() != gin.DebugMode,
+		CookieHTTPOnly: true,
+		CookieSameSite: http.SameSiteLaxMode,
+		TokenLookup:    "header: Authorization, token: jwt",
+		TokenHeadName:  "Bearer",
+		TimeFunc:       time.Now,
 	})
 
 	// check middleware errors
@@ -306,12 +313,47 @@ func BasicUnitAuth() gin.HandlerFunc {
 
 func BasicUserAuth() gin.HandlerFunc {
 	return func(c *gin.Context) {
+		// Try JWT authentication from cookie (used by Traefik ForwardAuth)
+		cookiePresent := false
+		tokenStr, err := c.Cookie(cookieName)
+		if err == nil && tokenStr != "" {
+			cookiePresent = true
+			token, err := InstanceJWT().ParseTokenString(tokenStr)
+			if err == nil && token.Valid {
+				claims := jwt.ExtractClaimsFromToken(token)
+				if id, ok := claims[identityKey].(string); ok && methods.CheckTokenValidation(id, token.Raw) {
+					// Enforce per-unit access check
+					unitID := c.Param("unit_id")
+					if unitID != "" && !methods.UserCanAccessUnit(id, unitID) {
+						c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+							Code:    403,
+							Message: "user does not have access to this unit",
+							Data:    nil,
+						}))
+						logs.Logs.Println("[INFO][AUTH] user " + id + " does not have access to unit " + unitID)
+						c.Abort()
+						return
+					}
+					logs.Logs.Println("[INFO][AUTH] user " + id + " authenticated via JWT cookie")
+					c.Header("X-Auth-User", id)
+					c.Next()
+					return
+				}
+			}
+			// Cookie present but invalid/expired: clear it
+			c.SetCookie(cookieName, "", -1, "/", "", gin.Mode() != gin.DebugMode, true)
+		}
+
+		// Fall back to Basic Auth
 		username, password, _ := c.Request.BasicAuth()
 
 		if username == "" || password == "" {
-			c.JSON(http.StatusBadRequest, structs.Map(response.StatusUnauthorized{
-				Code:    400,
-				Message: "missing username or password",
+			if cookiePresent {
+				logs.Logs.Println("[INFO][AUTH] invalid or expired JWT cookie, cleared")
+			}
+			c.JSON(http.StatusUnauthorized, structs.Map(response.StatusUnauthorized{
+				Code:    401,
+				Message: "missing or invalid credentials",
 				Data:    nil,
 			}))
 			c.Abort()
