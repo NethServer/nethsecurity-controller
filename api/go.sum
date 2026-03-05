@@ -2,6 +2,8 @@ github.com/Jeffail/gabs/v2 v2.7.0 h1:Y2edYaTcE8ZpRsR2AtmPu5xQdFDIthFG0jYhu5PY8kg
 github.com/Jeffail/gabs/v2 v2.7.0/go.mod h1:dp5ocw1FvBBQYssgHsG7I1WYsiLRtkUaB1FEtSwvNUw=
 github.com/NethServer/nethsecurity-api v0.0.0-20251002102226-f648b9d1b42b h1:rtGaH8MXhEmyRpyx4kYFsJVYHL/dkA8/NoPYWLQRHDg=
 github.com/NethServer/nethsecurity-api v0.0.0-20251002102226-f648b9d1b42b/go.mod h1:sDpqpJmef5iZ8Yh/Q7STcQdI7rfjUnO8fKvD/mG1soY=
+github.com/NethServer/nethsecurity-api v0.0.0-20251209115120-300d8f56a1fb h1:N/1D5tdxbpKhNiwRiG6sLLwHZ9smX66d4dT4TgDMp20=
+github.com/NethServer/nethsecurity-api v0.0.0-20251209115120-300d8f56a1fb/go.mod h1:sDpqpJmef5iZ8Yh/Q7STcQdI7rfjUnO8fKvD/mG1soY=
 github.com/Showmax/go-fqdn v1.0.0 h1:0rG5IbmVliNT5O19Mfuvna9LL7zlHyRfsSvBPZmF9tM=
 github.com/Showmax/go-fqdn v1.0.0/go.mod h1:SfrFBzmDCtCGrnHhoDjuvFnKsWjEQX/Q9ARZvOrJAko=
 github.com/appleboy/gin-jwt/v2 v2.9.1 h1:l29et8iLW6omcHltsOP6LLk4s3v4g2FbFs0koxGWVZs=
