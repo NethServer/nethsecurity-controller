@@ -9,7 +9,7 @@ require (
 	github.com/NethServer/nethsecurity-api v0.0.0-20251002102226-f648b9d1b42b
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/appleboy/gin-jwt/v2 v2.10.3
-	github.com/appleboy/gin-jwt/v3 v3.2.0
+	github.com/appleboy/gin-jwt/v3 v3.5.1
 	github.com/fatih/structs v1.1.0
 	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-contrib/gzip v1.2.6
@@ -65,9 +65,9 @@ require (
 	golang.org/x/mod v0.33.0 // indirect
 	golang.org/x/net v0.51.0 // indirect
 	golang.org/x/sync v0.20.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.35.0 // indirect
 	golang.org/x/tools v0.42.0 // indirect
-	google.golang.org/protobuf v1.36.10 // indirect
+	google.golang.org/protobuf v1.36.11 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
