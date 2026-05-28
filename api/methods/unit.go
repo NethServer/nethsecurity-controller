@@ -956,14 +956,27 @@ func GetPrometheusTargets(c *gin.Context) {
 		unitIp, ok2 := unit["ipaddress"].(string)
 
 		if ok1 && ok2 {
-			target := gin.H{
+			// Netdata target (port 19999)
+			netdataTarget := gin.H{
 				"targets": []string{unitIp + ":19999"},
 				"labels": gin.H{
 					"node":             unitIp,
 					"unit":             unitId,
+					"metrics_type":     "netdata",
 					"__metrics_path__": "/api/v1/allmetrics?format=prometheus&help=no"},
 			}
-			targets = append(targets, target)
+			targets = append(targets, netdataTarget)
+
+			// Telegraf target (port 9273)
+			telegrafTarget := gin.H{
+				"targets": []string{unitIp + ":9273"},
+				"labels": gin.H{
+					"node":             unitIp,
+					"unit":             unitId,
+					"metrics_type":     "telegraf",
+					"__metrics_path__": "/metrics"},
+			}
+			targets = append(targets, telegrafTarget)
 		}
 	}
 
