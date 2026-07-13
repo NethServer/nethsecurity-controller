@@ -399,3 +399,13 @@ func BasicUserAuth() gin.HandlerFunc {
 		c.Next()
 	}
 }
+
+// BodyLimit rejects requests whose body exceeds maxBytes before any downstream
+// binding reads it, so unauthenticated or semi-trusted routes cannot be used
+// to exhaust memory with oversized payloads.
+func BodyLimit(maxBytes int64) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, maxBytes)
+		c.Next()
+	}
+}
