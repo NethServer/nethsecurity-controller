@@ -94,8 +94,8 @@ func setup() *gin.Engine {
 	api := router.Group("/")
 
 	// define login and logout endpoint
-	api.POST("/login", middleware.InstanceJWT().LoginHandler)
-	api.POST("/logout", middleware.InstanceJWT().LogoutHandler)
+	api.POST("/login", middleware.BodyLimit(32<<10), middleware.InstanceJWT().LoginHandler)
+	api.POST("/logout", middleware.BodyLimit(1<<10), middleware.InstanceJWT().LogoutHandler)
 
 	// define healthcheck endpoint
 	api.GET("/health", func(c *gin.Context) {
@@ -103,10 +103,10 @@ func setup() *gin.Engine {
 	})
 
 	// 2FA APIs
-	api.POST("/2fa/otp-verify", methods.OTPVerify)
+	api.POST("/2fa/otp-verify", middleware.BodyLimit(32<<10), methods.OTPVerify)
 
 	// define server registration
-	api.POST("/units/register", methods.RegisterUnit)
+	api.POST("/units/register", middleware.BodyLimit(8<<10), methods.RegisterUnit)
 
 	// define JWT middleware
 	api.Use(middleware.InstanceJWT().MiddlewareFunc())
@@ -170,7 +170,7 @@ func setup() *gin.Engine {
 	}
 
 	// Ingest APIs: receive data from firewalls
-	authorized := router.Group("/ingest", middleware.BasicUnitAuth())
+	authorized := router.Group("/ingest", middleware.BasicUnitAuth(), middleware.BodyLimit(8<<20)) // 8 Mib limit
 	authorized.POST("/info", methods.AddInfo)
 	authorized.POST("/:firewall_api", methods.HandelMonitoring)
 

@@ -178,3 +178,35 @@ func TestBasicUserAuthCookieUnitAccess(t *testing.T) {
 	// Clean up
 	methods.DelTokenValidation("limiteduser", token)
 }
+
+func TestBodyLimit(t *testing.T) {
+	r := gin.New()
+	r.Use(BodyLimit(8))
+	r.POST("/test", func(c *gin.Context) {
+		_, err := io.ReadAll(c.Request.Body)
+		if err != nil {
+			c.JSON(http.StatusRequestEntityTooLarge, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(200, gin.H{"message": "ok"})
+	})
+
+	// Body within limit is accepted
+	req, _ := http.NewRequest("POST", "/test", strings.NewReader("1234567"))
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, 200, w.Code)
+
+	// Body exceeding limit is rejected by the handler's read, not silently truncated
+	req, _ = http.NewRequest("POST", "/test", strings.NewReader("123456789"))
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+
+	// Enforced on bytes actually read, independent of a spoofed Content-Length
+	req, _ = http.NewRequest("POST", "/test", strings.NewReader("123456789"))
+	req.ContentLength = 5
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
