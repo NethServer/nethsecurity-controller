@@ -29,3 +29,10 @@ type OTPJson struct {
 	Token    string `json:"token" structs:"token"`
 	OTP      string `json:"otp" structs:"otp"`
 }
+
+type UserAuthorizations struct {
+	Username      string   `json:"username" structs:"username"`
+	Role          string   `json:"role" structs:"role"`
+	Actions       []string `json:"actions" structs:"actions"`
+	SudoRequested bool     `json:"sudo_requested" structs:"sudo_requested"`
+}
