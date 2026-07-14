@@ -24,7 +24,7 @@ import (
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
 
-	"github.com/NethServer/nethsecurity-api/response"
+	"github.com/NethServer/nethsecurity-controller/api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"

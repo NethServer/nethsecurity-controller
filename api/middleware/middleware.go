@@ -24,8 +24,8 @@ import (
 
 	jwt "github.com/appleboy/gin-jwt/v2"
 
-	"github.com/NethServer/nethsecurity-api/models"
-	"github.com/NethServer/nethsecurity-api/response"
+	"github.com/NethServer/nethsecurity-controller/api/models"
+	"github.com/NethServer/nethsecurity-controller/api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/methods"

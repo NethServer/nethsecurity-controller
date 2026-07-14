@@ -12,7 +12,7 @@ package methods
 import (
 	"net/http"
 
-	"github.com/NethServer/nethsecurity-api/response"
+	"github.com/NethServer/nethsecurity-controller/api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/fatih/structs"
 	"github.com/gin-gonic/gin"

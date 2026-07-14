@@ -16,7 +16,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/NethServer/nethsecurity-api/response"
+	"github.com/NethServer/nethsecurity-controller/api/response"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
