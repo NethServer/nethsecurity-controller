@@ -16,9 +16,11 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"golang.org/x/time/rate"
 
 	"github.com/NethServer/nethsecurity-controller/api/models"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
@@ -209,4 +211,37 @@ func TestBodyLimit(t *testing.T) {
 	w = httptest.NewRecorder()
 	r.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusRequestEntityTooLarge, w.Code)
+}
+
+func TestRateLimiter(t *testing.T) {
+	r := gin.New()
+	r.Use(RateLimiter(rate.Every(time.Minute), 2))
+	r.GET("/test", func(c *gin.Context) {
+		c.JSON(200, gin.H{"message": "ok"})
+	})
+
+	newReq := func(remoteAddr string) *http.Request {
+		req, _ := http.NewRequest("GET", "/test", nil)
+		req.RemoteAddr = remoteAddr
+		return req
+	}
+
+	// Burst of 2 is allowed for the same client IP
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, newReq("1.2.3.4:1111"))
+	assert.Equal(t, 200, w.Code)
+
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, newReq("1.2.3.4:2222"))
+	assert.Equal(t, 200, w.Code)
+
+	// Third request from the same IP within the window is rejected
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, newReq("1.2.3.4:3333"))
+	assert.Equal(t, http.StatusTooManyRequests, w.Code)
+
+	// A different client IP has its own independent bucket
+	w = httptest.NewRecorder()
+	r.ServeHTTP(w, newReq("5.6.7.8:1111"))
+	assert.Equal(t, 200, w.Code)
 }

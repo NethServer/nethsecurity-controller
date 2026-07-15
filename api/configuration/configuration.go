@@ -12,6 +12,7 @@ package configuration
 import (
 	"encoding/json"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/NethServer/nethsecurity-controller/api/logs"
@@ -79,6 +80,11 @@ type Configuration struct {
 	// Prometheus basi authenticatin to access target list
 	PrometheusAuthUsername string `json:"prometheus_auth_username"`
 	PrometheusAuthPassword string `json:"prometheus_auth_password"`
+
+	// Generous global per-IP rate limit applied to every API route as a coarse
+	// safety net; 0 disables it
+	GlobalRateLimitAverage int `json:"global_rate_limit_average"`
+	GlobalRateLimitBurst   int `json:"global_rate_limit_burst"`
 }
 
 var Config = Configuration{}
@@ -332,5 +338,17 @@ func Init() {
 		Config.PrometheusAuthPassword = os.Getenv("PROMETHEUS_AUTH_PASSWORD")
 	} else {
 		Config.PrometheusAuthPassword = "prometheus"
+	}
+
+	if v, err := strconv.Atoi(os.Getenv("GLOBAL_RATE_LIMIT_AVERAGE")); err == nil {
+		Config.GlobalRateLimitAverage = v
+	} else {
+		Config.GlobalRateLimitAverage = 25
+	}
+
+	if v, err := strconv.Atoi(os.Getenv("GLOBAL_RATE_LIMIT_BURST")); err == nil {
+		Config.GlobalRateLimitBurst = v
+	} else {
+		Config.GlobalRateLimitBurst = 100
 	}
 }

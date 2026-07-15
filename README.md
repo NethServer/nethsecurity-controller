@@ -207,6 +207,8 @@ The following environment variables can be used to configure the containers:
 - `API_SECRET`: JWT secret token
 - `API_DEBUG`: enable debug logging and CORS if set to `1`, default is `0`
 - `API_SESSION_DURATION`: JWT session duration in seconds, default is 7 days
+- `GLOBAL_RATE_LIMIT_AVERAGE`: max sustained requests per second per client IP across all API routes, default is `25`; set to `0` to disable rate limiting
+- `GLOBAL_RATE_LIMIT_BURST`: burst allowance above the average before requests are rejected with HTTP 429, default is `100`
 - `PROXY_PORT`: proxy listening port, default is `8080`
 - `PROXY_BIND_IP`: proxy binding IP, default is `0.0.0.0`
 - `REPORT_DB_URI`: Timescale DB URI, like `postgresql://user:password@host:port/dbname`
