@@ -23,6 +23,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
 
 	"github.com/NethServer/nethsecurity-controller/api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
@@ -78,6 +79,22 @@ func setup() *gin.Engine {
 	// init routers
 	router := gin.Default()
 
+	// the app is only ever reached via the local reverse proxy (module Traefik,
+	// itself behind the NS8 core Traefik), both on loopback: trust only that
+	// hop's X-Forwarded-For so ClientIP() resolves the real client IP for
+	// RateLimiter instead of bucketing all traffic under 127.0.0.1
+	router.SetTrustedProxies([]string{"127.0.0.1", "::1"})
+
+	// Generous global per-IP rate limit as a coarse safety net across all
+	// routes (a looser second layer behind the tighter per-route limits on
+	// the pre-auth routes). Set GLOBAL_RATE_LIMIT_AVERAGE=0 to disable.
+	if configuration.Config.GlobalRateLimitAverage > 0 {
+		router.Use(middleware.RateLimiter(
+			rate.Limit(configuration.Config.GlobalRateLimitAverage),
+			configuration.Config.GlobalRateLimitBurst,
+		))
+	}
+
 	// add default compression
 	router.Use(gzip.Gzip(gzip.DefaultCompression))
 
@@ -93,7 +110,9 @@ func setup() *gin.Engine {
 	// define api group
 	api := router.Group("/")
 
-	// define login and logout endpoint
+	// define login and logout endpoint. BodyLimit caps each request's size;
+	// the global per-IP rate limiter (see above) bounds request frequency
+	// across every route, including these pre-authentication ones.
 	api.POST("/login", middleware.BodyLimit(32<<10), middleware.InstanceJWT().LoginHandler)
 	api.POST("/logout", middleware.BodyLimit(1<<10), middleware.InstanceJWT().LogoutHandler)
 

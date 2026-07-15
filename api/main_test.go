@@ -1220,6 +1220,11 @@ func setupRouter() *gin.Engine {
 	os.Setenv("SECRETS_DIR", "./secrets")
 	os.Setenv("ENCRYPTION_KEY", "12345678901234567890123456789012")
 	os.Setenv("PLATFORM_INFO", `{"vpn_port":"1194","vpn_network":"192.168.100.0/24", "controller_version":"1.0.0", "metrics_retention_days":30, "logs_retention_days":90}`)
+	// disable the global rate limiter in tests: the suite reuses this singleton
+	// router and fires many requests from one client IP, which would otherwise
+	// trip the limiter and cause cross-test flakiness (RateLimiter logic itself
+	// is covered by TestRateLimiter)
+	os.Setenv("GLOBAL_RATE_LIMIT_AVERAGE", "0")
 
 	// create directory configuration directory
 	if _, err := os.Stat(os.Getenv("DATA_DIR")); os.IsNotExist(err) {
