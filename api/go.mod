@@ -8,6 +8,7 @@ require (
 	github.com/Jeffail/gabs/v2 v2.7.0
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/appleboy/gin-jwt/v2 v2.10.3
+	github.com/appleboy/gin-jwt/v3 v3.5.1
 	github.com/fatih/structs v1.1.0
 	github.com/gin-contrib/cors v1.7.7
 	github.com/gin-contrib/gzip v1.2.6
