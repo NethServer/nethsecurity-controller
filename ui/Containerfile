@@ -1,16 +1,14 @@
 FROM docker.io/alpine:3.22.5 AS build
 RUN apk add --no-cache  \
-      git \
-      nodejs \
-      npm
+    git \
+    nodejs \
+    npm
 WORKDIR /build
 # renovate: datasource=github-releases depName=NethServer/nethsecurity-ui
-ARG UI_VERSION=2.23.3
-# FIXME: when git 2.49 is available in alpine, use --revision="$UI_VERSION" instead of --branch="$UI_VERSION"
-RUN git clone --depth=1 --branch="$UI_VERSION" https://github.com/NethServer/nethsecurity-ui . \
+ARG UI_VERSION=855ca8db5deeb13dd3b7d50c8b30f2767420311b
+RUN git clone --depth=1 --revision="$UI_VERSION" https://github.com/NethServer/nethsecurity-ui . \
     && npm ci \
-    && sed -i 's/standalone/controller/g' .env.production \
-    && npm run build
+    && VITE_UI_MODE=controller npm run build
 
 FROM docker.io/alpine:3.22.5 AS dist
 RUN apk add --no-cache lighttpd
