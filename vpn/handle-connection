@@ -19,14 +19,19 @@ else
 fi
 
 # Add route to traefik
-cat <<EOF > /etc/openvpn/proxy/$common_name.yaml
+# Written via .tmp + mv so traefik's fsnotify watcher cannot read a half-written file.
+cat <<EOF > /etc/openvpn/proxy/$common_name.yaml.tmp
 http:
   # Add the router
   routers:
     router$common_name:
       entryPoints:
       - web
+      # must outrank the catch-all PathPrefix(\`/\`) serving the controller UI
+      priority: 100
+      # addslash must come before stripprefix
       middlewares:
+      - m$common_name-addslash
       - m$common_name-stripprefix
       service: service-$common_name
       rule: PathPrefix(\`/$common_name\`)
@@ -40,9 +45,20 @@ http:
         passHostHeader: true
 
   # Add middleware
+  # Names are unit-prefixed: all units share one file-provider namespace, duplicates merge
+  # first-wins.
   middlewares:
+    # Without the trailing slash the unit's relative asset URLs resolve against the origin root
+    # and hit the controller's bundle. Replacement is path-only: traefik ignores
+    # X-Forwarded-Proto here, so an absolute one would emit a http:// Location.
+    m$common_name-addslash:
+      redirectRegex:
+        regex: "^https?://[^/]+/$common_name(\\\\?.*)?\$"
+        replacement: "/$common_name/\${1}"
+        permanent: false
     m$common_name-stripprefix:
       stripPrefix:
         prefixes:
           - "/$common_name"
 EOF
+mv /etc/openvpn/proxy/$common_name.yaml.tmp /etc/openvpn/proxy/$common_name.yaml
