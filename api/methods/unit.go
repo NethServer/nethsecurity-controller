@@ -100,8 +100,22 @@ func GetUnit(c *gin.Context) {
 }
 
 func GetToken(c *gin.Context) {
+	// extract user from JWT claims
+	user := jwt.ExtractClaims(c)["id"].(string)
+
 	// get unit id
 	unitId := c.Param("unit_id")
+
+	// This endpoint hands out a full admin token for the unit, so it must be gated on the caller's
+	// grants and not merely on being authenticated to the controller.
+	if !UserCanAccessUnit(user, unitId) {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "user does not have access to this unit",
+			Data:    nil,
+		}))
+		return
+	}
 
 	token, expire, err := getUnitToken(unitId)
 
