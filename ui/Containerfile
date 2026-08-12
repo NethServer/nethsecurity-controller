@@ -5,7 +5,7 @@ RUN apk add --no-cache  \
     npm
 WORKDIR /build
 # renovate: datasource=github-releases depName=NethServer/nethsecurity-ui
-ARG UI_VERSION=855ca8db5deeb13dd3b7d50c8b30f2767420311b
+ARG UI_VERSION=077c2ec4aa729d3af77e08112e21d84195f12690
 RUN git clone --depth=1 --revision="$UI_VERSION" https://github.com/NethServer/nethsecurity-ui . \
     && npm ci \
     && VITE_UI_MODE=controller npm run build
