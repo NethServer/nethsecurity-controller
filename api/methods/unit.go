@@ -102,8 +102,9 @@ func GetUnit(c *gin.Context) {
 func GetToken(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
+	user := jwt.ExtractClaims(c)["id"].(string)
 
-	token, expire, err := getUnitToken(unitId)
+	token, expire, err := getUnitToken(unitId, user)
 
 	if err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
@@ -142,7 +143,7 @@ func GetUnitInfo(c *gin.Context) {
 	}
 
 	// get unit info and store it
-	info, err := GetRemoteInfo(unitId)
+	info, err := GetRemoteInfo(unitId, user)
 
 	// check errors
 	if err != nil {
@@ -555,7 +556,7 @@ func ListConnectedUnits() ([]string, error) {
 	return storage.ListConnectedUnits()
 }
 
-func getUnitToken(unitId string) (string, string, error) {
+func getUnitToken(unitId string, onBehalfOf string) (string, string, error) {
 
 	// read credentials
 	username, password, err := storage.GetUnitCredentials(unitId)
@@ -568,8 +569,9 @@ func getUnitToken(unitId string) (string, string, error) {
 
 	// create request action
 	credentials := models.LoginRequest{
-		Username: username,
-		Password: password,
+		Username:   username,
+		Password:   password,
+		OnBehalfOf: onBehalfOf,
 	}
 	body, err := json.Marshal(credentials)
 	if err != nil {
@@ -608,9 +610,11 @@ func getUnitToken(unitId string) (string, string, error) {
 	return loginResponse.Token, loginResponse.Expire, nil
 }
 
-func GetRemoteInfo(unitId string) (models.UnitInfo, error) {
+// GetRemoteInfo takes an empty onBehalfOf when called by a routine, so that the
+// unit logs the request as the controller itself
+func GetRemoteInfo(unitId string, onBehalfOf string) (models.UnitInfo, error) {
 	// get the unit token and execute the request
-	token, _, _ := getUnitToken(unitId)
+	token, _, _ := getUnitToken(unitId, onBehalfOf)
 	if token == "" {
 		return models.UnitInfo{}, errors.New("error getting token")
 	}
