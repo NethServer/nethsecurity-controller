@@ -932,6 +932,21 @@ func TestUnitAuthorization(t *testing.T) {
 	router.ServeHTTP(w, req)
 	assert.Equal(t, http.StatusForbidden, w.Code, "limited user should not be able to get unitId_2")
 
+	// Test GET /units/<unit_id_2>/token with limited user - should return 403 Forbidden
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/units/"+unitId_2+"/token", nil)
+	req.Header.Set("Authorization", "Bearer "+limitedToken)
+	router.ServeHTTP(w, req)
+	assert.Equal(t, http.StatusForbidden, w.Code, "limited user should not be able to get a token for unitId_2")
+
+	// Test GET /units/<unit_id_1>/token with limited user - the unit is
+	// unreachable in tests, so the request fails after the access check
+	w = httptest.NewRecorder()
+	req, _ = http.NewRequest("GET", "/units/"+unitId_1+"/token", nil)
+	req.Header.Set("Authorization", "Bearer "+limitedToken)
+	router.ServeHTTP(w, req)
+	assert.NotEqual(t, http.StatusForbidden, w.Code, "limited user should be allowed to get a token for unitId_1")
+
 	// Test GET /units with limited user - should only return unitId_1
 	w = httptest.NewRecorder()
 	req, _ = http.NewRequest("GET", "/units", nil)

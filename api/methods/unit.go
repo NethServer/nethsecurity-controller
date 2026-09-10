@@ -103,6 +103,15 @@ func GetToken(c *gin.Context) {
 	// get unit id
 	unitId := c.Param("unit_id")
 
+	user := jwt.ExtractClaims(c)["id"].(string)
+	if !UserCanAccessUnit(user, unitId) {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "user does not have access to this unit",
+			Data:    nil,
+		}))
+		return
+	}
 	token, expire, err := getUnitToken(unitId)
 
 	if err != nil {
