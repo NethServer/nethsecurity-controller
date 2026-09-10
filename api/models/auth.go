@@ -12,6 +12,8 @@ package models
 type LoginRequest struct {
 	Username string `json:"username" binding:"required"`
 	Password string `json:"password" binding:"required"`
+	// controller user originating the request, ignored by older units
+	OnBehalfOf string `json:"on_behalf_of,omitempty"`
 }
 
 type LoginResponse struct {

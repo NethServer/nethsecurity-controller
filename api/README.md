@@ -380,6 +380,13 @@ Key design choices include:
    }
   ```
 
+  The endpoint returns `403 Forbidden` if the unit is not inside one of the unit groups of the
+  requesting user.
+
+  The username of the requesting user is sent to the unit, which records it in its own logs
+  along with the account used by the controller. Units older than `ns-api-server` 1.6.0 ignore
+  it.
+
 - `POST /units`
 
   REQ
