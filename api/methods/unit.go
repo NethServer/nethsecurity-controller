@@ -293,6 +293,7 @@ func AddUnit(c *gin.Context) {
 		"EASYRSA_BATCH=1",
 		"EASYRSA_REQ_CN="+jsonRequest.UnitId,
 		"EASYRSA_PKI="+configuration.Config.OpenVPNPKIDir,
+		"EASYRSA_CERT_EXPIRE=3650",
 	)
 	if err := cmdGenerateSignReq.Run(); err != nil {
 		c.JSON(http.StatusBadRequest, structs.Map(response.StatusBadRequest{
