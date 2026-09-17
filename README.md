@@ -186,6 +186,18 @@ The controller is composed by 4 services:
 - nethsec-api: REST API python server to manage nethsec-vpn clients, it listens on port 5000
 - nethsec-ui: lighttpd instance serving static UI files, it listens on port 3000
 
+### Certificate renewal
+
+The OpenVPN PKI lasts 10 years. At every restart the VPN container renews
+whatever has less than 6 months left: the CA, the server certificate, the unit
+certificates and the revocation list.
+
+Renewal keeps the existing key. Units get the new certificate the next time
+they register.
+
+Renewing the CA re-issues every certificate, so connected units drop and
+reconnect.
+
 ## Environment configuration
 
 The following environment variables can be used to configure the containers:

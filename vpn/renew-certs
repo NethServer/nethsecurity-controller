@@ -1,0 +1,68 @@
+#!/bin/sh
+
+#
+# Renew the OpenVPN PKI before it expires. Runs at container startup.
+# Certificates last 10 years and are renewed with 6 months left.
+#
+
+set -e
+
+easyrsa=${EASYRSA_BIN:-/usr/share/easy-rsa/easyrsa}
+pki=${EASYRSA_PKI:-/etc/openvpn/pki}
+cert_expire=3650 # 10 years
+renew_window=15552000 # 6 months
+
+export EASYRSA_BATCH=1
+export EASYRSA_PKI="$pki"
+
+[ -f "$pki/ca.crt" ] || exit 0
+
+is_fresh() {
+    openssl x509 -in "$1" -checkend "$renew_window" -noout >/dev/null 2>&1
+}
+
+# openssl has no -checkend for CRLs. Any read or parse failure means "not
+# fresh", so a broken CRL is rebuilt rather than left to lapse.
+crl_is_fresh() {
+    [ -f "$pki/crl.pem" ] || return 1
+    next=$(openssl crl -in "$pki/crl.pem" -noout -nextupdate 2>/dev/null | cut -d= -f2)
+    [ -n "$next" ] || return 1
+    next_epoch=$(date -u -D '%b %d %H:%M:%S %Y' -d "${next% GMT}" +%s 2>/dev/null) || return 1
+    [ "$next_epoch" -gt $(( $(date -u +%s) + renew_window )) ]
+}
+
+# Drop the superseded copy instead of revoking it: easy-rsa will not renew
+# while it exists, and revoking would disconnect units that have not
+# re-registered yet.
+renew_cert() {
+    rm -f "$pki/renewed/issued/$1.crt"
+    EASYRSA_CERT_EXPIRE="$cert_expire" "$easyrsa" renew "$1" nopass
+}
+
+# A renewed CA keeps its key but gets a new serial, which every issued
+# certificate pins. Renewing it means re-issuing all of them.
+if is_fresh "$pki/ca.crt"; then
+    renew_ca=0
+else
+    renew_ca=1
+    echo "[renew-certs] CA is about to expire, renewing it and the whole PKI"
+    EASYRSA_CA_EXPIRE="$cert_expire" "$easyrsa" renew-ca nopass
+fi
+
+for crt in "$pki"/issued/*.crt; do
+    [ -e "$crt" ] || continue
+    cn=$(basename "$crt" .crt)
+
+    if [ "$renew_ca" -eq 0 ] && is_fresh "$crt"; then
+        continue
+    fi
+
+    echo "[renew-certs] renewing certificate for $cn"
+    renew_cert "$cn"
+done
+
+# The CRL expires too, and OpenVPN then rejects all new connections.
+if [ "$renew_ca" -eq 1 ] || ! crl_is_fresh; then
+    echo "[renew-certs] refreshing the certificate revocation list"
+    EASYRSA_CRL_DAYS="$cert_expire" "$easyrsa" gen-crl
+fi

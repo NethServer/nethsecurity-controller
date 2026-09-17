@@ -15,8 +15,8 @@ if [ ! -f /etc/openvpn/pki/ca.crt ]; then
     EASYRSA_BATCH=1 /usr/share/easy-rsa/easyrsa init-pki
     EASYRSA_BATCH=1 EASYRSA_REQ_CN=$cn /usr/share/easy-rsa/easyrsa build-ca nopass
     openssl dhparam -dsaparam -out pki/dh.pem 2048
-    EASYRSA_BATCH=1 EASYRSA_REQ_CN=$cn /usr/share/easy-rsa/easyrsa build-server-full server nopass
-    EASYRSA_BATCH=1 EASYRSA_CRL_DAYS=3560 EASYRSA_REQ_CN=$cn /usr/share/easy-rsa/easyrsa gen-crl
+    EASYRSA_BATCH=1 EASYRSA_CERT_EXPIRE=3650 EASYRSA_REQ_CN=$cn /usr/share/easy-rsa/easyrsa build-server-full server nopass
+    EASYRSA_BATCH=1 EASYRSA_CRL_DAYS=3650 EASYRSA_REQ_CN=$cn /usr/share/easy-rsa/easyrsa gen-crl
     cd -
 fi
 
@@ -80,5 +80,8 @@ persist-key
 persist-tun
 verb 3
 EOF
+
+# renew expiring certificates before starting the server
+/usr/local/bin/renew-certs || echo "[entrypoint] certificate renewal failed"
 
 exec "$@"

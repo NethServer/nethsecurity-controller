@@ -7,6 +7,7 @@ COPY ip /sbin/ip
 COPY controller-auth /usr/local/bin/controller-auth
 COPY handle-connection /usr/local/bin/handle-connection
 COPY handle-disconnection /usr/local/bin/handle-disconnection
+COPY renew-certs /usr/local/bin/renew-certs
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["/usr/sbin/openvpn", "/etc/openvpn/server.conf"]
