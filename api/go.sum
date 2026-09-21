@@ -4,6 +4,7 @@ github.com/Showmax/go-fqdn v1.0.0 h1:0rG5IbmVliNT5O19Mfuvna9LL7zlHyRfsSvBPZmF9tM
 github.com/Showmax/go-fqdn v1.0.0/go.mod h1:SfrFBzmDCtCGrnHhoDjuvFnKsWjEQX/Q9ARZvOrJAko=
 github.com/appleboy/gin-jwt/v2 v2.10.3 h1:KNcPC+XPRNpuoBh+j+rgs5bQxN+SwG/0tHbIqpRoBGc=
 github.com/appleboy/gin-jwt/v2 v2.10.3/go.mod h1:LDUaQ8mF2W6LyXIbd5wqlV2SFebuyYs4RDwqMNgpsp8=
+github.com/appleboy/gin-jwt/v3 v3.5.3/go.mod h1:npllyKRA8QYK61wfv8wEyR1UnJXt/8inf9+JdJZ/xZQ=
 github.com/appleboy/gofight/v2 v2.1.2 h1:VOy3jow4vIK8BRQJoC/I9muxyYlJ2yb9ht2hZoS3rf4=
 github.com/appleboy/gofight/v2 v2.1.2/go.mod h1:frW+U1QZEdDgixycTj4CygQ48yLTUhplt43+Wczp3rw=
 github.com/boombuler/barcode v1.0.1-0.20190219062509-6c824513bacc h1:biVzkmvwrH8WK8raXaxBx6fRVTlJILwEwQGL1I/ByEI=
@@ -173,6 +174,8 @@ golang.org/x/crypto v0.53.0 h1:QZ4Muo8THX6CizN2vPPd5fBGHyogrdK9fG4wLPFUsto=
 golang.org/x/crypto v0.53.0/go.mod h1:DNLU434OwVakk9PzuwV8w62mAJpRJL3vsgcfp4Qnsio=
 golang.org/x/crypto v0.55.0 h1:+KWHjbgOaAQ66dh/YlkZKHlz9ZUlq61AFirAR9ntP8M=
 golang.org/x/crypto v0.55.0/go.mod h1:uq0V9dE/fzQuJtbnL+2EhWOE63vo164FY8xqEnV9xis=
+golang.org/x/crypto v0.56.0 h1:GUh5Ii4J5jtcseSMiRqr1jXCNHoxjeV9Fmekc2oLy6Y=
+golang.org/x/crypto v0.56.0/go.mod h1:OMW5y6CY9l38uPLmxU6l6pwcXp1obtLo3e6gT7gQR2I=
 golang.org/x/net v0.55.0 h1:bcvxaJn3e1U6InsFWt1JUq1aSjnRxLzT2rtD2KfkDF8=
 golang.org/x/net v0.55.0/go.mod h1:L5U2KuzuOe1lY7Z+aWVIKK6qEeJXnXV9yzGA+WCHJww=
 golang.org/x/net v0.57.0 h1:K5+3DljvIuDG9/Jv9rvyMywYNFCQ9RSUY6OOTTkT+tE=
