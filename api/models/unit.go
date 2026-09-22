@@ -45,11 +45,9 @@ type UnitInfo struct {
 	SystemID         string `json:"system_id"`
 	SSHPort          int    `json:"ssh_port"`
 	FQDN             string `json:"fqdn"`
-	APIVersion       string `json:"api_version"`
-	// UIVersion is the ns-ui package version. Empty on units whose ns-api predates it, which the
-	// controller UI treats as "cannot serve its own UI under a path prefix".
-	UIVersion   string `json:"ui_version"`
-	Description string `json:"description"`
+	APIVersion       string `json:"api_version"` // ns-api package
+	Description      string `json:"description"`
+	UIVersion        string `json:"ui_version"` // ns-ui package
 }
 
 type CheckSystemUpdate struct {
