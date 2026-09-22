@@ -13,8 +13,8 @@ api_port=${API_PORT:-5000}
 allowed_ips=${ALLOWED_IPS:-""}
 public_endpoints=${PUBLIC_ENDPOINTS:-""}
 
-# All generated files merge into one traefik config, so every router/service/middleware name must
-# be unique across them. Duplicates are dropped first-wins, in alphabetical file order.
+# Router/service/middleware names must be unique across all generated files: they merge into one
+# traefik config, and duplicates silently drop (first-wins, alphabetical file order).
 output_public_routers () {
   if [ -n "$public_endpoints" ]; then
     OLD_IFS="$IFS"
@@ -119,10 +119,8 @@ $(output_middlewares_list stripprefix-api)
 $(output_whitelist_middleware)
 EOF
 
-# Both files used to define a middleware named "stripprefix" with different prefixes; api.yaml won
-# the merge, so /ui was forwarded unstripped. Hence the -api/-ui suffixes.
-# ipallowlist stays duplicated in both files: identical definitions are harmless, whereas a
-# cross-file reference that failed to resolve would fail open.
+# separating single stripprefix into -api and -ui, shared name across files collides on merge
+# ipallowlist stays duplicated in both files, gets merged anyway
 cat << EOF > "${CONFIG_DIR}ui.yaml"
 http:
   routers:
@@ -137,7 +135,7 @@ $(output_middlewares_list stripprefix-ui)
     routerui-root:
       entryPoints:
       - web
-      # fallback for anything not claimed by the API, /ui, or a per-unit route
+      # fallback to keep backward compatibility
       priority: 1
 $(output_ui_middlewares_list)
       service: service-ui

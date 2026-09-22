@@ -19,7 +19,7 @@ else
 fi
 
 # Add route to traefik
-# Written via .tmp + mv so traefik's fsnotify watcher cannot read a half-written file.
+# using tmp to make the load atomic, moving the file at the end of the script
 cat <<EOF > /etc/openvpn/proxy/$common_name.yaml.tmp
 http:
   # Add the router
@@ -27,7 +27,7 @@ http:
     router$common_name:
       entryPoints:
       - web
-      # must outrank the catch-all PathPrefix(\`/\`) serving the controller UI
+      # must outrank the catch-all serving the controller UI
       priority: 100
       # addslash must come before stripprefix
       middlewares:
@@ -45,12 +45,9 @@ http:
         passHostHeader: true
 
   # Add middleware
-  # Names are unit-prefixed: all units share one file-provider namespace, duplicates merge
-  # first-wins.
   middlewares:
-    # Without the trailing slash the unit's relative asset URLs resolve against the origin root
-    # and hit the controller's bundle. Replacement is path-only: traefik ignores
-    # X-Forwarded-Proto here, so an absolute one would emit a http:// Location.
+    # without the trailing slash the unit's relative asset URLs resolve against the origin root
+    # and hit the controller's bundle
     m$common_name-addslash:
       redirectRegex:
         regex: "^https?://[^/]+/$common_name(\\\\?.*)?\$"
