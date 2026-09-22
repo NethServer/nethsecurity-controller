@@ -45,8 +45,9 @@ type UnitInfo struct {
 	SystemID         string `json:"system_id"`
 	SSHPort          int    `json:"ssh_port"`
 	FQDN             string `json:"fqdn"`
-	APIVersion       string `json:"api_version"`
+	APIVersion       string `json:"api_version"` // ns-api package
 	Description      string `json:"description"`
+	UIVersion        string `json:"ui_version"` // ns-ui package
 }
 
 type CheckSystemUpdate struct {

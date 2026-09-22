@@ -20,10 +20,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/NethServer/nethsecurity-controller/api/response"
 	"github.com/NethServer/nethsecurity-controller/api/configuration"
 	"github.com/NethServer/nethsecurity-controller/api/logs"
 	"github.com/NethServer/nethsecurity-controller/api/models"
+	"github.com/NethServer/nethsecurity-controller/api/response"
 
 	"github.com/NethServer/nethsecurity-controller/api/socket"
 	"github.com/NethServer/nethsecurity-controller/api/storage"
@@ -100,8 +100,21 @@ func GetUnit(c *gin.Context) {
 }
 
 func GetToken(c *gin.Context) {
+	// extract user
+	user := jwt.ExtractClaims(c)["id"].(string)
+
 	// get unit id
 	unitId := c.Param("unit_id")
+
+	// Gating access only if the user can actually access the unit
+	if !UserCanAccessUnit(user, unitId) {
+		c.JSON(http.StatusForbidden, structs.Map(response.StatusForbidden{
+			Code:    403,
+			Message: "user does not have access to this unit",
+			Data:    nil,
+		}))
+		return
+	}
 
 	token, expire, err := getUnitToken(unitId)
 
