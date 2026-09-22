@@ -185,12 +185,7 @@ traefik proxies the unit's own nginx and the unit serves its own UI at its own v
 render the copy of the standalone UI bundled into the controller.
 
 This runs unit-supplied JavaScript on the controller's origin — a path prefix is not an origin
-boundary, so everything under `/<unit-uuid>/` shares one `localStorage` with the controller UI. And
-`/www-ns/branding.js` is a conffile, editable on the unit and loaded before the app.
-
-**Accepted trade-off: root on any managed unit is equivalent to controller admin.** If that ever
-stops being acceptable, give each unit its own origin (per-unit subdomain plus wildcard
-certificate) rather than filtering the shared one.
+boundary, so everything under `/<unit-uuid>/` shares one `localStorage` with the controller UI.
 
 ### Services
 
