@@ -1,6 +1,6 @@
 module github.com/NethServer/nethsecurity-controller/api
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.26.8
 
@@ -21,7 +21,7 @@ require (
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.11.1
 	golang.org/x/crypto v0.55.0
-	golang.org/x/time v0.15.0
+	golang.org/x/time v0.16.0
 )
 
 require (
