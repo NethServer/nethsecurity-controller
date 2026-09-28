@@ -1,6 +1,6 @@
 module github.com/NethServer/nethsecurity-controller/api
 
-go 1.25.0
+go 1.26.0
 
 toolchain go1.26.8
 
@@ -9,7 +9,7 @@ require (
 	github.com/Showmax/go-fqdn v1.0.0
 	github.com/appleboy/gin-jwt/v2 v2.10.3
 	github.com/fatih/structs v1.1.0
-	github.com/gin-contrib/cors v1.7.8
+	github.com/gin-contrib/cors v1.7.9
 	github.com/gin-contrib/gzip v1.2.7
 	github.com/gin-gonic/gin v1.12.0
 	github.com/golang-jwt/jwt/v5 v5.3.1
@@ -20,7 +20,7 @@ require (
 	github.com/oschwald/geoip2-golang v1.13.0
 	github.com/pquerna/otp v1.5.0
 	github.com/stretchr/testify v1.11.1
-	golang.org/x/crypto v0.55.0
+	golang.org/x/crypto v0.56.0
 	golang.org/x/time v0.15.0
 )
 
