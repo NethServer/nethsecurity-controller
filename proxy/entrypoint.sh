@@ -13,6 +13,8 @@ api_port=${API_PORT:-5000}
 allowed_ips=${ALLOWED_IPS:-""}
 public_endpoints=${PUBLIC_ENDPOINTS:-""}
 
+# Router/service/middleware names must be unique across all generated files: they merge into one
+# traefik config, and duplicates silently drop (first-wins, alphabetical file order).
 output_public_routers () {
   if [ -n "$public_endpoints" ]; then
     OLD_IFS="$IFS"
@@ -24,8 +26,10 @@ output_public_routers () {
       printf "    routerapi%s:\n" "$name"
       printf "      entryPoints:\n"
       printf "      - web\n"
+      # higher than routerapi so public endpoints bypass the IP allow list
+      printf "      priority: 60\n"
       printf "      middlewares:\n"
-      printf "      - stripprefix\n"
+      printf "      - stripprefix-api\n"
       printf "      service: service-api\n"
       printf "      rule: PathPrefix(\`%s\`)\n" "$endpoint"
     done
@@ -33,7 +37,7 @@ output_public_routers () {
 }
 
 output_middlewares_list () {
-  printf "      - stripprefix\n"
+  printf "      - %s\n" "$1"
   if [ -n "$allowed_ips" ]; then
     printf "      - ipallowlist\n"
   fi
@@ -85,9 +89,6 @@ providers:
 serversTransport:
   insecureSkipVerify: true
 
-core:
-  defaultRuleSyntax: v2
-
 EOF
 
 cat << EOF > "${CONFIG_DIR}api.yaml"
@@ -97,8 +98,9 @@ $(output_public_routers)
     routerapi:
       entryPoints:
       - web
+      priority: 50
       middlewares:
-$(output_middlewares_list)
+$(output_middlewares_list stripprefix-api)
       service: service-api
       rule: PathPrefix(\`/api\`)
 
@@ -110,28 +112,31 @@ $(output_middlewares_list)
         passHostHeader: true
 
   middlewares:
-    stripprefix:
+    stripprefix-api:
       stripPrefix:
         prefixes:
           - "/api"
 $(output_whitelist_middleware)
 EOF
 
+# separating single stripprefix into -api and -ui, shared name across files collides on merge
+# ipallowlist stays duplicated in both files, gets merged anyway
 cat << EOF > "${CONFIG_DIR}ui.yaml"
 http:
   routers:
-$(output_public_routers)
-
     routerui:
       entryPoints:
       - web
+      priority: 50
       middlewares:
-$(output_middlewares_list)
+$(output_middlewares_list stripprefix-ui)
       service: service-ui
       rule: PathPrefix(\`/ui\`)
     routerui-root:
       entryPoints:
       - web
+      # fallback to keep backward compatibility
+      priority: 1
 $(output_ui_middlewares_list)
       service: service-ui
       rule: PathPrefix(\`/\`)
@@ -144,7 +149,7 @@ $(output_ui_middlewares_list)
         passHostHeader: true
 
   middlewares:
-    stripprefix:
+    stripprefix-ui:
       stripPrefix:
         prefixes:
           - "/ui"

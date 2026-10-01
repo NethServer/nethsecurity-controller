@@ -178,6 +178,15 @@ General workflow:
   - THe UI Uses the token to invoke Luci APIs: `curl http://localhost:8080/clientX/cgi-bin/luci/rpc/...`
 
 
+### Serving unit UIs
+
+A unit reporting a supported `ui_version` is opened at `https://<controller>/<unit-uuid>/`, where
+traefik proxies the unit's own nginx and the unit serves its own UI at its own version. Older units
+render the copy of the standalone UI bundled into the controller.
+
+This runs unit-supplied JavaScript on the controller's origin — a path prefix is not an origin
+boundary, so everything under `/<unit-uuid>/` shares one `localStorage` with the controller UI.
+
 ### Services
 
 The controller is composed by 4 services:
