@@ -9,7 +9,7 @@ RUN git init . \
     && npm ci \
     && VITE_UI_MODE=controller npm run build
 
-FROM docker.io/alpine:3.22.6 AS dist
+FROM docker.io/alpine:3.24.2 AS dist
 RUN apk add --no-cache lighttpd
 COPY entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["/entrypoint.sh"]
