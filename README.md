@@ -1,5 +1,8 @@
 # nethsecurity-controller
 
+> [!WARNING]
+> This repository is archived. The controller code has been merged into [ns8-nethsecurity-controller](https://github.com/NethServer/ns8-nethsecurity-controller), all development continues there.
+
 The controller (server) is a set of containers that allow the admin to remotely manage multiple [NethSecurity](https://github.com/NethServer/nethsecurity) installations (firewalls).
 
 Firewalls can register to the server using [ns-plug](https://github.com/NethServer/nethsecurity/tree/master/packages/ns-plug) client. Upon registration the server will:
